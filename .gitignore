@@ -1,0 +1,4 @@
+# Temporary test files & outputs
+dc_sample.html
+*.zip
+.DS_Store

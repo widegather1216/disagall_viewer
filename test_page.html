@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>[디지털 사진 갤러리] 출사 사진 모음 - 디시인사이드 테스트</title>
+  <style>
+    body {
+      background: #f4f5f7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 40px 0;
+      color: #333;
+    }
+    .container {
+      width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 30px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    h1 {
+      font-size: 20px;
+      border-bottom: 2px solid #3b82f6;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+    .write_div {
+      line-height: 1.8;
+      font-size: 15px;
+    }
+    .write_div img {
+      max-width: 100%;
+      height: auto;
+      margin: 20px 0;
+      border-radius: 4px;
+      cursor: pointer;
+      display: block;
+    }
+    .info-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: #1e3a8a;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>디지털 사진 갤러리 - 풍경 & 인물 출사 샘플 (확장 프로그램 테스트용)</h1>
+    
+    <div class="info-box">
+      <b>📌 크롬 확장 프로그램 테스트 방법:</b><br>
+      1. 크롬 주소창에 <code>chrome://extensions</code> 입력 후 개발자 모드 켜기<br>
+      2. <b>"압축해제된 확장 프로그램을 로드합니다"</b> 클릭 후 <code>/Users/kimbeomjun/disagall_viewer</code> 폴더 선택<br>
+      3. 아래 사진 중 하나를 <b>우클릭</b> ➔ <b>"📷 디시 사진 뷰어로 화면 맞춤 보기"</b> 선택!
+    </div>
+
+    <div class="write_div">
+      <p>오늘 촬영한 가로 방향 풍경 사진입니다. (가로 뷰포트 피팅 테스트)</p>
+      <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1600&q=80" alt="가로 풍경 사진 샘플 1">
+      
+      <p>세로 방향 비율 3:4 고화질 프레임입니다. (우클릭 후 뷰어로 보기 테스트)</p>
+      <img src="https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=1200&q=80" alt="세로 숲 사진 샘플 2">
+
+      <p>초고화질 세로 방향 사진입니다.</p>
+      <img src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1200&q=80" alt="세로 산 풍경 사진 샘플 3">
+    </div>
+
+    <!-- 본문 외 요소 테스트 (댓글 디시콘 및 광고 배너) -->
+    <div class="comment_box" style="margin-top: 40px; padding-top: 20px; border-top: 1px dashed #ccc;">
+      <h3>💬 댓글 목록 (뷰어 수집 대상에서 제외됨)</h3>
+      <div class="cmt_list" style="margin-top: 10px;">
+        <p>ㅇㅇ: 잘 봤습니다! <img src="https://nimg.dcinside.com/dc/dccon/icon_1.png" style="width:50px; height:50px; vertical-align:middle;" alt="디시콘 예시"></p>
+        <p>사진가: 대단하네요~ <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80" style="width:40px; height:40px; border-radius:50%;" alt="댓글 유저 아바타"></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

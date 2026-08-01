@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "디시 사진 뷰어 - 화면 맞춤 원본 감상기",
+  "version": "1.0.0",
+  "description": "디시인사이드 게시글 사진을 우클릭 메뉴 한 번으로 원본 화질 그대로 화면에 맞춰 잘림 없이 몰입해서 감상할 수 있습니다.",
+  "permissions": [
+    "contextMenus",
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://gall.dcinside.com/*",
+    "https://*.dcinside.com/*"
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gall.dcinside.com/*",
+        "https://*.dcinside.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "디시 사진 뷰어 설정",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  }
+}

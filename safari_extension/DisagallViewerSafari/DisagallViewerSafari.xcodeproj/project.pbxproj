@@ -1,0 +1,629 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		196DD802301D0CAB00E7FCFA /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196DD801301D0CAB00E7FCFA /* AppDelegate.swift */; };
+		196DD806301D0CAB00E7FCFA /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = 196DD804301D0CAB00E7FCFA /* Main.html */; };
+		196DD808301D0CAB00E7FCFA /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 196DD807301D0CAB00E7FCFA /* Icon.png */; };
+		196DD80A301D0CAB00E7FCFA /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = 196DD809301D0CAB00E7FCFA /* Style.css */; };
+		196DD80C301D0CAB00E7FCFA /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = 196DD80B301D0CAB00E7FCFA /* Script.js */; };
+		196DD80E301D0CAB00E7FCFA /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196DD80D301D0CAB00E7FCFA /* ViewController.swift */; };
+		196DD811301D0CAB00E7FCFA /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 196DD80F301D0CAB00E7FCFA /* Main.storyboard */; };
+		196DD813301D0CAC00E7FCFA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 196DD812301D0CAC00E7FCFA /* Assets.xcassets */; };
+		196DD81A301D0CAC00E7FCFA /* DisagallViewerSafari Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 196DD819301D0CAC00E7FCFA /* DisagallViewerSafari Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		196DD81F301D0CAC00E7FCFA /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 196DD81E301D0CAC00E7FCFA /* SafariWebExtensionHandler.swift */; };
+		196DD834301D0CAC00E7FCFA /* icon16.png in Resources */ = {isa = PBXBuildFile; fileRef = 196DD82B301D0CAC00E7FCFA /* icon16.png */; };
+		196DD835301D0CAC00E7FCFA /* popup.js in Resources */ = {isa = PBXBuildFile; fileRef = 196DD82C301D0CAC00E7FCFA /* popup.js */; };
+		196DD836301D0CAC00E7FCFA /* content.css in Resources */ = {isa = PBXBuildFile; fileRef = 196DD82D301D0CAC00E7FCFA /* content.css */; };
+		196DD837301D0CAC00E7FCFA /* background.js in Resources */ = {isa = PBXBuildFile; fileRef = 196DD82E301D0CAC00E7FCFA /* background.js */; };
+		196DD838301D0CAC00E7FCFA /* popup.html in Resources */ = {isa = PBXBuildFile; fileRef = 196DD82F301D0CAC00E7FCFA /* popup.html */; };
+		196DD839301D0CAC00E7FCFA /* icon48.png in Resources */ = {isa = PBXBuildFile; fileRef = 196DD830301D0CAC00E7FCFA /* icon48.png */; };
+		196DD83A301D0CAC00E7FCFA /* icon128.png in Resources */ = {isa = PBXBuildFile; fileRef = 196DD831301D0CAC00E7FCFA /* icon128.png */; };
+		196DD83B301D0CAC00E7FCFA /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 196DD832301D0CAC00E7FCFA /* manifest.json */; };
+		196DD83C301D0CAC00E7FCFA /* content.js in Resources */ = {isa = PBXBuildFile; fileRef = 196DD833301D0CAC00E7FCFA /* content.js */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		196DD81B301D0CAC00E7FCFA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 196DD7F6301D0CAB00E7FCFA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 196DD818301D0CAC00E7FCFA;
+			remoteInfo = "DisagallViewerSafari Extension";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		196DD826301D0CAC00E7FCFA /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				196DD81A301D0CAC00E7FCFA /* DisagallViewerSafari Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		196DD7FE301D0CAB00E7FCFA /* DisagallViewerSafari.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DisagallViewerSafari.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		196DD801301D0CAB00E7FCFA /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		196DD805301D0CAB00E7FCFA /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Base; path = Base.lproj/Main.html; sourceTree = "<group>"; };
+		196DD807301D0CAB00E7FCFA /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
+		196DD809301D0CAB00E7FCFA /* Style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = Style.css; sourceTree = "<group>"; };
+		196DD80B301D0CAB00E7FCFA /* Script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Script.js; sourceTree = "<group>"; };
+		196DD80D301D0CAB00E7FCFA /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		196DD810301D0CAB00E7FCFA /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		196DD812301D0CAC00E7FCFA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		196DD814301D0CAC00E7FCFA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		196DD819301D0CAC00E7FCFA /* DisagallViewerSafari Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "DisagallViewerSafari Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		196DD81E301D0CAC00E7FCFA /* SafariWebExtensionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariWebExtensionHandler.swift; sourceTree = "<group>"; };
+		196DD820301D0CAC00E7FCFA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		196DD82B301D0CAC00E7FCFA /* icon16.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = icon16.png; path = Resources/icon16.png; sourceTree = "<group>"; };
+		196DD82C301D0CAC00E7FCFA /* popup.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = popup.js; path = Resources/popup.js; sourceTree = "<group>"; };
+		196DD82D301D0CAC00E7FCFA /* content.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; name = content.css; path = Resources/content.css; sourceTree = "<group>"; };
+		196DD82E301D0CAC00E7FCFA /* background.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = background.js; path = Resources/background.js; sourceTree = "<group>"; };
+		196DD82F301D0CAC00E7FCFA /* popup.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = popup.html; path = Resources/popup.html; sourceTree = "<group>"; };
+		196DD830301D0CAC00E7FCFA /* icon48.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = icon48.png; path = Resources/icon48.png; sourceTree = "<group>"; };
+		196DD831301D0CAC00E7FCFA /* icon128.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = icon128.png; path = Resources/icon128.png; sourceTree = "<group>"; };
+		196DD832301D0CAC00E7FCFA /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = manifest.json; path = Resources/manifest.json; sourceTree = "<group>"; };
+		196DD833301D0CAC00E7FCFA /* content.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = content.js; path = Resources/content.js; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		196DD7FB301D0CAB00E7FCFA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		196DD816301D0CAC00E7FCFA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		196DD7F5301D0CAB00E7FCFA = {
+			isa = PBXGroup;
+			children = (
+				196DD800301D0CAB00E7FCFA /* DisagallViewerSafari */,
+				196DD81D301D0CAC00E7FCFA /* DisagallViewerSafari Extension */,
+				196DD7FF301D0CAB00E7FCFA /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		196DD7FF301D0CAB00E7FCFA /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				196DD7FE301D0CAB00E7FCFA /* DisagallViewerSafari.app */,
+				196DD819301D0CAC00E7FCFA /* DisagallViewerSafari Extension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		196DD800301D0CAB00E7FCFA /* DisagallViewerSafari */ = {
+			isa = PBXGroup;
+			children = (
+				196DD801301D0CAB00E7FCFA /* AppDelegate.swift */,
+				196DD80D301D0CAB00E7FCFA /* ViewController.swift */,
+				196DD80F301D0CAB00E7FCFA /* Main.storyboard */,
+				196DD812301D0CAC00E7FCFA /* Assets.xcassets */,
+				196DD814301D0CAC00E7FCFA /* Info.plist */,
+				196DD803301D0CAB00E7FCFA /* Resources */,
+			);
+			path = DisagallViewerSafari;
+			sourceTree = "<group>";
+		};
+		196DD803301D0CAB00E7FCFA /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				196DD804301D0CAB00E7FCFA /* Main.html */,
+				196DD807301D0CAB00E7FCFA /* Icon.png */,
+				196DD809301D0CAB00E7FCFA /* Style.css */,
+				196DD80B301D0CAB00E7FCFA /* Script.js */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		196DD81D301D0CAC00E7FCFA /* DisagallViewerSafari Extension */ = {
+			isa = PBXGroup;
+			children = (
+				196DD82A301D0CAC00E7FCFA /* Resources */,
+				196DD81E301D0CAC00E7FCFA /* SafariWebExtensionHandler.swift */,
+				196DD820301D0CAC00E7FCFA /* Info.plist */,
+			);
+			path = "DisagallViewerSafari Extension";
+			sourceTree = "<group>";
+		};
+		196DD82A301D0CAC00E7FCFA /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				196DD82B301D0CAC00E7FCFA /* icon16.png */,
+				196DD82C301D0CAC00E7FCFA /* popup.js */,
+				196DD82D301D0CAC00E7FCFA /* content.css */,
+				196DD82E301D0CAC00E7FCFA /* background.js */,
+				196DD82F301D0CAC00E7FCFA /* popup.html */,
+				196DD830301D0CAC00E7FCFA /* icon48.png */,
+				196DD831301D0CAC00E7FCFA /* icon128.png */,
+				196DD832301D0CAC00E7FCFA /* manifest.json */,
+				196DD833301D0CAC00E7FCFA /* content.js */,
+			);
+			name = Resources;
+			path = "DisagallViewerSafari Extension";
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		196DD7FD301D0CAB00E7FCFA /* DisagallViewerSafari */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 196DD827301D0CAC00E7FCFA /* Build configuration list for PBXNativeTarget "DisagallViewerSafari" */;
+			buildPhases = (
+				196DD7FA301D0CAB00E7FCFA /* Sources */,
+				196DD7FB301D0CAB00E7FCFA /* Frameworks */,
+				196DD7FC301D0CAB00E7FCFA /* Resources */,
+				196DD826301D0CAC00E7FCFA /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				196DD81C301D0CAC00E7FCFA /* PBXTargetDependency */,
+			);
+			name = DisagallViewerSafari;
+			packageProductDependencies = (
+			);
+			productName = DisagallViewerSafari;
+			productReference = 196DD7FE301D0CAB00E7FCFA /* DisagallViewerSafari.app */;
+			productType = "com.apple.product-type.application";
+		};
+		196DD818301D0CAC00E7FCFA /* DisagallViewerSafari Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 196DD823301D0CAC00E7FCFA /* Build configuration list for PBXNativeTarget "DisagallViewerSafari Extension" */;
+			buildPhases = (
+				196DD815301D0CAC00E7FCFA /* Sources */,
+				196DD816301D0CAC00E7FCFA /* Frameworks */,
+				196DD817301D0CAC00E7FCFA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "DisagallViewerSafari Extension";
+			packageProductDependencies = (
+			);
+			productName = "DisagallViewerSafari Extension";
+			productReference = 196DD819301D0CAC00E7FCFA /* DisagallViewerSafari Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		196DD7F6301D0CAB00E7FCFA /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2640;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					196DD7FD301D0CAB00E7FCFA = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
+					196DD818301D0CAC00E7FCFA = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
+				};
+			};
+			buildConfigurationList = 196DD7F9301D0CAB00E7FCFA /* Build configuration list for PBXProject "DisagallViewerSafari" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 196DD7F5301D0CAB00E7FCFA;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 196DD7FF301D0CAB00E7FCFA /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				196DD7FD301D0CAB00E7FCFA /* DisagallViewerSafari */,
+				196DD818301D0CAC00E7FCFA /* DisagallViewerSafari Extension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		196DD7FC301D0CAB00E7FCFA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				196DD808301D0CAB00E7FCFA /* Icon.png in Resources */,
+				196DD811301D0CAB00E7FCFA /* Main.storyboard in Resources */,
+				196DD80C301D0CAB00E7FCFA /* Script.js in Resources */,
+				196DD806301D0CAB00E7FCFA /* Main.html in Resources */,
+				196DD813301D0CAC00E7FCFA /* Assets.xcassets in Resources */,
+				196DD80A301D0CAB00E7FCFA /* Style.css in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		196DD817301D0CAC00E7FCFA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				196DD837301D0CAC00E7FCFA /* background.js in Resources */,
+				196DD838301D0CAC00E7FCFA /* popup.html in Resources */,
+				196DD839301D0CAC00E7FCFA /* icon48.png in Resources */,
+				196DD836301D0CAC00E7FCFA /* content.css in Resources */,
+				196DD83B301D0CAC00E7FCFA /* manifest.json in Resources */,
+				196DD834301D0CAC00E7FCFA /* icon16.png in Resources */,
+				196DD83C301D0CAC00E7FCFA /* content.js in Resources */,
+				196DD835301D0CAC00E7FCFA /* popup.js in Resources */,
+				196DD83A301D0CAC00E7FCFA /* icon128.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		196DD7FA301D0CAB00E7FCFA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				196DD80E301D0CAB00E7FCFA /* ViewController.swift in Sources */,
+				196DD802301D0CAB00E7FCFA /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		196DD815301D0CAC00E7FCFA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				196DD81F301D0CAC00E7FCFA /* SafariWebExtensionHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		196DD81C301D0CAC00E7FCFA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 196DD818301D0CAC00E7FCFA /* DisagallViewerSafari Extension */;
+			targetProxy = 196DD81B301D0CAC00E7FCFA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		196DD804301D0CAB00E7FCFA /* Main.html */ = {
+			isa = PBXVariantGroup;
+			children = (
+				196DD805301D0CAB00E7FCFA /* Base */,
+			);
+			name = Main.html;
+			sourceTree = "<group>";
+		};
+		196DD80F301D0CAB00E7FCFA /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				196DD810301D0CAB00E7FCFA /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		196DD821301D0CAC00E7FCFA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		196DD822301D0CAC00E7FCFA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		196DD824301D0CAC00E7FCFA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "DisagallViewerSafari Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "DisagallViewerSafari Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.beomjun.DisagallViewerSafari.Extension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		196DD825301D0CAC00E7FCFA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "DisagallViewerSafari Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "DisagallViewerSafari Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.beomjun.DisagallViewerSafari.Extension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		196DD828301D0CAC00E7FCFA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DisagallViewerSafari/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DisagallViewerSafari;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.beomjun.DisagallViewerSafari;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		196DD829301D0CAC00E7FCFA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DisagallViewerSafari/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DisagallViewerSafari;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.beomjun.DisagallViewerSafari;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		196DD7F9301D0CAB00E7FCFA /* Build configuration list for PBXProject "DisagallViewerSafari" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				196DD821301D0CAC00E7FCFA /* Debug */,
+				196DD822301D0CAC00E7FCFA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		196DD823301D0CAC00E7FCFA /* Build configuration list for PBXNativeTarget "DisagallViewerSafari Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				196DD824301D0CAC00E7FCFA /* Debug */,
+				196DD825301D0CAC00E7FCFA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		196DD827301D0CAC00E7FCFA /* Build configuration list for PBXNativeTarget "DisagallViewerSafari" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				196DD828301D0CAC00E7FCFA /* Debug */,
+				196DD829301D0CAC00E7FCFA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 196DD7F6301D0CAB00E7FCFA /* Project object */;
+}
