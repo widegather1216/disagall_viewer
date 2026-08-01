@@ -1,4 +1,10 @@
-# Temporary test files & outputs
+# IDE & Editor files
+.vscode/
+.idea/
+
+# OS metadata & temporary test outputs
+.DS_Store
+Thumbs.db
 dc_sample.html
 *.zip
-.DS_Store
+node_modules/
