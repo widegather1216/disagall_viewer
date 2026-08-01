@@ -8,10 +8,6 @@
     "storage",
     "activeTab"
   ],
-  "host_permissions": [
-    "https://gall.dcinside.com/*",
-    "https://*.dcinside.com/*"
-  ],
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
