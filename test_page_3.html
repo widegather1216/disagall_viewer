@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>[디지털 사진 갤러리] 출사 사진 모음 - 디시인사이드 테스트</title>
+  <title>[디지털 사진 갤러리] 3번 글 - 제주도 바다 노을 스냅</title>
   <link rel="stylesheet" href="content.css">
   <style>
     body {
@@ -69,37 +69,18 @@
 </head>
 <body>
   <div class="container">
-    <h1>[사진] 1번 글: 풍경 & 인물 출사 샘플 (최신 글)</h1>
+    <h1>[사진] 3번 글: 제주도 바다 노을 스냅</h1>
     
     <div class="info-box">
-      <b>📌 방향키 신기능 테스트 안내:</b><br>
-      1. 아래 사진 우클릭 ➔ <b>"📷 디시 사진 뷰어로 화면 맞춤 보기"</b> (또는 아래 테스트 버튼 클릭)<br>
-      2. 뷰어에서 <code>←</code>, <code>→</code> 키: <b>현재 글의 사진 넘기기</b><br>
-      3. 뷰어에서 <code>↑</code> 키: <b>목록 최신 글 알림 ("목록의 가장 최신 글입니다")</b><br>
-      4. 뷰어에서 <code>↓</code> 키: <b>아래 글(2번 글)로 이동 + 뷰어 자동 오픈 (연속 감상)</b><br>
-      <div style="margin-top: 10px;">
-        <button id="btn-open-test" style="background:#3b82f6; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:600; cursor:pointer;">📷 뷰어 바로 열기 (로컬 테스트용)</button>
-      </div>
+      <b>📌 엣지 케이스 테스트 (마지막 글):</b><br>
+      이 페이지는 목록의 마지막 글(가장 과거 글)입니다.<br>
+      뷰어에서 <code>↓</code>를 누르면 <b>"목록의 마지막 글입니다."</b> 토스트가 뜨는지 확인하세요.<br>
+      <code>↑</code>를 누르면 2번 글(골목길 스냅)로 이동합니다.
     </div>
 
     <div class="write_div">
-      <p>오늘 촬영한 가로 방향 풍경 사진입니다. (가로 뷰포트 피팅 테스트)</p>
-      <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1600&q=80" alt="가로 풍경 사진 샘플 1">
-      
-      <p>세로 방향 비율 3:4 고화질 프레임입니다. (우클릭 후 뷰어로 보기 테스트)</p>
-      <img src="https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=1200&q=80" alt="세로 숲 사진 샘플 2">
-
-      <p>초고화질 세로 방향 사진입니다.</p>
-      <img src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1200&q=80" alt="세로 산 풍경 사진 샘플 3">
-    </div>
-
-    <!-- 본문 외 요소 테스트 (댓글 디시콘 및 광고 배너) -->
-    <div class="comment_box" style="margin-top: 40px; padding-top: 20px; border-top: 1px dashed #ccc;">
-      <h3>💬 댓글 목록 (뷰어 수집 대상에서 제외됨)</h3>
-      <div class="cmt_list" style="margin-top: 10px;">
-        <p>ㅇㅇ: 잘 봤습니다! <img src="https://nimg.dcinside.com/dc/dccon/icon_1.png" style="width:50px; height:50px; vertical-align:middle;" alt="디시콘 예시"></p>
-        <p>사진가: 대단하네요~ <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80" style="width:40px; height:40px; border-radius:50%;" alt="댓글 유저 아바타"></p>
-      </div>
+      <p>제주도 해변 일몰 사진입니다.</p>
+      <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1400&q=80" alt="제주도 바다 일몰">
     </div>
 
     <!-- 하단 갤러리 리스트 시뮬레이션 -->
@@ -120,10 +101,10 @@
             <td class="gall_tit"><a href="#">[필독] 갤러리 이용 안내 공지사항</a></td>
             <td>관리자</td>
           </tr>
-          <tr class="ub-content crt">
-            <td class="gall_num"><span class="crt_icon"></span>1003</td>
+          <tr class="ub-content">
+            <td class="gall_num">1003</td>
             <td class="gall_subject">사진</td>
-            <td class="gall_tit"><a href="test_page.html?no=1003">1번 글: 풍경 & 인물 출사 샘플 (현재 글 / 최신 글)</a></td>
+            <td class="gall_tit"><a href="test_page.html?no=1003">1번 글: 풍경 & 인물 출사 샘플 (최신 글)</a></td>
             <td>디붕이1</td>
           </tr>
           <tr class="ub-content">
@@ -138,10 +119,10 @@
             <td class="gall_tit"><a href="#">광고 배너 영역</a></td>
             <td>운영자</td>
           </tr>
-          <tr class="ub-content">
-            <td class="gall_num">1001</td>
+          <tr class="ub-content crt">
+            <td class="gall_num"><span class="crt_icon"></span>1001</td>
             <td class="gall_subject">사진</td>
-            <td class="gall_tit"><a href="test_page_3.html?no=1001">3번 글: 제주도 바다 노을 스냅 (마지막 글)</a></td>
+            <td class="gall_tit"><a href="test_page_3.html?no=1001">3번 글: 제주도 바다 노을 스냅 (현재 글 / 마지막 글)</a></td>
             <td>디붕이3</td>
           </tr>
         </tbody>
@@ -150,10 +131,5 @@
   </div>
 
   <script src="content.js"></script>
-  <script>
-    document.getElementById('btn-open-test').addEventListener('click', () => {
-      window.postMessage({ action: 'disagall_test_open' }, '*');
-    });
-  </script>
 </body>
 </html>

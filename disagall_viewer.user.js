@@ -363,32 +363,65 @@
   to { transform: rotate(360deg); }
 }
 
-/* Floating Quick Launcher Button for Safari */
+/* Toast Notification */
+.disagall-toast {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f8fafc;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.disagall-toast.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Floating Quick Launcher Button for Safari (Clean & Minimal) */
 #disagall-quick-launcher {
   position: fixed;
   bottom: 24px;
   right: 24px;
   z-index: 999990;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 30px;
-  padding: 10px 18px;
-  font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
+  background: rgba(15, 23, 42, 0.8);
+  color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0.85;
 }
 
 #disagall-quick-launcher:hover {
-  transform: translateY(-3px) scale(1.03);
-  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.6);
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  opacity: 1;
+  transform: translateY(-2px);
+  color: #f8fafc;
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 `;
 
@@ -413,6 +446,8 @@
   let prevBtnEl = null;
   let nextBtnEl = null;
   let loaderEl = null;
+  let toastEl = null;
+  let toastTimer = null;
 
   // Zoom & Pan state variables
   let zoomScale = 1.0;
@@ -469,66 +504,229 @@
 
   function getBestImgUrl(img) {
     if (!img) return '';
+    
     let rawUrl = img.getAttribute('data-original') || 
                  img.getAttribute('data-src') || 
-                 (img.dataset ? (img.dataset.original || img.dataset.src) : '') || 
+                 img.getAttribute('data-url') ||
+                 img.getAttribute('data-lazy-src') ||
+                 (img.dataset ? (img.dataset.original || img.dataset.src || img.dataset.url) : '') || 
                  img.src || 
                  '';
-    if (!rawUrl) return '';
-    if (rawUrl.includes('gallview_loading') || rawUrl.includes('loading') || rawUrl.includes('blank.gif') || rawUrl.includes('nstatic.dcinside.com')) {
+
+    if (!rawUrl || rawUrl.includes('gallview_loading') || rawUrl.includes('loading') || rawUrl.includes('blank.gif') || rawUrl.includes('nstatic.dcinside.com')) {
       const dataOrig = img.getAttribute('data-original') || img.getAttribute('data-src') || (img.dataset ? (img.dataset.original || img.dataset.src) : '');
-      if (dataOrig) rawUrl = dataOrig;
+      if (dataOrig && !dataOrig.includes('loading')) {
+        rawUrl = dataOrig;
+      } else {
+        const parentAnchor = img.closest('a');
+        if (parentAnchor && parentAnchor.href) {
+          const anchorHref = parentAnchor.href;
+          if (anchorHref.includes('viewimage.php') || anchorHref.includes('dcimg') || anchorHref.includes('image') || anchorHref.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i)) {
+            rawUrl = anchorHref;
+          }
+        }
+      }
     }
+
     return getCleanOriginalUrl(rawUrl);
   }
 
-  function isPostBodyImage(img) {
-    if (!img) return false;
-    if (img.width > 0 && img.width < 100 && img.height > 0 && img.height < 100) return false;
-    const postContainers = [
-      '.writing_view_box',
-      '.thum-txtin',
-      '.usertxt',
-      '.gallview_contents',
-      '.btn_recommend_box',
-      '#dc_contents'
-    ];
-    for (const selector of postContainers) {
-      if (img.closest(selector)) return true;
+  function isDcIconOrUiAsset(img, url) {
+    if (!url) return true;
+
+    if (
+      url.includes('/dcicon/') ||
+      url.includes('/emoticon/') ||
+      url.includes('/dccon') ||
+      url.includes('dccon.php') ||
+      url.includes('nik.gif') ||
+      url.includes('fix_nik.gif') ||
+      url.includes('bestcon') ||
+      url.includes('/btn_') ||
+      url.includes('icon_') ||
+      url.includes('logo') ||
+      url.includes('banner') ||
+      url.includes('gallview_loading') ||
+      url.includes('nstatic.dcinside.com')
+    ) {
+      return true;
     }
+
+    if (img) {
+      if (
+        img.classList.contains('written_dccon') ||
+        img.classList.contains('dccon') ||
+        img.hasAttribute('conalt') ||
+        img.hasAttribute('detail') ||
+        (img.dataset && img.dataset.dcconoverstatus !== undefined) ||
+        (img.title && img.title.includes('갤로그'))
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function isPostBodyImage(img) {
+    if (!img || img.tagName !== 'IMG') return false;
+
+    const excludedParent = img.closest([
+      '.comment_box',
+      '.comment_wrap',
+      '.cmt_list',
+      '.reply_box',
+      '.btn_box',
+      '.rcmd_box',
+      '.dc_allbanner',
+      '.con_banner',
+      '#right_box',
+      '.side_box',
+      '.gall_list',
+      '.recommend_box',
+      '.pop_info',
+      '.attached_file',
+      '.option_box',
+      '.written_dccon',
+      '#ad_nv_slot',
+      '.ad_box',
+      'header',
+      'footer',
+      '.gnb',
+      '.lnb'
+    ].join(', '));
+    if (excludedParent) return false;
+
+    const url = getBestImgUrl(img);
+    if (isDcIconOrUiAsset(img, url)) return false;
+
+    const postContainer = img.closest([
+      '.write_div',
+      '.thum-txtin',
+      '.us-txt',
+      '.usertxt',
+      '.writing_view_box',
+      '.gallview_contents',
+      '.view_content_wrap',
+      '.reading_box',
+      '.article-content',
+      '#dc_contents',
+      '[id*="write_div"]',
+      '[class*="write_div"]',
+      '.gall_view_box',
+      '.view_content',
+      '.contents'
+    ].join(', '));
+
+    if (postContainer) return true;
+
+    const isKnownPhotoUrl = url.includes('viewimage.php') ||
+                            url.includes('dcimg') ||
+                            url.includes('dccdn') ||
+                            url.includes('upload') ||
+                            url.includes('image.dcinside') ||
+                            url.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i);
+
+    if (isKnownPhotoUrl) return true;
+
     return false;
   }
 
   function forcePreloadPostImages() {
-    const images = document.querySelectorAll('img');
-    images.forEach(img => {
-      if (isPostBodyImage(img)) {
-        const orig = img.getAttribute('data-original') || img.getAttribute('data-src') || (img.dataset ? (img.dataset.original || img.dataset.src) : '');
-        if (orig && (img.src !== orig || img.src.includes('blank.gif') || img.src.includes('loading'))) {
-          img.src = orig;
-        }
+    const bodySelectors = [
+      '.write_div',
+      '.thum-txtin',
+      '.us-txt',
+      '.usertxt',
+      '.writing_view_box',
+      '.gallview_contents',
+      '.view_content_wrap',
+      '.reading_box',
+      '.article-content',
+      '#dc_contents',
+      '[id*="write_div"]',
+      '[class*="write_div"]',
+      '.gall_view_box',
+      '.view_content',
+      '.contents'
+    ].join(', ');
+
+    const imgs = document.querySelectorAll(`${bodySelectors} img, img`);
+    imgs.forEach(img => {
+      if (!isPostBodyImage(img)) return;
+      const orig = img.getAttribute('data-original') || img.getAttribute('data-src') || img.getAttribute('data-url') || (img.dataset ? (img.dataset.original || img.dataset.src || img.dataset.url) : null);
+      if (orig && (img.src.includes('loading') || img.src.includes('blank.gif') || img.classList.contains('lazy'))) {
+        img.src = orig;
+        img.classList.remove('lazy');
       }
     });
+
+    try {
+      window.dispatchEvent(new Event('scroll'));
+      window.dispatchEvent(new Event('resize'));
+    } catch (e) {}
   }
 
   function collectPostImages() {
     postImages = [];
-    const images = document.querySelectorAll('img');
     const seenUrls = new Set();
 
-    images.forEach(img => {
-      if (isPostBodyImage(img)) {
-        const url = getBestImgUrl(img);
-        if (url && !seenUrls.has(url)) {
-          seenUrls.add(url);
+    const bodySelectors = [
+      '.write_div',
+      '.thum-txtin',
+      '.us-txt',
+      '.usertxt',
+      '.writing_view_box',
+      '.gallview_contents',
+      '.view_content_wrap',
+      '.reading_box',
+      '.article-content',
+      '#dc_contents',
+      '[id*="write_div"]',
+      '[class*="write_div"]',
+      '.gall_view_box',
+      '.view_content',
+      '.contents'
+    ].join(', ');
+
+    let containers = Array.from(document.querySelectorAll(bodySelectors));
+    containers = containers.filter(c => !c.closest('.comment_box, .comment_wrap, .cmt_list, .reply_box, #right_box, .side_box, header, footer'));
+
+    containers.forEach((container) => {
+      const imageElements = container.querySelectorAll('img');
+      imageElements.forEach((img) => {
+        if (!isPostBodyImage(img)) return;
+
+        const cleanUrl = getBestImgUrl(img);
+        if (cleanUrl && !seenUrls.has(cleanUrl)) {
+          seenUrls.add(cleanUrl);
           postImages.push({
-            url: url,
-            alt: img.alt || '디시 사진 원본',
-            element: img
+            url: cleanUrl,
+            element: img,
+            alt: img.alt || '디시 갤러리 본문 이미지'
           });
         }
-      }
+      });
     });
+
+    if (postImages.length === 0) {
+      const allImages = document.querySelectorAll('img');
+      allImages.forEach((img) => {
+        if (!isPostBodyImage(img)) return;
+
+        const cleanUrl = getBestImgUrl(img);
+        if (cleanUrl && !seenUrls.has(cleanUrl)) {
+          seenUrls.add(cleanUrl);
+          postImages.push({
+            url: cleanUrl,
+            element: img,
+            alt: img.alt || '디시 갤러리 본문 이미지'
+          });
+        }
+      });
+    }
+
+    return postImages;
   }
 
   function applyFittingAndPadding() {
@@ -607,8 +805,11 @@
         </button>
       </div>
 
+      <div class="disagall-toast" id="disagall-toast"></div>
+
       <div class="disagall-footer">
         <div class="disagall-keyhints">
+          <div class="disagall-keyhint"><span class="disagall-kbd">↑</span> <span class="disagall-kbd">↓</span> 이전/다음 글</div>
           <div class="disagall-keyhint"><span class="disagall-kbd">←</span> <span class="disagall-kbd">→</span> 이전/다음 사진</div>
           <div class="disagall-keyhint"><span class="disagall-kbd">휠/트랙패드</span> 자유 확대/축소</div>
           <div class="disagall-keyhint"><span class="disagall-kbd">드래그</span> 화면 이동</div>
@@ -628,6 +829,7 @@
     prevBtnEl = document.getElementById('disagall-prev');
     nextBtnEl = document.getElementById('disagall-next');
     loaderEl = document.getElementById('disagall-loader');
+    toastEl = document.getElementById('disagall-toast');
 
     // Event listeners
     document.getElementById('disagall-btn-close').addEventListener('click', closeViewer);
@@ -737,6 +939,166 @@
     showImage(currentIndex + direction);
   }
 
+  // Show temporary feedback toast inside viewer overlay
+  function showViewerToast(message, duration = 1800) {
+    if (!toastEl) return;
+    if (toastTimer) clearTimeout(toastTimer);
+
+    toastEl.textContent = message;
+    toastEl.classList.add('show');
+
+    toastTimer = setTimeout(() => {
+      if (toastEl) toastEl.classList.remove('show');
+    }, duration);
+  }
+
+  // Extract post ID from DC Inside URL
+  function extractPostNo(url) {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url, window.location.origin);
+      const no = parsed.searchParams.get('no');
+      if (no) return no;
+      const match = parsed.pathname.match(/\/(\d+)(?:\/|\?|$)/);
+      if (match) return match[1];
+    } catch (e) {
+      const match = url.match(/[?&]no=(\d+)/) || url.match(/\/(\d+)(?:\/|\?|$)/);
+      if (match) return match[1];
+    }
+    return null;
+  }
+
+  // Find adjacent post (previous / next) from the bottom post list table
+  function getAdjacentPostUrl(direction) {
+    const currentPostNo = extractPostNo(window.location.href);
+
+    // 1. Desktop DC table rows (.gall_list tbody tr.ub-content)
+    const tableRows = Array.from(document.querySelectorAll('table.gall_list tbody tr.ub-content, .gall_listwrap table tbody tr.ub-content'));
+
+    let validRows = [];
+    if (tableRows.length > 0) {
+      validRows = tableRows.filter(tr => {
+        const titLink = tr.querySelector('.gall_tit a:not(.reply_numbox)') || tr.querySelector('a');
+        if (!titLink || !titLink.href) return false;
+        const hrefAttr = titLink.getAttribute('href') || titLink.href || '';
+        if (hrefAttr.startsWith('javascript:')) return false;
+
+        // Check if this row is the current post being viewed
+        const isCurrentPost = tr.classList.contains('crt') || 
+                              tr.className.includes('crt') || 
+                              !!tr.querySelector('.crt_icon') || 
+                              (currentPostNo && (
+                                tr.innerHTML.includes(currentPostNo) || 
+                                extractPostNo(titLink.href) === currentPostNo
+                              ));
+
+        const numEl = tr.querySelector('.gall_num');
+        const subjectEl = tr.querySelector('.gall_subject');
+        const numText = numEl ? numEl.textContent.trim() : '';
+        const subjectText = subjectEl ? subjectEl.textContent.trim() : '';
+
+        // If it is the current post, it is always valid (DC replaces post number with crt_icon)
+        if (isCurrentPost) {
+          return true;
+        }
+
+        // Ignore notice, AD, survey, and placeholder rows for non-current rows
+        if (numText === '-' || !numText || isNaN(Number(numText))) return false;
+        if (subjectText === '공지' || subjectText === 'AD' || subjectText === '설문') return false;
+        if (numText === '공지' || numText === '설문') return false;
+        if (tr.classList.contains('notice')) return false;
+
+        return true;
+      });
+    }
+
+    // 2. Mobile DC list fallback (.gall-detail-lst li)
+    if (validRows.length === 0) {
+      const mobileItems = Array.from(document.querySelectorAll('.gall-detail-lst li, .gall-thum-btm li'));
+      validRows = mobileItems.filter(li => {
+        const link = li.querySelector('a');
+        if (!link || !link.href) return false;
+        const hrefAttr = link.getAttribute('href') || link.href || '';
+        if (hrefAttr.startsWith('javascript:')) return false;
+        if (li.classList.contains('notice') || li.querySelector('.sp-notice')) return false;
+        return true;
+      });
+    }
+
+    if (validRows.length === 0) {
+      return null;
+    }
+
+    // Find index of current post in valid rows
+    let currentIdx = validRows.findIndex(row => {
+      // Direct class match or icon
+      if (row.classList.contains('crt') || row.className.includes('crt') || !!row.querySelector('.crt_icon')) return true;
+
+      // Match by post number
+      if (currentPostNo) {
+        const numEl = row.querySelector('.gall_num');
+        if (numEl && numEl.textContent.trim() === currentPostNo) return true;
+
+        const titLink = row.querySelector('.gall_tit a:not(.reply_numbox)') || row.querySelector('a');
+        if (titLink && extractPostNo(titLink.href) === currentPostNo) return true;
+      }
+      return false;
+    });
+
+    if (currentIdx === -1) {
+      return null;
+    }
+
+    // direction: 'up' -> targetIdx = currentIdx - 1 (위쪽 행: 더 최신 글)
+    // direction: 'down' -> targetIdx = currentIdx + 1 (아래쪽 행: 더 과거 글)
+    const targetIdx = direction === 'up' ? currentIdx - 1 : currentIdx + 1;
+
+    if (targetIdx < 0) {
+      return { error: 'top', message: '목록의 가장 최신 글입니다.' };
+    }
+    if (targetIdx >= validRows.length) {
+      return { error: 'bottom', message: '목록의 마지막 글입니다.' };
+    }
+
+    const targetRow = validRows[targetIdx];
+    const targetLink = targetRow.querySelector('.gall_tit a:not(.reply_numbox)') || targetRow.querySelector('a');
+    const targetTitle = targetLink ? (targetLink.textContent || '').trim().replace(/\s+/g, ' ') : '';
+
+    return {
+      url: targetLink ? targetLink.href : null,
+      title: targetTitle
+    };
+  }
+
+  // Navigate to adjacent post with auto-open session flag
+  function navigatePost(direction) {
+    const result = getAdjacentPostUrl(direction);
+
+    if (!result) {
+      showViewerToast('이동할 수 있는 게시글 목록을 찾을 수 없습니다.');
+      return;
+    }
+
+    if (result.error) {
+      showViewerToast(result.message);
+      return;
+    }
+
+    if (result.url) {
+      const label = direction === 'up' ? '위쪽 최신 글' : '아래쪽 이전 글';
+      const titleHint = result.title ? ` (${result.title.length > 12 ? result.title.slice(0, 12) + '...' : result.title})` : '';
+      showViewerToast(`${label}로 이동 중...${titleHint}`);
+
+      try {
+        sessionStorage.setItem('disagall_auto_open', '1');
+      } catch (e) {}
+
+      setTimeout(() => {
+        window.location.href = result.url;
+      }, 150);
+    }
+  }
+
   function handleKeyDown(e) {
     if (!overlayEl || !overlayEl.classList.contains('active')) return;
 
@@ -749,15 +1111,23 @@
     } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
       e.preventDefault();
       navigate(1);
+    } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+      e.preventDefault();
+      navigatePost('up');
+    } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+      e.preventDefault();
+      navigatePost('down');
     }
   }
 
-  function openViewer(targetSrc) {
+  function openViewer(targetSrc, isAuto = false) {
     forcePreloadPostImages();
     collectPostImages();
 
     if (postImages.length === 0) {
-      alert("디시 사진 뷰어: 게시글 본문에서 감상 가능한 이미지를 찾지 못했습니다.");
+      if (!isAuto) {
+        alert("디시 사진 뷰어: 게시글 본문에서 감상 가능한 이미지를 찾지 못했습니다.");
+      }
       return;
     }
 
@@ -826,7 +1196,39 @@
     GM_registerMenuCommand("📷 디시 사진 뷰어 실행", () => openViewer());
   }
 
-  window.addEventListener('DOMContentLoaded', initQuickLauncher);
-  setTimeout(initQuickLauncher, 1000);
+  // Automatically open viewer if navigated via post navigation (sessionStorage)
+  function checkAutoOpen() {
+    try {
+      const autoOpen = sessionStorage.getItem('disagall_auto_open');
+      if (autoOpen === '1') {
+        sessionStorage.removeItem('disagall_auto_open');
+
+        let attempts = 0;
+        const maxAttempts = 15;
+        const pollTimer = setInterval(() => {
+          attempts++;
+          forcePreloadPostImages();
+          collectPostImages();
+
+          if (postImages.length > 0) {
+            clearInterval(pollTimer);
+            openViewer(null, true);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(pollTimer);
+          }
+        }, 150);
+      }
+    } catch (e) {}
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    initQuickLauncher();
+    checkAutoOpen();
+  });
+  setTimeout(() => {
+    initQuickLauncher();
+    checkAutoOpen();
+  }, 1000);
 
 })();
+

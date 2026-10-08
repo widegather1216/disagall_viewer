@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>[디지털 사진 갤러리] 2번 글 - 후지 X-T5 출사 사진</title>
+  <link rel="stylesheet" href="content.css">
+  <style>
+    body {
+      background: #f4f5f7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 40px 0;
+      color: #333;
+    }
+    .container {
+      width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 30px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    h1 {
+      font-size: 20px;
+      border-bottom: 2px solid #3b82f6;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+    .write_div {
+      line-height: 1.8;
+      font-size: 15px;
+    }
+    .write_div img {
+      max-width: 100%;
+      height: auto;
+      margin: 20px 0;
+      border-radius: 4px;
+      cursor: pointer;
+      display: block;
+    }
+    .info-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: #1e3a8a;
+    }
+    table.gall_list {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 30px;
+      font-size: 13px;
+    }
+    table.gall_list th, table.gall_list td {
+      border-bottom: 1px solid #eee;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    table.gall_list tr.crt {
+      background-color: #f0f7ff;
+      font-weight: bold;
+    }
+    table.gall_list td.gall_tit {
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>[사진] 2번 글: 후지 X-T5로 담은 골목길 스냅</h1>
+    
+    <div class="info-box">
+      <b>🚀 연속 감상 테스트 안내:</b><br>
+      이 페이지는 1번 글에서 <code>↓</code> 방향키를 눌렀을 때 자동으로 뷰어가 유지되며 열리는 페이지입니다.<br>
+      뷰어에서 <code>↑</code>를 누르면 다시 1번 글로 이동하고, <code>↓</code>를 누르면 3번 글로 이동합니다.
+    </div>
+
+    <div class="write_div">
+      <p>골목길의 따뜻한 햇살 샘플 사진입니다.</p>
+      <img src="https://images.unsplash.com/photo-1517849845537-4d257902454a?w=1200&q=80" alt="골목길 강아지 샘플">
+      
+      <p>비 온 뒤 맑게 갠 거리 풍경입니다.</p>
+      <img src="https://images.unsplash.com/photo-1477959858617-67f30bc75b82?w=1400&q=80" alt="도시 야경 풍경">
+    </div>
+
+    <!-- 하단 갤러리 리스트 시뮬레이션 -->
+    <div class="gall_listwrap list">
+      <table class="gall_list">
+        <thead>
+          <tr>
+            <th>번호</th>
+            <th>말머리</th>
+            <th>제목</th>
+            <th>글쓴이</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="ub-content">
+            <td class="gall_num">-</td>
+            <td class="gall_subject">공지</td>
+            <td class="gall_tit"><a href="#">[필독] 갤러리 이용 안내 공지사항</a></td>
+            <td>관리자</td>
+          </tr>
+          <tr class="ub-content">
+            <td class="gall_num">1003</td>
+            <td class="gall_subject">사진</td>
+            <td class="gall_tit"><a href="test_page.html?no=1003">1번 글: 풍경 & 인물 출사 샘플 (최신 글)</a></td>
+            <td>디붕이1</td>
+          </tr>
+          <tr class="ub-content crt">
+            <td class="gall_num"><span class="crt_icon"></span>1002</td>
+            <td class="gall_subject">사진</td>
+            <td class="gall_tit"><a href="test_page_2.html?no=1002">2번 글: 후지 X-T5로 담은 골목길 스냅 (현재 글)</a></td>
+            <td>디붕이2</td>
+          </tr>
+          <tr class="ub-content">
+            <td class="gall_num">-</td>
+            <td class="gall_subject">AD</td>
+            <td class="gall_tit"><a href="#">광고 배너 영역</a></td>
+            <td>운영자</td>
+          </tr>
+          <tr class="ub-content">
+            <td class="gall_num">1001</td>
+            <td class="gall_subject">사진</td>
+            <td class="gall_tit"><a href="test_page_3.html?no=1001">3번 글: 제주도 바다 노을 스냅 (이전 글)</a></td>
+            <td>디붕이3</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="content.js"></script>
+</body>
+</html>

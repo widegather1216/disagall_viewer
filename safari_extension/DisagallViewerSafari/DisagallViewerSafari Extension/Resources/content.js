@@ -15,6 +15,8 @@
   let prevBtnEl = null;
   let nextBtnEl = null;
   let loaderEl = null;
+  let toastEl = null;
+  let toastTimer = null;
   let lastRightClickedImgSrc = null;
 
   // Zoom & Pan state variables
@@ -74,38 +76,83 @@
     });
   }
 
-  // Extract real image URL considering lazy loading (data-original / data-src)
+  // Extract real image URL considering lazy loading (data-original / data-src) & parent <a> link
   function getBestImgUrl(img) {
     if (!img) return '';
     
     // Check lazy loading attributes first before src
     let rawUrl = img.getAttribute('data-original') || 
                  img.getAttribute('data-src') || 
-                 (img.dataset ? (img.dataset.original || img.dataset.src) : '') || 
+                 img.getAttribute('data-url') ||
+                 img.getAttribute('data-lazy-src') ||
+                 (img.dataset ? (img.dataset.original || img.dataset.src || img.dataset.url) : '') || 
                  img.src || 
                  '';
-    if (!rawUrl) return '';
 
-    // If rawUrl is placeholder/spinner/static asset, fallback to data-original if present
-    if (rawUrl.includes('gallview_loading') || rawUrl.includes('loading') || rawUrl.includes('blank.gif') || rawUrl.includes('nstatic.dcinside.com')) {
+    // If rawUrl is placeholder/spinner/loading gif/nstatic, check parent <a> link or data-original
+    if (!rawUrl || rawUrl.includes('gallview_loading') || rawUrl.includes('loading') || rawUrl.includes('blank.gif') || rawUrl.includes('nstatic.dcinside.com')) {
       const dataOrig = img.getAttribute('data-original') || img.getAttribute('data-src') || (img.dataset ? (img.dataset.original || img.dataset.src) : '');
-      if (dataOrig) {
+      if (dataOrig && !dataOrig.includes('loading')) {
         rawUrl = dataOrig;
+      } else {
+        const parentAnchor = img.closest('a');
+        if (parentAnchor && parentAnchor.href) {
+          const anchorHref = parentAnchor.href;
+          if (anchorHref.includes('viewimage.php') || anchorHref.includes('dcimg') || anchorHref.includes('image') || anchorHref.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i)) {
+            rawUrl = anchorHref;
+          }
+        }
       }
     }
 
     return getCleanOriginalUrl(rawUrl);
   }
 
-  // Helper to check if an image belongs strictly to post body content
+  // Check if an element or URL is a DC Con, Nikcon, profile icon, or UI asset
+  function isDcIconOrUiAsset(img, url) {
+    if (!url) return true;
+
+    // Check URL patterns
+    if (
+      url.includes('/dcicon/') ||
+      url.includes('/emoticon/') ||
+      url.includes('/dccon') ||
+      url.includes('dccon.php') ||
+      url.includes('nik.gif') ||
+      url.includes('fix_nik.gif') ||
+      url.includes('bestcon') ||
+      url.includes('/btn_') ||
+      url.includes('icon_') ||
+      url.includes('logo') ||
+      url.includes('banner') ||
+      url.includes('gallview_loading') ||
+      url.includes('nstatic.dcinside.com')
+    ) {
+      return true;
+    }
+
+    // Check element attributes & classes
+    if (img) {
+      if (
+        img.classList.contains('written_dccon') ||
+        img.classList.contains('dccon') ||
+        img.hasAttribute('conalt') ||
+        img.hasAttribute('detail') ||
+        (img.dataset && img.dataset.dcconoverstatus !== undefined) ||
+        (img.title && img.title.includes('갤로그'))
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // Helper to check if an image belongs to post body content
   function isPostBodyImage(img) {
     if (!img || img.tagName !== 'IMG') return false;
 
-    // 1. Must be strictly inside post body container (.write_div, .thum-txtin, .us-txt)
-    const postContainer = img.closest('.write_div, .thum-txtin, .us-txt');
-    if (!postContainer) return false;
-
-    // 2. Exclude non-body sections even if nested inside container
+    // 1. Exclude non-body sections (comments, banners, sidebars, headers, footers)
     const excludedParent = img.closest([
       '.comment_box',
       '.comment_wrap',
@@ -124,66 +171,50 @@
       '.option_box',
       '.written_dccon',
       '#ad_nv_slot',
-      '.ad_box'
+      '.ad_box',
+      'header',
+      'footer',
+      '.gnb',
+      '.lnb'
     ].join(', '));
     if (excludedParent) return false;
 
-    // 3. Exclude DC Cons / Stickers by class and attributes
-    if (
-      img.classList.contains('written_dccon') ||
-      img.classList.contains('dccon') ||
-      img.hasAttribute('conalt') ||
-      img.hasAttribute('detail') ||
-      (img.dataset && img.dataset.dcconoverstatus !== undefined)
-    ) {
-      return false;
-    }
-
-    // 4. Exclude Nikcons / Profile Icons / Gallog links
-    if (
-      (img.title && img.title.includes('갤로그')) ||
-      (img.src && (img.src.includes('nik.gif') || img.src.includes('fix_nik.gif') || img.src.includes('bestcon')))
-    ) {
-      return false;
-    }
-
-    // 5. Check image URL
+    // 2. Check for DC Cons / UI assets
     const url = getBestImgUrl(img);
-    if (!url) return false;
+    if (isDcIconOrUiAsset(img, url)) return false;
 
-    // Exclude static assets from nstatic (unless data-original points to a viewimage photo)
-    if (url.includes('nstatic.dcinside.com') || url.includes('gallview_loading')) {
-      return false;
-    }
+    // 3. Check if inside any known post body container
+    const postContainer = img.closest([
+      '.write_div',
+      '.thum-txtin',
+      '.us-txt',
+      '.usertxt',
+      '.writing_view_box',
+      '.gallview_contents',
+      '.view_content_wrap',
+      '.reading_box',
+      '.article-content',
+      '#dc_contents',
+      '[id*="write_div"]',
+      '[class*="write_div"]',
+      '.gall_view_box',
+      '.view_content',
+      '.contents'
+    ].join(', '));
 
-    // Exclude UI assets, emoticons, logos, icons, dccon, banners
-    if (
-      url.includes('/dcicon/') ||
-      url.includes('/emoticon/') ||
-      url.includes('/dccon') ||
-      url.includes('dccon.php') ||
-      url.includes('/btn_') ||
-      url.includes('icon_') ||
-      url.includes('logo') ||
-      url.includes('banner')
-    ) {
-      return false;
-    }
+    if (postContainer) return true;
 
-    // 6. Must be a genuine uploaded photo (viewimage.php, dcimg, upload, cdn, or has data-fileno)
-    const isUploadedPhoto = img.hasAttribute('data-fileno') ||
-                            url.includes('viewimage.php') ||
+    // 4. Fallback check: if url is a known photo upload URL or direct image format
+    const isKnownPhotoUrl = url.includes('viewimage.php') ||
                             url.includes('dcimg') ||
+                            url.includes('dccdn') ||
                             url.includes('upload') ||
-                            url.includes('dccdn');
+                            url.includes('image.dcinside') ||
+                            url.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i);
 
-    if (!isUploadedPhoto) return false;
+    if (isKnownPhotoUrl) return true;
 
-    // 7. Ignore tiny icon images / tracking pixels
-    if (img.width > 0 && img.width < 50) return false;
-    if (img.height > 0 && img.height < 50) return false;
-
-    return true;
+    return false;
   }
 
   // Track right-clicked element on the page
@@ -218,14 +249,29 @@
   // Find all post body images strictly in current DC Inside page
   function collectPostImages() {
     postImages = [];
-    
-    // Find post content containers first
-    let containers = Array.from(document.querySelectorAll('.write_div, .thum-txtin, .us-txt'));
-    
-    // Filter out containers inside comments or sidebars
-    containers = containers.filter(c => !c.closest('.comment_box, .comment_wrap, .cmt_list, .reply_box, #right_box, .side_box'));
-
     const seenUrls = new Set();
+
+    const bodySelectors = [
+      '.write_div',
+      '.thum-txtin',
+      '.us-txt',
+      '.usertxt',
+      '.writing_view_box',
+      '.gallview_contents',
+      '.view_content_wrap',
+      '.reading_box',
+      '.article-content',
+      '#dc_contents',
+      '[id*="write_div"]',
+      '[class*="write_div"]',
+      '.gall_view_box',
+      '.view_content',
+      '.contents'
+    ].join(', ');
+
+    // Find post content containers first
+    let containers = Array.from(document.querySelectorAll(bodySelectors));
+    containers = containers.filter(c => !c.closest('.comment_box, .comment_wrap, .cmt_list, .reply_box, #right_box, .side_box, header, footer'));
 
     containers.forEach((container) => {
       const imageElements = container.querySelectorAll('img');
@@ -244,6 +290,24 @@
       });
     });
 
+    // Fallback scan: search all <img> tags if container-based search yielded 0 images
+    if (postImages.length === 0) {
+      const allImages = document.querySelectorAll('img');
+      allImages.forEach((img) => {
+        if (!isPostBodyImage(img)) return;
+
+        const cleanUrl = getBestImgUrl(img);
+        if (cleanUrl && !seenUrls.has(cleanUrl)) {
+          seenUrls.add(cleanUrl);
+          postImages.push({
+            url: cleanUrl,
+            element: img,
+            alt: img.alt || '디시 갤러리 본문 이미지'
+          });
+        }
+      });
+    }
+
     return postImages;
   }
 
@@ -259,8 +323,9 @@
         <div class="disagall-header-left">
           <div class="disagall-title">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-              <circle cx="12" cy="13" r="4"></circle>
+              <rect x="3" y="3" width="18" height="18" rx="3" ry="3"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
             </svg>
             디시 사진 뷰어
           </div>
@@ -308,8 +373,11 @@
         </div>
       </div>
 
+      <div class="disagall-toast" id="disagall-toast"></div>
+
       <div class="disagall-footer">
         <div class="disagall-keyhints">
+          <div class="disagall-keyhint"><span class="disagall-kbd">↑</span> <span class="disagall-kbd">↓</span> 이전/다음 글</div>
           <div class="disagall-keyhint"><span class="disagall-kbd">←</span> <span class="disagall-kbd">→</span> 이전/다음 사진</div>
           <div class="disagall-keyhint"><span class="disagall-kbd">마우스 휠 / 트랙패드</span> 확대/축소</div>
           <div class="disagall-keyhint"><span class="disagall-kbd">드래그</span> 사진 이동</div>
@@ -330,6 +398,7 @@
     prevBtnEl = document.getElementById('disagall-prev-btn');
     nextBtnEl = document.getElementById('disagall-next-btn');
     loaderEl = document.getElementById('disagall-loader');
+    toastEl = document.getElementById('disagall-toast');
 
     // Event Bindings
     document.getElementById('disagall-close-btn').addEventListener('click', closeViewer);
@@ -478,19 +547,34 @@
 
   // Force DC Inside lazy-loaded images to load immediately on page/viewer open
   function forcePreloadPostImages() {
-    const containers = document.querySelectorAll('.write_div, .thum-txtin, .us-txt');
-    containers.forEach(container => {
-      const imgs = container.querySelectorAll('img');
-      imgs.forEach(img => {
-        const orig = img.getAttribute('data-original') || img.getAttribute('data-src') || (img.dataset ? (img.dataset.original || img.dataset.src) : null);
-        if (orig && (img.src.includes('loading') || img.classList.contains('lazy'))) {
-          img.src = orig;
-          img.classList.remove('lazy');
-        }
-      });
+    const bodySelectors = [
+      '.write_div',
+      '.thum-txtin',
+      '.us-txt',
+      '.usertxt',
+      '.writing_view_box',
+      '.gallview_contents',
+      '.view_content_wrap',
+      '.reading_box',
+      '.article-content',
+      '#dc_contents',
+      '[id*="write_div"]',
+      '[class*="write_div"]',
+      '.gall_view_box',
+      '.view_content',
+      '.contents'
+    ].join(', ');
+
+    const imgs = document.querySelectorAll(`${bodySelectors} img, img`);
+    imgs.forEach(img => {
+      if (!isPostBodyImage(img)) return;
+      const orig = img.getAttribute('data-original') || img.getAttribute('data-src') || img.getAttribute('data-url') || (img.dataset ? (img.dataset.original || img.dataset.src || img.dataset.url) : null);
+      if (orig && (img.src.includes('loading') || img.src.includes('blank.gif') || img.classList.contains('lazy'))) {
+        img.src = orig;
+        img.classList.remove('lazy');
+      }
     });
 
-    // Fire window events to trigger any DC Inside lazyload listeners
     try {
       window.dispatchEvent(new Event('scroll'));
       window.dispatchEvent(new Event('resize'));
@@ -556,6 +640,166 @@
     showImage(currentIndex + direction);
   }
 
+  // Show temporary feedback toast inside viewer overlay
+  function showViewerToast(message, duration = 1800) {
+    if (!toastEl) return;
+    if (toastTimer) clearTimeout(toastTimer);
+
+    toastEl.textContent = message;
+    toastEl.classList.add('show');
+
+    toastTimer = setTimeout(() => {
+      if (toastEl) toastEl.classList.remove('show');
+    }, duration);
+  }
+
+  // Extract post ID from DC Inside URL
+  function extractPostNo(url) {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url, window.location.origin);
+      const no = parsed.searchParams.get('no');
+      if (no) return no;
+      const match = parsed.pathname.match(/\/(\d+)(?:\/|\?|$)/);
+      if (match) return match[1];
+    } catch (e) {
+      const match = url.match(/[?&]no=(\d+)/) || url.match(/\/(\d+)(?:\/|\?|$)/);
+      if (match) return match[1];
+    }
+    return null;
+  }
+
+  // Find adjacent post (previous / next) from the bottom post list table
+  function getAdjacentPostUrl(direction) {
+    const currentPostNo = extractPostNo(window.location.href);
+
+    // 1. Desktop DC table rows (.gall_list tbody tr.ub-content)
+    const tableRows = Array.from(document.querySelectorAll('table.gall_list tbody tr.ub-content, .gall_listwrap table tbody tr.ub-content'));
+
+    let validRows = [];
+    if (tableRows.length > 0) {
+      validRows = tableRows.filter(tr => {
+        const titLink = tr.querySelector('.gall_tit a:not(.reply_numbox)') || tr.querySelector('a');
+        if (!titLink || !titLink.href) return false;
+        const hrefAttr = titLink.getAttribute('href') || titLink.href || '';
+        if (hrefAttr.startsWith('javascript:')) return false;
+
+        // Check if this row is the current post being viewed
+        const isCurrentPost = tr.classList.contains('crt') || 
+                              tr.className.includes('crt') || 
+                              !!tr.querySelector('.crt_icon') || 
+                              (currentPostNo && (
+                                tr.innerHTML.includes(currentPostNo) || 
+                                extractPostNo(titLink.href) === currentPostNo
+                              ));
+
+        const numEl = tr.querySelector('.gall_num');
+        const subjectEl = tr.querySelector('.gall_subject');
+        const numText = numEl ? numEl.textContent.trim() : '';
+        const subjectText = subjectEl ? subjectEl.textContent.trim() : '';
+
+        // If it is the current post, it is always valid (DC replaces post number with crt_icon)
+        if (isCurrentPost) {
+          return true;
+        }
+
+        // Ignore notice, AD, survey, and placeholder rows for non-current rows
+        if (numText === '-' || !numText || isNaN(Number(numText))) return false;
+        if (subjectText === '공지' || subjectText === 'AD' || subjectText === '설문') return false;
+        if (numText === '공지' || numText === '설문') return false;
+        if (tr.classList.contains('notice')) return false;
+
+        return true;
+      });
+    }
+
+    // 2. Mobile DC list fallback (.gall-detail-lst li)
+    if (validRows.length === 0) {
+      const mobileItems = Array.from(document.querySelectorAll('.gall-detail-lst li, .gall-thum-btm li'));
+      validRows = mobileItems.filter(li => {
+        const link = li.querySelector('a');
+        if (!link || !link.href) return false;
+        const hrefAttr = link.getAttribute('href') || link.href || '';
+        if (hrefAttr.startsWith('javascript:')) return false;
+        if (li.classList.contains('notice') || li.querySelector('.sp-notice')) return false;
+        return true;
+      });
+    }
+
+    if (validRows.length === 0) {
+      return null;
+    }
+
+    // Find index of current post in valid rows
+    let currentIdx = validRows.findIndex(row => {
+      // Direct class match or icon
+      if (row.classList.contains('crt') || row.className.includes('crt') || !!row.querySelector('.crt_icon')) return true;
+
+      // Match by post number
+      if (currentPostNo) {
+        const numEl = row.querySelector('.gall_num');
+        if (numEl && numEl.textContent.trim() === currentPostNo) return true;
+
+        const titLink = row.querySelector('.gall_tit a:not(.reply_numbox)') || row.querySelector('a');
+        if (titLink && extractPostNo(titLink.href) === currentPostNo) return true;
+      }
+      return false;
+    });
+
+    if (currentIdx === -1) {
+      return null;
+    }
+
+    // direction: 'up' -> targetIdx = currentIdx - 1 (위쪽 행: 더 최신 글)
+    // direction: 'down' -> targetIdx = currentIdx + 1 (아래쪽 행: 더 과거 글)
+    const targetIdx = direction === 'up' ? currentIdx - 1 : currentIdx + 1;
+
+    if (targetIdx < 0) {
+      return { error: 'top', message: '목록의 가장 최신 글입니다.' };
+    }
+    if (targetIdx >= validRows.length) {
+      return { error: 'bottom', message: '목록의 마지막 글입니다.' };
+    }
+
+    const targetRow = validRows[targetIdx];
+    const targetLink = targetRow.querySelector('.gall_tit a:not(.reply_numbox)') || targetRow.querySelector('a');
+    const targetTitle = targetLink ? (targetLink.textContent || '').trim().replace(/\s+/g, ' ') : '';
+
+    return {
+      url: targetLink ? targetLink.href : null,
+      title: targetTitle
+    };
+  }
+
+  // Navigate to adjacent post with auto-open session flag
+  function navigatePost(direction) {
+    const result = getAdjacentPostUrl(direction);
+
+    if (!result) {
+      showViewerToast('이동할 수 있는 게시글 목록을 찾을 수 없습니다.');
+      return;
+    }
+
+    if (result.error) {
+      showViewerToast(result.message);
+      return;
+    }
+
+    if (result.url) {
+      const label = direction === 'up' ? '위쪽 최신 글' : '아래쪽 이전 글';
+      const titleHint = result.title ? ` (${result.title.length > 12 ? result.title.slice(0, 12) + '...' : result.title})` : '';
+      showViewerToast(`${label}로 이동 중...${titleHint}`);
+
+      try {
+        sessionStorage.setItem('disagall_auto_open', '1');
+      } catch (e) {}
+
+      setTimeout(() => {
+        window.location.href = result.url;
+      }, 150);
+    }
+  }
+
   // Keyboard Event Handler
   function handleKeyDown(e) {
     if (!overlayEl || !overlayEl.classList.contains('active')) return;
@@ -572,11 +816,19 @@
       e.preventDefault();
       e.stopPropagation();
       navigate(1);
+    } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+      e.preventDefault();
+      e.stopPropagation();
+      navigatePost('up');
+    } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+      e.preventDefault();
+      e.stopPropagation();
+      navigatePost('down');
     }
   }
 
   // Open Lightbox Viewer
-  function openViewer(targetSrc) {
+  function openViewer(targetSrc, isAuto = false) {
     // 1. Force un-lazyload all post body images immediately
     forcePreloadPostImages();
 
@@ -584,7 +836,9 @@
     collectPostImages();
 
     if (postImages.length === 0) {
-      alert("디시 사진 뷰어: 게시글 본문에서 감상 가능한 이미지를 찾지 못했습니다.");
+      if (!isAuto) {
+        alert("디시 사진 뷰어: 게시글 본문에서 감상 가능한 이미지를 찾지 못했습니다.");
+      }
       return;
     }
 
@@ -625,6 +879,13 @@
     });
   }
 
+  // Window message listener for test pages or internal triggers
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.action === 'disagall_test_open') {
+      openViewer();
+    }
+  });
+
   // Window Resize Listener for dynamic viewport fit
   window.addEventListener('resize', () => {
     if (overlayEl && overlayEl.classList.contains('active')) {
@@ -632,4 +893,37 @@
     }
   });
 
+  // Automatically open viewer if navigated via post navigation (sessionStorage)
+  function checkAutoOpen() {
+    try {
+      const autoOpen = sessionStorage.getItem('disagall_auto_open');
+      if (autoOpen === '1') {
+        sessionStorage.removeItem('disagall_auto_open');
+
+        let attempts = 0;
+        const maxAttempts = 15;
+        const pollTimer = setInterval(() => {
+          attempts++;
+          forcePreloadPostImages();
+          collectPostImages();
+
+          if (postImages.length > 0) {
+            clearInterval(pollTimer);
+            openViewer(null, true);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(pollTimer);
+          }
+        }, 150);
+      }
+    } catch (e) {}
+  }
+
+  // Bootstrap auto-open check
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkAutoOpen);
+  } else {
+    checkAutoOpen();
+  }
+
 })();
+
