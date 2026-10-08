@@ -17,6 +17,7 @@
   let loaderEl = null;
   let toastEl = null;
   let toastTimer = null;
+  let recommendBtnEl = null;
   let lastRightClickedImgSrc = null;
 
   // Zoom & Pan state variables
@@ -348,6 +349,12 @@
         </div>
 
         <div class="disagall-header-right">
+          <button class="disagall-btn disagall-btn-recommend" id="disagall-btn-recommend" title="개념글 추천 (단축키: R)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+            </svg>
+            <span>개추</span>
+          </button>
           <button class="disagall-btn disagall-btn-close" id="disagall-close-btn" title="닫기 (ESC)">✕ 닫기</button>
         </div>
       </div>
@@ -377,6 +384,7 @@
 
       <div class="disagall-footer">
         <div class="disagall-keyhints">
+          <div class="disagall-keyhint"><span class="disagall-kbd">R</span> 개추</div>
           <div class="disagall-keyhint"><span class="disagall-kbd">↑</span> <span class="disagall-kbd">↓</span> 이전/다음 글</div>
           <div class="disagall-keyhint"><span class="disagall-kbd">←</span> <span class="disagall-kbd">→</span> 이전/다음 사진</div>
           <div class="disagall-keyhint"><span class="disagall-kbd">마우스 휠 / 트랙패드</span> 확대/축소</div>
@@ -399,9 +407,17 @@
     nextBtnEl = document.getElementById('disagall-next-btn');
     loaderEl = document.getElementById('disagall-loader');
     toastEl = document.getElementById('disagall-toast');
+    recommendBtnEl = document.getElementById('disagall-btn-recommend');
 
     // Event Bindings
     document.getElementById('disagall-close-btn').addEventListener('click', closeViewer);
+
+    if (recommendBtnEl) {
+      recommendBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        triggerPostRecommend();
+      });
+    }
 
     prevBtnEl.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -653,6 +669,61 @@
     }, duration);
   }
 
+  // Get post recommend count from page DOM
+  function getPostRecommendCount() {
+    const countEl = document.querySelector('[id^="recommend_view_up_"], .up_num_box .up_num, .btn_recommend_box .up_num, .recom_num');
+    if (countEl) {
+      const text = countEl.textContent.trim();
+      const num = parseInt(text.replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(num)) return num;
+    }
+    return null;
+  }
+
+  // Find native recommend button in the post
+  function getNativeRecommendButton() {
+    return document.querySelector('button.btn_recom_up, .btn_recommend_box button.btn_recom_up, .btn_recom_up, .btn-recom, .btn_recommend');
+  }
+
+  // Update recommend button label with latest count
+  function updateRecommendButtonUi() {
+    if (!recommendBtnEl) return;
+    const count = getPostRecommendCount();
+    const countText = count !== null ? ` (${count})` : '';
+    recommendBtnEl.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+      </svg>
+      <span>개추${countText}</span>
+    `;
+  }
+
+  // Trigger post recommend action
+  function triggerPostRecommend() {
+    const btn = getNativeRecommendButton();
+    if (!btn) {
+      showViewerToast('본문의 추천 버튼을 찾을 수 없습니다.');
+      return false;
+    }
+
+    try {
+      btn.click();
+      showViewerToast('개념글 추천을 눌렀습니다! 👍');
+
+      if (recommendBtnEl) {
+        recommendBtnEl.classList.add('voted');
+      }
+
+      // Check for updated count after DC ajax finishes
+      setTimeout(updateRecommendButtonUi, 500);
+      setTimeout(updateRecommendButtonUi, 1200);
+      return true;
+    } catch (e) {
+      showViewerToast('추천 실행 중 오류가 발생했습니다.');
+      return false;
+    }
+  }
+
   // Extract post ID from DC Inside URL
   function extractPostNo(url) {
     if (!url) return null;
@@ -824,6 +895,10 @@
       e.preventDefault();
       e.stopPropagation();
       navigatePost('down');
+    } else if (e.key === 'r' || e.key === 'R' || e.key === 'c' || e.key === 'C') {
+      e.preventDefault();
+      e.stopPropagation();
+      triggerPostRecommend();
     }
   }
 
@@ -858,6 +933,7 @@
     overlayEl.classList.add('active');
     document.body.style.overflow = 'hidden'; // Prevent page scroll behind overlay
 
+    updateRecommendButtonUi();
     showImage(targetIndex);
   }
 

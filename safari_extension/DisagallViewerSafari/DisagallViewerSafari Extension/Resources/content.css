@@ -163,6 +163,42 @@
   transform: translateY(-1px);
 }
 
+.disagall-btn-recommend {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(96, 165, 250, 0.45);
+  color: #93c5fd;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  padding: 6px 13px;
+  transition: all 0.2s ease;
+}
+
+.disagall-btn-recommend:hover {
+  background: rgba(59, 130, 246, 0.38);
+  border-color: rgba(96, 165, 250, 0.75);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.disagall-btn-recommend:active,
+.disagall-btn-recommend.voted {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #ffffff;
+  transform: scale(0.96);
+}
+
+.disagall-btn-recommend svg {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.disagall-btn-recommend:hover svg {
+  transform: scale(1.18) rotate(-6deg);
+}
+
 .disagall-btn-close {
   background: rgba(239, 68, 68, 0.2);
   border-color: rgba(239, 68, 68, 0.35);

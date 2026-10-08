@@ -72,11 +72,11 @@
     <h1>[사진] 1번 글: 풍경 & 인물 출사 샘플 (최신 글)</h1>
     
     <div class="info-box">
-      <b>📌 방향키 신기능 테스트 안내:</b><br>
+      <b>📌 신기능 테스트 안내:</b><br>
       1. 아래 사진 우클릭 ➔ <b>"📷 디시 사진 뷰어로 화면 맞춤 보기"</b> (또는 아래 테스트 버튼 클릭)<br>
       2. 뷰어에서 <code>←</code>, <code>→</code> 키: <b>현재 글의 사진 넘기기</b><br>
-      3. 뷰어에서 <code>↑</code> 키: <b>목록 최신 글 알림 ("목록의 가장 최신 글입니다")</b><br>
-      4. 뷰어에서 <code>↓</code> 키: <b>아래 글(2번 글)로 이동 + 뷰어 자동 오픈 (연속 감상)</b><br>
+      3. 뷰어에서 <code>↑</code>, <code>↓</code> 키: <b>목록 이전/다음 글 이동 + 뷰어 자동 오픈 (연속 감상)</b><br>
+      4. 뷰어 헤더의 <b>[👍 개추]</b> 버튼 또는 <code>R</code> 키: <b>본문 개념글 추천 즉시 실행</b><br>
       <div style="margin-top: 10px;">
         <button id="btn-open-test" style="background:#3b82f6; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:600; cursor:pointer;">📷 뷰어 바로 열기 (로컬 테스트용)</button>
       </div>
@@ -91,6 +91,16 @@
 
       <p>초고화질 세로 방향 사진입니다.</p>
       <img src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1200&q=80" alt="세로 산 풍경 사진 샘플 3">
+    </div>
+
+    <!-- 개념글 추천 박스 시뮬레이션 -->
+    <div class="btn_recommend_box" style="margin: 30px auto; text-align: center; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; max-width: 240px;">
+      <div class="up_num_box">
+        <p class="up_num font_red" id="recommend_view_up_1001" style="font-size: 24px; font-weight: 800; color: #ef4444; margin: 0 0 8px 0;">12</p>
+      </div>
+      <button type="button" class="btn_recom_up" data-no="1001" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer;" onclick="const el = document.getElementById('recommend_view_up_1001'); el.textContent = parseInt(el.textContent) + 1; alert('개념글 추천 완료!');">
+        👍 개념 추천 (본문 버튼)
+      </button>
     </div>
 
     <!-- 본문 외 요소 테스트 (댓글 디시콘 및 광고 배너) -->
