@@ -3,9 +3,22 @@
 (function () {
   'use strict';
 
+  const CONFIG = {
+    DEFAULT_PADDING: 24,
+    STORAGE_KEY_PADDING: 'defaultPadding',
+    STORAGE_KEY_AUTO_OPEN: 'disagall_auto_open',
+    TOAST_DURATION: 1800,
+    POST_NAV_DELAY: 150,
+    AUTO_OPEN_MAX_ATTEMPTS: 15,
+    AUTO_OPEN_POLL_INTERVAL: 150,
+    RECOMMEND_SYNC_DELAYS: [500, 1200],
+    RECOMMEND_THROTTLE_MS: 1200,
+    NO_PHOTO_NOTICE_DURATION: 8000
+  };
+
   let postImages = [];
   let currentIndex = 0;
-  let currentPadding = 24; // default padding in px
+  let currentPadding = CONFIG.DEFAULT_PADDING; // default padding in px
   let overlayEl = null;
   let mainImgEl = null;
   let counterEl = null;
@@ -19,6 +32,7 @@
   let toastTimer = null;
   let recommendBtnEl = null;
   let lastRightClickedImgSrc = null;
+  let previousBodyOverflow = '';
 
   // Zoom & Pan state variables
   let zoomScale = 1.0;
@@ -28,6 +42,23 @@
   let startX = 0;
   let startY = 0;
   let transformRafId = null;
+
+  // Drag event listeners with dynamic lifecycle
+  function onWindowMouseMove(e) {
+    if (!isDragging) return;
+    panX = e.clientX - startX;
+    panY = e.clientY - startY;
+    updateImgTransform();
+  }
+
+  function onWindowMouseUp() {
+    if (isDragging) {
+      isDragging = false;
+      window.removeEventListener('mousemove', onWindowMouseMove);
+      window.removeEventListener('mouseup', onWindowMouseUp);
+      updateImgTransform();
+    }
+  }
 
   // Apply zoom and pan transform to main image element with hardware acceleration (rAF)
   function updateImgTransform() {
@@ -60,15 +91,19 @@
     zoomScale = 1.0;
     panX = 0;
     panY = 0;
-    isDragging = false;
+    if (isDragging) {
+      isDragging = false;
+      window.removeEventListener('mousemove', onWindowMouseMove);
+      window.removeEventListener('mouseup', onWindowMouseUp);
+    }
     updateImgTransform();
   }
 
   // Load saved padding setting from chrome.storage
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-    chrome.storage.sync.get(['defaultPadding'], (result) => {
-      if (result && typeof result.defaultPadding === 'number') {
-        currentPadding = result.defaultPadding;
+    chrome.storage.sync.get([CONFIG.STORAGE_KEY_PADDING], (result) => {
+      if (result && typeof result[CONFIG.STORAGE_KEY_PADDING] === 'number') {
+        currentPadding = result[CONFIG.STORAGE_KEY_PADDING];
         if (sliderEl) {
           sliderEl.value = currentPadding;
           if (sliderValEl) sliderValEl.textContent = currentPadding + 'px';
@@ -149,61 +184,64 @@
     return false;
   }
 
+  // Selectors for non-body elements to exclude
+  const EXCLUDED_CONTAINER_SELECTORS = [
+    '.comment_box',
+    '.comment_wrap',
+    '.cmt_list',
+    '.reply_box',
+    '.btn_box',
+    '.rcmd_box',
+    '.dc_allbanner',
+    '.con_banner',
+    '#right_box',
+    '.side_box',
+    '.gall_list',
+    '.recommend_box',
+    '.pop_info',
+    '.attached_file',
+    '.option_box',
+    '.written_dccon',
+    '#ad_nv_slot',
+    '.ad_box',
+    'header',
+    'footer',
+    '.gnb',
+    '.lnb'
+  ].join(', ');
+
+  // Selectors for known post body containers
+  const POST_BODY_CONTAINER_SELECTORS = [
+    '.write_div',
+    '.thum-txtin',
+    '.us-txt',
+    '.usertxt',
+    '.writing_view_box',
+    '.gallview_contents',
+    '.view_content_wrap',
+    '.reading_box',
+    '.article-content',
+    '#dc_contents',
+    '[id*="write_div"]',
+    '[class*="write_div"]',
+    '.gall_view_box',
+    '.view_content',
+    '.contents'
+  ].join(', ');
+
   // Helper to check if an image belongs to post body content
   function isPostBodyImage(img) {
     if (!img || img.tagName !== 'IMG') return false;
 
     // 1. Exclude non-body sections (comments, banners, sidebars, headers, footers)
-    const excludedParent = img.closest([
-      '.comment_box',
-      '.comment_wrap',
-      '.cmt_list',
-      '.reply_box',
-      '.btn_box',
-      '.rcmd_box',
-      '.dc_allbanner',
-      '.con_banner',
-      '#right_box',
-      '.side_box',
-      '.gall_list',
-      '.recommend_box',
-      '.pop_info',
-      '.attached_file',
-      '.option_box',
-      '.written_dccon',
-      '#ad_nv_slot',
-      '.ad_box',
-      'header',
-      'footer',
-      '.gnb',
-      '.lnb'
-    ].join(', '));
-    if (excludedParent) return false;
+    if (img.closest(EXCLUDED_CONTAINER_SELECTORS)) return false;
 
     // 2. Check for DC Cons / UI assets
     const url = getBestImgUrl(img);
     if (isDcIconOrUiAsset(img, url)) return false;
 
     // 3. Check if inside any known post body container
-    const postContainer = img.closest([
-      '.write_div',
-      '.thum-txtin',
-      '.us-txt',
-      '.usertxt',
-      '.writing_view_box',
-      '.gallview_contents',
-      '.view_content_wrap',
-      '.reading_box',
-      '.article-content',
-      '#dc_contents',
-      '[id*="write_div"]',
-      '[class*="write_div"]',
-      '.gall_view_box',
-      '.view_content',
-      '.contents'
-    ].join(', '));
-
-    if (postContainer) return true;
+    if (img.closest(POST_BODY_CONTAINER_SELECTORS)) return true;
 
     // 4. Fallback check: if url is a known photo upload URL or direct image format
     const isKnownPhotoUrl = url.includes('viewimage.php') ||
@@ -213,9 +251,7 @@
                             url.includes('image.dcinside') ||
                             url.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i);
 
-    if (isKnownPhotoUrl) return true;
-
-    return false;
+    return !!isKnownPhotoUrl;
   }
 
   // Track right-clicked element on the page
@@ -247,79 +283,55 @@
     }
   }
 
-  // Find all post body images strictly in current DC Inside page
-  function collectPostImages() {
-    postImages = [];
-    const seenUrls = new Set();
+  // Helper to extract image candidates from elements with deduplication
+  function extractImagesFromElements(imageElements, seenUrls) {
+    const results = [];
+    imageElements.forEach((img) => {
+      if (!isPostBodyImage(img)) return;
 
-    const bodySelectors = [
-      '.write_div',
-      '.thum-txtin',
-      '.us-txt',
-      '.usertxt',
-      '.writing_view_box',
-      '.gallview_contents',
-      '.view_content_wrap',
-      '.reading_box',
-      '.article-content',
-      '#dc_contents',
-      '[id*="write_div"]',
-      '[class*="write_div"]',
-      '.gall_view_box',
-      '.view_content',
-      '.contents'
-    ].join(', ');
+      const cleanUrl = getBestImgUrl(img);
+      if (cleanUrl && !seenUrls.has(cleanUrl)) {
+        seenUrls.add(cleanUrl);
+        results.push({
+          url: cleanUrl,
+          element: img,
+          alt: img.alt || '디시 갤러리 본문 이미지'
+        });
+      }
+    });
+    return results;
+  }
+
+  // Pure extractor: Find all post body images strictly in given root
+  function extractPostImages(root = document) {
+    const seenUrls = new Set();
+    const collected = [];
 
     // Find post content containers first
-    let containers = Array.from(document.querySelectorAll(bodySelectors));
-    containers = containers.filter(c => !c.closest('.comment_box, .comment_wrap, .cmt_list, .reply_box, #right_box, .side_box, header, footer'));
+    let containers = Array.from(root.querySelectorAll(POST_BODY_CONTAINER_SELECTORS));
+    containers = containers.filter(c => !c.closest(EXCLUDED_CONTAINER_SELECTORS));
 
     containers.forEach((container) => {
-      const imageElements = container.querySelectorAll('img');
-      imageElements.forEach((img) => {
-        if (!isPostBodyImage(img)) return;
-
-        const cleanUrl = getBestImgUrl(img);
-        if (cleanUrl && !seenUrls.has(cleanUrl)) {
-          seenUrls.add(cleanUrl);
-          postImages.push({
-            url: cleanUrl,
-            element: img,
-            alt: img.alt || '디시 갤러리 본문 이미지'
-          });
-        }
-      });
+      collected.push(...extractImagesFromElements(container.querySelectorAll('img'), seenUrls));
     });
 
     // Fallback scan: search all <img> tags if container-based search yielded 0 images
-    if (postImages.length === 0) {
-      const allImages = document.querySelectorAll('img');
-      allImages.forEach((img) => {
-        if (!isPostBodyImage(img)) return;
-
-        const cleanUrl = getBestImgUrl(img);
-        if (cleanUrl && !seenUrls.has(cleanUrl)) {
-          seenUrls.add(cleanUrl);
-          postImages.push({
-            url: cleanUrl,
-            element: img,
-            alt: img.alt || '디시 갤러리 본문 이미지'
-          });
-        }
-      });
+    if (collected.length === 0) {
+      collected.push(...extractImagesFromElements(root.querySelectorAll('img'), seenUrls));
     }
 
+    return collected;
+  }
+
+  // Find all post body images and update state
+  function collectPostImages() {
+    postImages = extractPostImages(document);
     return postImages;
   }
 
-  // Initialize and Create Overlay DOM
-  function createOverlay() {
-    if (overlayEl) return;
-
-    overlayEl = document.createElement('div');
-    overlayEl.id = 'disagall-viewer-overlay';
-
-    overlayEl.innerHTML = `
+  // Build viewer overlay HTML markup
+  function buildOverlayHtml() {
+    return `
       <div class="disagall-header">
         <div class="disagall-header-left">
           <div class="disagall-title">
@@ -394,10 +406,10 @@
         </div>
       </div>
     `;
+  }
 
-    document.body.appendChild(overlayEl);
-
-    // Cache elements
+  // Cache overlay DOM element references
+  function cacheOverlayElements() {
     mainImgEl = document.getElementById('disagall-main-img');
     counterEl = document.getElementById('disagall-counter');
     infoBadgeEl = document.getElementById('disagall-info-badge');
@@ -408,8 +420,10 @@
     loaderEl = document.getElementById('disagall-loader');
     toastEl = document.getElementById('disagall-toast');
     recommendBtnEl = document.getElementById('disagall-btn-recommend');
+  }
 
-    // Event Bindings
+  // Bind interactive events for overlay
+  function bindOverlayEvents() {
     document.getElementById('disagall-close-btn').addEventListener('click', closeViewer);
 
     if (recommendBtnEl) {
@@ -436,7 +450,7 @@
       
       // Save padding preference
       if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-        chrome.storage.sync.set({ defaultPadding: currentPadding });
+        chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: currentPadding });
       }
     });
 
@@ -470,7 +484,7 @@
       updateImgTransform();
     }, { passive: false });
 
-    // Drag to Pan when zoomed in
+    // Drag to Pan when zoomed in (dynamically bind mousemove/mouseup)
     mainImgEl.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return; // Left click only
       if (zoomScale > 1.0) {
@@ -479,20 +493,8 @@
         startY = e.clientY - panY;
         mainImgEl.style.cursor = 'grabbing';
         e.preventDefault();
-      }
-    });
-
-    window.addEventListener('mousemove', (e) => {
-      if (!isDragging) return;
-      panX = e.clientX - startX;
-      panY = e.clientY - startY;
-      updateImgTransform();
-    });
-
-    window.addEventListener('mouseup', () => {
-      if (isDragging) {
-        isDragging = false;
-        updateImgTransform();
+        window.addEventListener('mousemove', onWindowMouseMove);
+        window.addEventListener('mouseup', onWindowMouseUp);
       }
     });
 
@@ -513,33 +515,42 @@
     window.addEventListener('keydown', handleKeyDown, true);
   }
 
+  // Initialize and Create Overlay DOM
+  function createOverlay() {
+    if (overlayEl) return;
+
+    overlayEl = document.createElement('div');
+    overlayEl.id = 'disagall-viewer-overlay';
+    overlayEl.innerHTML = buildOverlayHtml();
+    document.body.appendChild(overlayEl);
+
+    cacheOverlayElements();
+    bindOverlayEvents();
+  }
+
   // Apply Fitting Rules & Padding dynamically
   function applyFittingAndPadding() {
-    if (!mainImgEl || !mainImgEl.naturalWidth) return;
+    if (!mainImgEl || !mainImgEl.naturalWidth || !mainImgEl.naturalHeight) return;
 
     const nw = mainImgEl.naturalWidth;
     const nh = mainImgEl.naturalHeight;
-    const aspect = (nw / nh).toFixed(2);
-
     const isPortrait = nh >= nw;
 
-    // Header is ~50px, Footer is ~36px
-    const headerHeight = 52;
-    const footerHeight = 38;
+    // Dynamically calculate available area considering actual header & footer heights
+    const headerEl = overlayEl ? overlayEl.querySelector('.disagall-header') : null;
+    const footerEl = overlayEl ? overlayEl.querySelector('.disagall-footer') : null;
+    const headerHeight = headerEl ? headerEl.offsetHeight : 52;
+    const footerHeight = footerEl ? footerEl.offsetHeight : 38;
     const availableHeight = Math.max(100, window.innerHeight - headerHeight - footerHeight - (currentPadding * 2));
     const availableWidth = Math.max(100, window.innerWidth - (currentPadding * 2));
 
     // Calculate maximum image dimensions while maintaining natural aspect ratio
-    let targetWidth = nw;
-    let targetHeight = nh;
-
-    // Fit to available bounding box
     const widthRatio = availableWidth / nw;
     const heightRatio = availableHeight / nh;
     const scale = Math.min(widthRatio, heightRatio);
 
-    targetWidth = Math.round(nw * scale);
-    targetHeight = Math.round(nh * scale);
+    const targetWidth = Math.round(nw * scale);
+    const targetHeight = Math.round(nh * scale);
 
     mainImgEl.style.maxWidth = `${targetWidth}px`;
     mainImgEl.style.maxHeight = `${targetHeight}px`;
@@ -563,25 +574,7 @@
 
   // Force DC Inside lazy-loaded images to load immediately on page/viewer open
   function forcePreloadPostImages() {
-    const bodySelectors = [
-      '.write_div',
-      '.thum-txtin',
-      '.us-txt',
-      '.usertxt',
-      '.writing_view_box',
-      '.gallview_contents',
-      '.view_content_wrap',
-      '.reading_box',
-      '.article-content',
-      '#dc_contents',
-      '[id*="write_div"]',
-      '[class*="write_div"]',
-      '.gall_view_box',
-      '.view_content',
-      '.contents'
-    ].join(', ');
-
-    const imgs = document.querySelectorAll(`${bodySelectors} img, img`);
+    const imgs = document.querySelectorAll(`${POST_BODY_CONTAINER_SELECTORS} img, img`);
     imgs.forEach(img => {
       if (!isPostBodyImage(img)) return;
       const orig = img.getAttribute('data-original') || img.getAttribute('data-src') || img.getAttribute('data-url') || (img.dataset ? (img.dataset.original || img.dataset.src || img.dataset.url) : null);
@@ -657,7 +650,7 @@
   }
 
   // Show temporary feedback toast inside viewer overlay
-  function showViewerToast(message, duration = 1800) {
+  function showViewerToast(message, duration = CONFIG.TOAST_DURATION) {
     if (!toastEl) return;
     if (toastTimer) clearTimeout(toastTimer);
 
@@ -680,47 +673,200 @@
     return null;
   }
 
+  // Extended selectors for DC Inside recommend buttons across desktop, mobile, and minor/mini galleries
+  const RECOMMEND_BUTTON_SELECTORS = [
+    'button.btn_recom_up',
+    '.btn_recommend_box button.btn_recom_up',
+    '.btn_recommend_box button',
+    '.btn_recom_up',
+    '.btn-recom',
+    '.btn_recommend',
+    'button[data-action="recommend"]',
+    'button[data-type="recommend"]',
+    'button[onclick*="recom"]',
+    'a[onclick*="recom"]',
+    'button.recom_btn',
+    'button[id*="recommend"]',
+    'button[data-no]',
+    'a.btn_recom_up',
+    'div.btn_recom_up'
+  ].join(', ');
+
+  let lastRecommendTime = 0;
+  let isRecommending = false;
+  let hasVotedCurrentPost = false;
+
   // Find native recommend button in the post
   function getNativeRecommendButton() {
-    return document.querySelector('button.btn_recom_up, .btn_recommend_box button.btn_recom_up, .btn_recom_up, .btn-recom, .btn_recommend');
+    return document.querySelector(RECOMMEND_BUTTON_SELECTORS);
   }
 
-  // Update recommend button label with latest count
+  // Check if current user is logged in on DC Inside
+  function isUserLoggedIn() {
+    const isLoginInput = document.getElementById('is_login') || document.querySelector('input[name="is_login"]');
+    if (isLoginInput && isLoginInput.value) {
+      return isLoginInput.value.trim().toUpperCase() === 'Y';
+    }
+
+    const loginOutBtn = document.querySelector('.btn_top_loginout, .login_info a, .user_info .logout, a[href*="logout"]');
+    if (loginOutBtn) {
+      const text = loginOutBtn.textContent.trim();
+      if (text.includes('로그아웃')) return true;
+      if (text.includes('로그인')) return false;
+    }
+
+    if (document.querySelector('.my_nick, .user_name, .btn_logout, .user_info_box')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Check if gallery has anti-spam / anti-bot code enforcement (kcaptcha_use = 'Y')
+  function isGalleryCodeEnforced() {
+    const kcaptchaInput = document.getElementById('kcaptcha_use') || document.querySelector('input[name="kcaptcha_use"]');
+    if (kcaptchaInput && kcaptchaInput.value) {
+      return kcaptchaInput.value.trim().toUpperCase() === 'Y';
+    }
+
+    return !!document.querySelector('#kcaptcha, [id*="kcaptcha"], .captcha_box');
+  }
+
+  // Safe single-dispatch for recommend button (native click, fallback to synthetic MouseEvent only on error)
+  function dispatchRecommendClick(btn) {
+    if (!btn) return false;
+
+    // 1. Attempt native click first - executes all bound event listeners with native bubbling
+    if (typeof btn.click === 'function') {
+      try {
+        btn.click();
+        return true;
+      } catch (e) {}
+    }
+
+    // 2. Fallback to synthetic MouseEvent ONLY if native click is unavailable or throws
+    try {
+      const mouseEvt = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        buttons: 1
+      });
+      return btn.dispatchEvent(mouseEvt);
+    } catch (err) {
+      return false;
+    }
+  }
+
+  // Update recommend button label with latest count and login status hints
   function updateRecommendButtonUi() {
     if (!recommendBtnEl) return;
     const count = getPostRecommendCount();
     const countText = count !== null ? ` (${count})` : '';
+
+    const isLoggedIn = isUserLoggedIn();
+    const isCodeEnforced = isGalleryCodeEnforced();
+
+    // If gallery strictly enforces code/login for non-members and user is not logged in
+    const lockIcon = (!isLoggedIn && isCodeEnforced) ? ' 🔒' : '';
+    const hintTitle = (!isLoggedIn && isCodeEnforced) 
+      ? '개념글 추천 (비회원 코드/로그인 제한 갤러리 - 단축키: R)' 
+      : '개념글 추천 (단축키: R)';
+
+    recommendBtnEl.title = hintTitle;
+
     recommendBtnEl.innerHTML = `
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
       </svg>
-      <span>개추${countText}</span>
+      <span>개추${countText}${lockIcon}</span>
     `;
   }
 
-  // Trigger post recommend action
+  // Trigger post recommend action with single-dispatch, throttling, and login verification
   function triggerPostRecommend() {
+    if (isRecommending) return false;
+
+    const now = Date.now();
+    if (now - lastRecommendTime < CONFIG.RECOMMEND_THROTTLE_MS) {
+      showViewerToast('잠시 후 다시 시도해 주세요.');
+      return false;
+    }
+
     const btn = getNativeRecommendButton();
     if (!btn) {
       showViewerToast('본문의 추천 버튼을 찾을 수 없습니다.');
       return false;
     }
 
-    try {
-      btn.click();
-      showViewerToast('개념글 추천을 눌렀습니다! 👍');
+    // Edge case: Already voted in this session or button explicitly disabled
+    const isAlreadyVoted = hasVotedCurrentPost || 
+                           btn.disabled || 
+                           (recommendBtnEl && recommendBtnEl.classList.contains('voted'));
 
-      if (recommendBtnEl) {
-        recommendBtnEl.classList.add('voted');
+    if (isAlreadyVoted) {
+      showViewerToast('이미 개념글 추천을 완료한 게시글입니다. 👍');
+      return true;
+    }
+
+    const isLoggedIn = isUserLoggedIn();
+    const isCodeEnforced = isGalleryCodeEnforced();
+    const beforeCount = getPostRecommendCount();
+
+    lastRecommendTime = now;
+    isRecommending = true;
+
+    try {
+      dispatchRecommendClick(btn);
+
+      // Initial feedback toast
+      if (!isLoggedIn && isCodeEnforced) {
+        showViewerToast('개추 시도 중... (비회원 코드 제한 가능 🔒)');
+      } else {
+        showViewerToast('개념글 추천을 눌렀습니다! 👍');
       }
 
-      // Check for updated count after DC ajax finishes
-      setTimeout(updateRecommendButtonUi, 500);
-      setTimeout(updateRecommendButtonUi, 1200);
+      // Check count after DC ajax finishes to verify if recommendation actually succeeded
+      setTimeout(() => {
+        const midCount = getPostRecommendCount();
+        updateRecommendButtonUi();
+
+        if (midCount !== null && beforeCount !== null && midCount > beforeCount) {
+          hasVotedCurrentPost = true;
+          if (recommendBtnEl) recommendBtnEl.classList.add('voted');
+          showViewerToast('개념글 추천이 완료되었습니다! 👍');
+        }
+      }, CONFIG.RECOMMEND_SYNC_DELAYS[0]); // 500ms
+
+      setTimeout(() => {
+        const afterCount = getPostRecommendCount();
+        updateRecommendButtonUi();
+
+        if (afterCount !== null && beforeCount !== null) {
+          if (afterCount > beforeCount) {
+            hasVotedCurrentPost = true;
+            if (recommendBtnEl) recommendBtnEl.classList.add('voted');
+          } else {
+            hasVotedCurrentPost = false;
+            // Count didn't increase! Check login / code enforcement edge cases
+            if (!isLoggedIn) {
+              if (recommendBtnEl) recommendBtnEl.classList.remove('voted');
+              showViewerToast('로그인이 필요한 갤러리입니다. (비회원 추천 제한 🔒)', 2500);
+            } else {
+              showViewerToast('추천이 반영되지 않았습니다. (이미 추천했거나 제한됨)');
+            }
+          }
+        }
+      }, CONFIG.RECOMMEND_SYNC_DELAYS[1]); // 1200ms
+
       return true;
     } catch (e) {
       showViewerToast('추천 실행 중 오류가 발생했습니다.');
       return false;
+    } finally {
+      setTimeout(() => {
+        isRecommending = false;
+      }, 500);
     }
   }
 
@@ -740,73 +886,62 @@
     return null;
   }
 
-  // Find adjacent post (previous / next) from the bottom post list table
-  function getAdjacentPostUrl(direction) {
-    const currentPostNo = extractPostNo(window.location.href);
+  // Validate desktop DC post row
+  function isDesktopPostRowValid(tr, currentPostNo) {
+    const titLink = tr.querySelector('.gall_tit a:not(.reply_numbox)') || tr.querySelector('a');
+    if (!titLink || !titLink.href) return false;
+    const hrefAttr = titLink.getAttribute('href') || titLink.href || '';
+    if (hrefAttr.startsWith('javascript:')) return false;
 
-    // 1. Desktop DC table rows (.gall_list tbody tr.ub-content)
+    // Check if this row is the current post being viewed
+    const isCurrentPost = tr.classList.contains('crt') || 
+                          tr.className.includes('crt') || 
+                          !!tr.querySelector('.crt_icon') || 
+                          (currentPostNo && (
+                            tr.innerHTML.includes(currentPostNo) || 
+                            extractPostNo(titLink.href) === currentPostNo
+                          ));
+
+    if (isCurrentPost) return true;
+
+    const numEl = tr.querySelector('.gall_num');
+    const subjectEl = tr.querySelector('.gall_subject');
+    const numText = numEl ? numEl.textContent.trim() : '';
+    const subjectText = subjectEl ? subjectEl.textContent.trim() : '';
+
+    if (numText === '-' || !numText || isNaN(Number(numText))) return false;
+    if (subjectText === '공지' || subjectText === 'AD' || subjectText === '설문') return false;
+    if (numText === '공지' || numText === '설문') return false;
+    if (tr.classList.contains('notice')) return false;
+
+    return true;
+  }
+
+  // Validate mobile DC post item
+  function isMobilePostItemValid(li) {
+    const link = li.querySelector('a');
+    if (!link || !link.href) return false;
+    const hrefAttr = link.getAttribute('href') || link.href || '';
+    if (hrefAttr.startsWith('javascript:')) return false;
+    if (li.classList.contains('notice') || li.querySelector('.sp-notice')) return false;
+    return true;
+  }
+
+  // Parse valid post rows from desktop or mobile list
+  function getValidPostRows(currentPostNo) {
     const tableRows = Array.from(document.querySelectorAll('table.gall_list tbody tr.ub-content, .gall_listwrap table tbody tr.ub-content'));
-
-    let validRows = [];
     if (tableRows.length > 0) {
-      validRows = tableRows.filter(tr => {
-        const titLink = tr.querySelector('.gall_tit a:not(.reply_numbox)') || tr.querySelector('a');
-        if (!titLink || !titLink.href) return false;
-        const hrefAttr = titLink.getAttribute('href') || titLink.href || '';
-        if (hrefAttr.startsWith('javascript:')) return false;
-
-        // Check if this row is the current post being viewed
-        const isCurrentPost = tr.classList.contains('crt') || 
-                              tr.className.includes('crt') || 
-                              !!tr.querySelector('.crt_icon') || 
-                              (currentPostNo && (
-                                tr.innerHTML.includes(currentPostNo) || 
-                                extractPostNo(titLink.href) === currentPostNo
-                              ));
-
-        const numEl = tr.querySelector('.gall_num');
-        const subjectEl = tr.querySelector('.gall_subject');
-        const numText = numEl ? numEl.textContent.trim() : '';
-        const subjectText = subjectEl ? subjectEl.textContent.trim() : '';
-
-        // If it is the current post, it is always valid (DC replaces post number with crt_icon)
-        if (isCurrentPost) {
-          return true;
-        }
-
-        // Ignore notice, AD, survey, and placeholder rows for non-current rows
-        if (numText === '-' || !numText || isNaN(Number(numText))) return false;
-        if (subjectText === '공지' || subjectText === 'AD' || subjectText === '설문') return false;
-        if (numText === '공지' || numText === '설문') return false;
-        if (tr.classList.contains('notice')) return false;
-
-        return true;
-      });
+      return tableRows.filter(tr => isDesktopPostRowValid(tr, currentPostNo));
     }
+    const mobileItems = Array.from(document.querySelectorAll('.gall-detail-lst li, .gall-thum-btm li'));
+    return mobileItems.filter(isMobilePostItemValid);
+  }
 
-    // 2. Mobile DC list fallback (.gall-detail-lst li)
-    if (validRows.length === 0) {
-      const mobileItems = Array.from(document.querySelectorAll('.gall-detail-lst li, .gall-thum-btm li'));
-      validRows = mobileItems.filter(li => {
-        const link = li.querySelector('a');
-        if (!link || !link.href) return false;
-        const hrefAttr = link.getAttribute('href') || link.href || '';
-        if (hrefAttr.startsWith('javascript:')) return false;
-        if (li.classList.contains('notice') || li.querySelector('.sp-notice')) return false;
-        return true;
-      });
-    }
-
-    if (validRows.length === 0) {
-      return null;
-    }
-
-    // Find index of current post in valid rows
-    let currentIdx = validRows.findIndex(row => {
-      // Direct class match or icon
+  // Find index of the currently viewed post among valid rows
+  function findCurrentPostRowIndex(validRows, currentPostNo) {
+    return validRows.findIndex(row => {
       if (row.classList.contains('crt') || row.className.includes('crt') || !!row.querySelector('.crt_icon')) return true;
 
-      // Match by post number
       if (currentPostNo) {
         const numEl = row.querySelector('.gall_num');
         if (numEl && numEl.textContent.trim() === currentPostNo) return true;
@@ -816,15 +951,80 @@
       }
       return false;
     });
+  }
 
+  // Check if a post list row/item contains photo attachments (for boards without a dedicated photo tab)
+  function hasPhotoAttachment(row) {
+    if (!row) return false;
+
+    // 1. Check subject text (e.g. '사진' category)
+    const subjectEl = row.querySelector('.gall_subject');
+    if (subjectEl) {
+      const subj = subjectEl.textContent.trim();
+      if (subj.includes('사진')) return true;
+    }
+
+    // 2. Check desktop DC title photo icon (.icon_pic, .icon_recomimg)
+    const photoIcon = row.querySelector(
+      '.icon_pic, .icon_recomimg, .icon_img.icon_pic, .icon_img.icon_recomimg, [class*="icon_pic"], em.icon_pic, em.icon_recomimg'
+    );
+    if (photoIcon) return true;
+
+    // 3. Check mobile DC photo icon
+    const mobilePhotoIcon = row.querySelector('.sp-lst-img, .sp-photo, [class*="sp-lst-img"], [class*="ico_pic"]');
+    if (mobilePhotoIcon) return true;
+
+    // 4. Check general image icon excluding text/survey/ad icons
+    const anyImgIcon = row.querySelector('.icon_img');
+    if (anyImgIcon) {
+      const cls = anyImgIcon.className || '';
+      if (!cls.includes('icon_txt') && !cls.includes('survey') && !cls.includes('notice') && !cls.includes('ad')) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // Find adjacent post (previous / next) with smart photo filtering for boards without a photo tab
+  function getAdjacentPostUrl(direction, preferPhotos = true) {
+    const currentPostNo = extractPostNo(window.location.href);
+    const validRows = getValidPostRows(currentPostNo);
+
+    if (validRows.length === 0) {
+      return null;
+    }
+
+    const currentIdx = findCurrentPostRowIndex(validRows, currentPostNo);
     if (currentIdx === -1) {
       return null;
     }
 
-    // direction: 'up' -> targetIdx = currentIdx - 1 (위쪽 행: 더 최신 글)
-    // direction: 'down' -> targetIdx = currentIdx + 1 (아래쪽 행: 더 과거 글)
-    const targetIdx = direction === 'up' ? currentIdx - 1 : currentIdx + 1;
+    const step = direction === 'up' ? -1 : 1;
+    let targetIdx = -1;
 
+    // 1. If photo filtering is preferred (e.g. photo tab does not exist / mixed post list),
+    // look for the next row that contains photo attachments
+    if (preferPhotos) {
+      let candidateIdx = currentIdx + step;
+      while (candidateIdx >= 0 && candidateIdx < validRows.length) {
+        if (hasPhotoAttachment(validRows[candidateIdx])) {
+          targetIdx = candidateIdx;
+          break;
+        }
+        candidateIdx += step;
+      }
+    }
+
+    // 2. Fallback: If no photo post found ahead or preferPhotos is false, take immediate adjacent valid row
+    if (targetIdx === -1) {
+      const fallbackIdx = currentIdx + step;
+      if (fallbackIdx >= 0 && fallbackIdx < validRows.length) {
+        targetIdx = fallbackIdx;
+      }
+    }
+
+    // Boundary checks
     if (targetIdx < 0) {
       return { error: 'top', message: '목록의 가장 최신 글입니다.' };
     }
@@ -838,7 +1038,8 @@
 
     return {
       url: targetLink ? targetLink.href : null,
-      title: targetTitle
+      title: targetTitle,
+      hasPhoto: hasPhotoAttachment(targetRow)
     };
   }
 
@@ -858,47 +1059,116 @@
 
     if (result.url) {
       const label = direction === 'up' ? '위쪽 최신 글' : '아래쪽 이전 글';
+      const photoHint = result.hasPhoto ? ' 📷' : '';
       const titleHint = result.title ? ` (${result.title.length > 12 ? result.title.slice(0, 12) + '...' : result.title})` : '';
-      showViewerToast(`${label}로 이동 중...${titleHint}`);
+      showViewerToast(`${label}로 이동 중...${photoHint}${titleHint}`);
 
       try {
-        sessionStorage.setItem('disagall_auto_open', '1');
+        sessionStorage.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, '1');
       } catch (e) {}
 
       setTimeout(() => {
         window.location.href = result.url;
-      }, 150);
+      }, CONFIG.POST_NAV_DELAY);
     }
   }
 
-  // Keyboard Event Handler
+  // Floating notification when auto-navigated to a post with no photos (e.g. photo tab absent)
+  function showNoPhotoNotice() {
+    let noticeEl = document.getElementById('disagall-no-photo-notice');
+    if (noticeEl) noticeEl.remove();
+
+    noticeEl = document.createElement('div');
+    noticeEl.id = 'disagall-no-photo-notice';
+    noticeEl.className = 'disagall-no-photo-notice';
+    noticeEl.innerHTML = `
+      <div class="disagall-notice-content">
+        <span class="disagall-notice-icon">📷</span>
+        <span class="disagall-notice-text">본문에 사진이 없는 글입니다. (사진 탭 미적용)</span>
+      </div>
+      <div class="disagall-notice-btns">
+        <button id="disagall-notice-prev" class="disagall-notice-btn" title="이전 글 (↑ / W)">↑ 이전 글</button>
+        <button id="disagall-notice-next" class="disagall-notice-btn" title="다음 글 (↓ / S)">↓ 다음 글</button>
+        <button id="disagall-notice-close" class="disagall-notice-btn close" title="닫기 (ESC)">✕</button>
+      </div>
+    `;
+
+    document.body.appendChild(noticeEl);
+
+    // Event listeners
+    const prevBtn = noticeEl.querySelector('#disagall-notice-prev');
+    const nextBtn = noticeEl.querySelector('#disagall-notice-next');
+    const closeBtn = noticeEl.querySelector('#disagall-notice-close');
+
+    if (prevBtn) prevBtn.addEventListener('click', () => navigatePost('up'));
+    if (nextBtn) nextBtn.addEventListener('click', () => navigatePost('down'));
+    if (closeBtn) closeBtn.addEventListener('click', () => noticeEl.remove());
+
+    // Allow keyboard navigation even when overlay is closed
+    const handleNoticeKey = (e) => {
+      if (['ArrowUp', 'w', 'W'].includes(e.key)) {
+        e.preventDefault();
+        window.removeEventListener('keydown', handleNoticeKey);
+        navigatePost('up');
+      } else if (['ArrowDown', 's', 'S'].includes(e.key)) {
+        e.preventDefault();
+        window.removeEventListener('keydown', handleNoticeKey);
+        navigatePost('down');
+      } else if (e.key === 'Escape') {
+        noticeEl.remove();
+        window.removeEventListener('keydown', handleNoticeKey);
+      }
+    };
+    window.addEventListener('keydown', handleNoticeKey);
+
+    // Auto dismiss after specified duration
+    setTimeout(() => {
+      if (noticeEl && noticeEl.parentNode) {
+        noticeEl.remove();
+        window.removeEventListener('keydown', handleNoticeKey);
+      }
+    }, CONFIG.NO_PHOTO_NOTICE_DURATION);
+  }
+
+  // Key-Action mapping for viewer shortcuts
+  const KEY_ACTIONS = {
+    'Escape': () => closeViewer(),
+    'ArrowLeft': () => navigate(-1),
+    'a': () => navigate(-1),
+    'A': () => navigate(-1),
+    'ArrowRight': () => navigate(1),
+    'd': () => navigate(1),
+    'D': () => navigate(1),
+    'ArrowUp': () => navigatePost('up'),
+    'w': () => navigatePost('up'),
+    'W': () => navigatePost('up'),
+    'ArrowDown': () => navigatePost('down'),
+    's': () => navigatePost('down'),
+    'S': () => navigatePost('down'),
+    'r': () => triggerPostRecommend(),
+    'R': () => triggerPostRecommend(),
+    'c': () => triggerPostRecommend(),
+    'C': () => triggerPostRecommend()
+  };
+
+  // Keyboard Event Handler with input focus guard and key repeat prevention
   function handleKeyDown(e) {
     if (!overlayEl || !overlayEl.classList.contains('active')) return;
+    if (e.repeat) return; // Prevent rapid duplicate calls on held-down keys
 
-    if (e.key === 'Escape') {
+    // Edge case: Ignore shortcuts if user is typing inside an input/textarea/editable element
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) {
+      if (e.key === 'Escape') {
+        e.target.blur();
+      }
+      return;
+    }
+
+    const action = KEY_ACTIONS[e.key];
+    if (action) {
       e.preventDefault();
       e.stopPropagation();
-      closeViewer();
-    } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-      e.preventDefault();
-      e.stopPropagation();
-      navigate(-1);
-    } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-      e.preventDefault();
-      e.stopPropagation();
-      navigate(1);
-    } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
-      e.preventDefault();
-      e.stopPropagation();
-      navigatePost('up');
-    } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
-      e.preventDefault();
-      e.stopPropagation();
-      navigatePost('down');
-    } else if (e.key === 'r' || e.key === 'R' || e.key === 'c' || e.key === 'C') {
-      e.preventDefault();
-      e.stopPropagation();
-      triggerPostRecommend();
+      action();
     }
   }
 
@@ -931,7 +1201,12 @@
     }
 
     overlayEl.classList.add('active');
+    previousBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden'; // Prevent page scroll behind overlay
+
+    if (!hasVotedCurrentPost && recommendBtnEl) {
+      recommendBtnEl.classList.remove('voted');
+    }
 
     updateRecommendButtonUi();
     showImage(targetIndex);
@@ -941,7 +1216,7 @@
   function closeViewer() {
     if (overlayEl) {
       overlayEl.classList.remove('active');
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousBodyOverflow;
     }
   }
 
@@ -955,29 +1230,35 @@
     });
   }
 
-  // Window message listener for test pages or internal triggers
+  // Window message listener for test pages or internal triggers (with origin validation)
   window.addEventListener('message', (event) => {
+    if (event.origin && event.origin !== window.location.origin && window.location.origin !== 'null') return;
     if (event.data && event.data.action === 'disagall_test_open') {
       openViewer();
     }
   });
 
-  // Window Resize Listener for dynamic viewport fit
+  // Window Resize Listener for dynamic viewport fit (throttled via requestAnimationFrame)
+  let resizeRafId = null;
   window.addEventListener('resize', () => {
     if (overlayEl && overlayEl.classList.contains('active')) {
-      applyFittingAndPadding();
+      if (resizeRafId) cancelAnimationFrame(resizeRafId);
+      resizeRafId = requestAnimationFrame(() => {
+        applyFittingAndPadding();
+        resizeRafId = null;
+      });
     }
   });
 
   // Automatically open viewer if navigated via post navigation (sessionStorage)
   function checkAutoOpen() {
     try {
-      const autoOpen = sessionStorage.getItem('disagall_auto_open');
+      const autoOpen = sessionStorage.getItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
       if (autoOpen === '1') {
-        sessionStorage.removeItem('disagall_auto_open');
+        sessionStorage.removeItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
 
         let attempts = 0;
-        const maxAttempts = 15;
+        const maxAttempts = CONFIG.AUTO_OPEN_MAX_ATTEMPTS;
         const pollTimer = setInterval(() => {
           attempts++;
           forcePreloadPostImages();
@@ -988,8 +1269,10 @@
             openViewer(null, true);
           } else if (attempts >= maxAttempts) {
             clearInterval(pollTimer);
+            // Edge case: Navigated to a post with no photos (e.g. photo tab absent)
+            showNoPhotoNotice();
           }
-        }, 150);
+        }, CONFIG.AUTO_OPEN_POLL_INTERVAL);
       }
     } catch (e) {}
   }
