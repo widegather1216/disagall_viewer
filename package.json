@@ -1,6 +1,6 @@
 {
   "name": "disagall_viewer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest_V3-green.svg)](manifest.json)",
   "main": "background.js",
   "directories": {
@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "node build.js",
+    "pack": "npm run build && rm -f disagall_viewer.zip && zip -r -X disagall_viewer.zip manifest.json background.js content.js content.css popup.html popup.js icon16.png icon48.png icon128.png",
     "test": "node tests/module_import.test.js && node tests/post_navigation.test.js && node tests/recommend.test.js"
   },
   "repository": {

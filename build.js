@@ -6,7 +6,7 @@ const esbuild = require('esbuild');
 const USERSCRIPT_BANNER = `// ==UserScript==
 // @name         디시 사진 뷰어 (Disagall Viewer - Safari / Tampermonkey)
 // @namespace    https://gall.dcinside.com/
-// @version      1.0.0
+// @version      1.1.0
 // @description  디시인사이드 게시글 사진을 화면에 맞춰 원본 화질 그대로 감상하는 유저스크립트 (Safari 지원)
 // @author       Beomjun Kim
 // @match        https://gall.dcinside.com/*
