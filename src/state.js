@@ -24,6 +24,11 @@ export const state = {
 
   toastTimer: null,
 
+  // Immersion & UI Auto-Hide
+  idleTimer: null,
+  autoHideUi: true,
+  isUiHidden: false,
+
   // Zoom & Pan
   zoom: {
     scale: 1.0,

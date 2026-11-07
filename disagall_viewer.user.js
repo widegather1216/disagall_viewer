@@ -25,7 +25,10 @@
     AUTO_OPEN_POLL_INTERVAL: 150,
     RECOMMEND_SYNC_DELAYS: [500, 1200],
     RECOMMEND_THROTTLE_MS: 1200,
-    NO_PHOTO_NOTICE_DURATION: 8e3
+    NO_PHOTO_NOTICE_DURATION: 8e3,
+    // Immersion & UI Auto-Hide
+    UI_IDLE_TIMEOUT: 2500,
+    STORAGE_KEY_AUTO_HIDE_UI: "autoHideUi"
   };
 
   // src/state.js
@@ -50,6 +53,10 @@
       recommendBtnEl: null
     },
     toastTimer: null,
+    // Immersion & UI Auto-Hide
+    idleTimer: null,
+    autoHideUi: true,
+    isUiHidden: false,
     // Zoom & Pan
     zoom: {
       scale: 1,
