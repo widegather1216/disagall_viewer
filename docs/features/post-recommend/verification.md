@@ -1,31 +1,55 @@
-# Verification & Defect Log - Post Recommend
+# 🧪 [post-recommend] Verification & Ticket Logs
 
-### [DEFECT-REC-01] 추천 1회 실행 시 디시인사이드 "추천은 1일 1회만 가능합니다" 알림 발생
-- **현재 상태**: 🟢 RESOLVED (수정 완료)
-- **발생 위치**: `content.js` 내 `dispatchRecommendClick(btn)`
-- **증상**: 
-  - 뷰어 내에서 단축키 `R` 또는 [개추] 버튼을 한 번만 눌렀음에도 디시인사이드에서 `"추천은 1일 1회만 가능합니다"` 알림 팝업이 뜨며 추천이 거부되거나 경고가 노출됨.
-- **근본 원인**:
-  - `dispatchRecommendClick(btn)` 내부에서 `btn.click()` 실행 후 바로 다음 줄에서 `btn.dispatchEvent(mouseEvt)`를 무조건 순차 실행하는 2중 디스패치 구조였음.
-  - 이로 인해 이벤트 리스너가 수 마이크로초 간격으로 2회 연속 트리거되어 디시 내부의 1일 1회 중복 방지 방어벽에 걸림.
-- **해결 내역**:
-  - `btn.click()` 실행 후 성공 시 즉시 `return true`로 종료.
-  - 네이티브 클릭이 실패하거나 지원되지 않는 환경에서만 `dispatchEvent`를 fallback으로 단일 실행하도록 변경.
-  - `tests/recommend.test.js`에 [Test 7: Single-dispatch 검증] 추가 및 100% 통과.
+- **검증 상태**: `🟢 QA & Audit Sign-Off`
+- **인수 조건 통과율**: `4 / 4 (100%)`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
 
 ---
 
-### [DEFECT-REC-02] 미추천 게시글인데도 "이미 추천을 했다"고 뜨며 추천 실행이 차단되는 현상
-- **현재 상태**: 🟢 RESOLVED (수정 완료)
-- **발생 위치**: `content.js` 내 `triggerPostRecommend()`의 `isAlreadyVoted` 검사 로직
-- **증상**:
-  - 사용자가 해당 글에 추천을 누른 적이 전혀 없는데도 뷰어에서 `R` 키나 버튼을 누르면 "이미 개념글 추천을 완료한 게시글입니다. 👍" 토스트가 뜨며 실제 추천이 실행되지 않음.
-  - 뷰어를 닫고 디시 웹페이지의 추천 버튼을 직접 클릭하면 정상적으로 추천이 반영됨.
-- **근본 원인**:
-  - 디시인사이드 데스크톱 실제 마크업(`<button type="button" class="btn_recom_up on">`) 분석 결과, 디시 데스크톱 본문 추천 버튼에는 **처음부터 기본 클래스로 `on`이 포함**되어 있음.
-  - 기존 로직의 `const isAlreadyVoted = btn.classList.contains('on') || ...` 사전 가드에 의해 모든 미추천 글이 이미 추천된 글로 오판단되어 조기 리턴됨.
-- **해결 내역**:
-  - 사전 `isAlreadyVoted` 검사식에서 `btn.classList.contains('on')` 가드 제거.
-  - 세션 기반 플래그 `hasVotedCurrentPost`를 도입하여, 현재 글에서 추천 후 카운트가 실제로 증가했을 때(`afterCount > beforeCount`)에만 추천 완료 상태로 전환.
-  - 뷰어 오픈(`openViewer`) 시 아직 투표하지 않은 글에 대해 버튼의 `voted` 클래스를 리셋.
-  - `tests/recommend.test.js`의 `dc_sample.html` 통합 검증([Test 6]) 및 단위 검증([Test 3])을 통해 클래스 `on`이 있어도 미추천 상태에서 정상 디스패치됨을 확인.
+## ✅ 1. 인수 조건 (Acceptance Criteria - Given/When/Then)
+
+- **AC-01 (헤더 추천 버튼 클릭 및 단축키 R/C)**:
+  - **Given** 사진 뷰어가 활성화되어 있을 때,
+  - **When** 헤더의 [개추] 버튼을 누르거나 키보드 `R`/`C`를 누르면,
+  - **Then** 본문 추천 버튼이 단 1회 클릭 디스패치되고 즉시 확인 토스트가 출력된다.
+- **AC-02 (실시간 카운트 업 동기화)**:
+  - **Given** 추천 디스패치가 성공적으로 완료되었을 때,
+  - **When** 500ms 및 1200ms 후 DOM에서 최신 추천 수를 조회하여 카운트가 증가하면,
+  - **Then** 버튼 라벨이 증가된 수치로 갱신되고 `.voted` 클래스가 부여된다.
+- **AC-03 (중복 추천 및 광클릭 쓰로틀링 방어)**:
+  - **Given** 사용자가 1.5초 이내에 연속으로 개추 버튼을 누르거나 이미 투표한 글인 경우,
+  - **When** 추가 입력을 시도하면,
+  - **Then** 디스패치를 차단하고 안내 토스트를 띄워 디시 서버 차단을 방지한다.
+- **AC-04 (미추천 글 `on` 클래스 오탐 방어)**:
+  - **Given** 디시 데스크톱 본문 버튼에 기본 클래스로 `on`이 포함되어 있을 때,
+  - **When** 사용자가 첫 추천을 시도하면,
+  - **Then** 미추천 글로 정상 인식되어 추천이 정상 디스패치된다.
+
+---
+
+## 📋 2. 테스트 시나리오 매트릭스 (Test Scenario Matrix)
+
+| ID | 구분 | 시나리오 요약 | 관련 AC | 검증 결과 (`⏳` / `PASS` / `FAIL`) | 비고 (티켓 링크) |
+| :--- | :---: | :--- | :--- :---: | :---: | :--- |
+| `TC-HP-01` | Happy | 추천 수 파싱 및 헤더 버튼 라벨 정상 동기화 | `AC-01` | `PASS` | - |
+| `TC-HP-02` | Happy | `r`/`c` 단축키 및 클릭 시 1회성 단일 디스패치 | `AC-01` | `PASS` | [DEFECT-01] |
+| `TC-HP-03` | Happy | 투표 후 500ms/1200ms 비동기 카운트 업 반영 | `AC-02` | `PASS` | - |
+| `TC-BD-01` | Boundary | 기본 `on` 클래스가 존재하는 데스크톱 추천 버튼 정상 투표 | `AC-04` | `PASS` | [DEFECT-02] |
+| `TC-NG-01` | Negative | 1.5초 이내 광클릭 시 쓰로틀링 차단 | `AC-03` | `PASS` | - |
+| `TC-NG-02` | Negative | 뷰어 비활성(`!active`) 상태 시 R/C 단축키 인터셉트 차단 | `AC-01` | `PASS` | - |
+
+---
+
+## 🚨 3. 결함 리포트 (Defect Logs)
+
+### [DEFECT-01] 추천 1회 실행 시 디시인사이드 "추천은 1일 1회만 가능합니다" 알림 발생
+- **현재 상태**: 🟢 RESOLVED — 수정: `btn.click()` 단일 디스패치 분기 처리 | 회귀 테스트: `PASS`
+
+### [DEFECT-02] 미추천 게시글인데도 "이미 추천을 했다"고 뜨며 추천 실행이 차단되는 현상
+- **현재 상태**: 🟢 RESOLVED — 수정: `on` 클래스 사전 가드 제거 및 세션 카운트 증분 판별 | 회귀 테스트: `PASS`
+
+---
+
+## 🧐 4. 코드 품질 감사 리포트 (Audit & Refactoring Logs)
+
+*(현재 등록된 미해결 리팩토링 티켓 없음)*

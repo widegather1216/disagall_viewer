@@ -1,33 +1,41 @@
-# Feature: 위/아래 방향키 게시글 탐색 (Post Navigation)
+# 📦 [post-navigation] 위/아래 방향키 게시글 탐색 (Post Navigation)
 
-## 📌 기능 개요
-디시 사진 뷰어가 열려 있는 상태에서 `↑` / `↓` 방향키를 눌러 하단 글 목록(사진탭/말머리 목록 포함)의 이전/다음 게시글로 이동하고, 연속 감상 모드(`sessionStorage`)를 통해 새 게시글에서도 뷰어가 자동으로 열려 끊김 없이 사진을 감상할 수 있는 2차원 내비게이션 기능.
+- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
+- **구현 진척도**: `[■■■■] 4/4 Steps`
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
-## 🧭 키 매핑 및 동작 규칙
-- `←` / `→`: 현재 게시글 본문의 이전/다음 사진 넘기기
-- `↑` (ArrowUp / w / W): 목록 상 위쪽 글(최신 글)로 이동
-- `↓` (ArrowDown / s / S): 목록 상 아래쪽 글(이전 글)로 이동
-- 단축키 동작 조건: **사진 뷰어가 활성화(`active`)된 상태에서만 동작** (웹 브라우징 기본 스크롤과의 충돌 방지)
+---
 
-## 🏗️ 아키텍처 및 구현 레이어
-1. **DOM 탐색 레이어 (`getAdjacentPostUrl(direction)`)**
-   - 하단 갤러리 리스트(`table.gall_list tbody tr.ub-content`) 파싱
-   - 공지, 설문, AD 광고 행 필터링
-   - 현재 활성 게시글(`tr.crt`, `.crt_icon`, `data-no`) 탐색
-   - 인접(위/아래) 유효 행의 제목 링크(`a[href]`) 추출
-2. **상태 및 연속 감상 레이어 (`navigatePost(direction)`)**
-   - 유효 링크가 있을 경우 `sessionStorage.setItem('disagall_auto_open', '1')` 플래그 설정 후 `window.location.href`로 페이지 전환
-   - 다음/이전 글이 없는 경우(목록의 시작/끝) 인디케이터 토스트 안내
-   - 페이지 로드 시 플래그 확인 후 `openViewer()` 자동 호출
-3. **UI/UX 피드백 레이어**
-   - 하단 힌트 바에 `↑ ↓ 이전/다음 글` 단축키 힌트 추가
-   - 화면 중앙/상단에 이동 안내 및 경계 도달 알림 토스트 표시
+## 🎯 1. 도메인 개요 (Overview)
+디시 사진 뷰어가 열려 있는 상태에서 `↑` / `↓` 방향키를 눌러 하단 글 목록의 이전/다음 게시글로 이동하고, 연속 감상 모드(`sessionStorage`)를 통해 새 게시글에서도 뷰어가 자동으로 열려 끊김 없이 사진을 감상할 수 있는 2차원 내비게이션 기능입니다.
 
-## 📋 구현 체크리스트
-- [x] 1. `getAdjacentPostUrl(direction)` 순수 탐색 함수 구현
-- [x] 2. `showToast(message)` 알림 함수 구현
-- [x] 3. `handleKeyDown`에 `ArrowUp`, `ArrowDown` 핸들러 추가
-- [x] 4. `sessionStorage` 기반 자동 뷰어 오픈 부트스트랩 로직 추가
-- [x] 5. 뷰어 하단 `disagall-keyhints`에 안내 추가
-- [x] 6. `content.js`, `disagall_viewer.user.js`, `Safari extension` 리소스 동기화
-- [x] 7. `test_page.html`에 테스트용 게시판 목록 추가 및 동작 검증 (Unit tests PASS)
+---
+
+## 🗺️ 2. 계층별 구현 로드맵 (Layer-Chunked Roadmap)
+
+### ✅ Baseline (As-Is 기구현 완료)
+
+- [x] **Step 1 [Schema & Types / Config & Constants]**: `CONFIG.STORAGE_KEY_AUTO_OPEN`, `CONFIG.POST_NAV_DELAY`, 행 정보 구조체 정의
+  - 📂 구현: [`src/config.js`](../../../src/config.js) | 🧪 테스트: [`tests/post_navigation.test.js`](../../../tests/post_navigation.test.js) (`PASS`)
+- [x] **Step 2 [Data Access & API / DOM Parser]**: `getAdjacentPostUrl()`, 데스크톱/모바일 테이블 크롤링, 공지/광고 필터링, `crt_icon` 현재 글 식별(DEFECT-01 해결)
+  - 📂 구현: [`src/parser/post_navigator.js`](../../../src/parser/post_navigator.js) | 🧪 테스트: [`tests/post_navigation.test.js`](../../../tests/post_navigation.test.js) (`PASS`)
+- [x] **Step 3 [Domain Service & State / Navigation Controller]**: `navigatePost('up'|'down')`, `sessionStorage` 기반 연속 감상 모드 전환, 경계 도달 토스트 안내
+  - 📂 구현: [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js) | 🧪 테스트: [`tests/post_navigation.test.js`](../../../tests/post_navigation.test.js) (`PASS`)
+- [x] **Step 4 [UI & Integration / Shortcuts & Notice Bar]**: `handleKeyDown`에 `↑`/`↓`/`W`/`S` 바인딩, 하단 키힌트 바 업데이트, 사진 없는 글 알림 바(`#disagall-no-photo-notice`) 마운트
+  - 📂 구현: [`src/ui/overlay.js`](../../../src/ui/overlay.js), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js) | 🧪 테스트: [`tests/post_navigation.test.js`](../../../tests/post_navigation.test.js) (`PASS`)
+
+---
+
+## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
+
+- **직전 완료 작업**: 2026-11-07 / `interactive-feature-planner` / `post-navigation` 도메인 위키 표준화 및 5대 문서군(`architecture.md`, `spec.md` 등) 정비 완료
+- **생성/수정된 핵심 파일**:
+  - `src/parser/post_navigator.js`: 게시판 목록 파싱 및 스마트 사진글 스킵 알고리즘
+  - `src/controller/viewer_controller.js`: 세션 플래그 설정 및 연속 감상 부트스트랩
+  - `tests/post_navigation.test.js`: 통합 단위 테스트 7종 검증
+- **검증 완료된 테스트 실행 명령어**:
+  - `node tests/post_navigation.test.js`: 전 케이스 PASS
+- **다음 세션 포커스 및 주의사항 (Caveats)**:
+  - 디시 목록에서 현재 글(`crt`)은 글 번호가 빈 문자열(`""`)일 수 있으므로 번호 대신 `crt_icon`이나 `className`으로 판별해야 함.
+  - `sessionStorage` 키는 읽은 직후 `removeItem`하여 새로고침 시 무한 뷰어 오픈 루프를 방지할 것.

@@ -1,32 +1,41 @@
-# Feature: 뷰어 내 개념글 추천(개추) 연동 (Post Recommend)
+# 📦 [post-recommend] 뷰어 내 개념글 추천 연동 (Post Recommend)
 
-## 📌 기능 개요
-디시 사진 뷰어로 사진을 감상하는 도중, 뷰어를 닫고 본문 하단으로 스크롤할 필요 없이 상단 헤더의 버튼이나 단축키(`r` / `c`)를 통해 현재 게시글에 개념글 추천(개추)을 누를 수 있는 편의 기능.
+- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
+- **구현 진척도**: `[■■■■] 4/4 Steps`
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
-## 🧭 키 매핑 및 동작 규칙
-- **UI 버튼**: 상단 헤더 우측(`disagall-header-right`)에 `👍 개추 (추천수)` 버튼 배치
-- **단축키**: `r` (Recommend) 또는 `c` (개추)
-- **동작 조건**: **뷰어가 활성화(`overlayEl.classList.contains('active')`)된 상태에서만 동작**
-- **동작 방식**: 본문의 실제 디시 추천 버튼(`button.btn_recom_up` / 모바일 `.btn-recom`) 탐색 후 프로그래밍 방식의 `.click()` 호출
+---
 
-## 🏗️ 아키텍처 및 구현 레이어
-1. **추천 DOM 탐색 및 제어 레이어 (`triggerPostRecommend()`, `getPostRecommendCount()`)**
-   - 데스크톱/모바일 추천 버튼 엘리먼트 쿼리
-   - 현재 추천 수 추출 및 반환
-   - 버튼 클릭 이벤트 트리거 및 예외 방어
-2. **UI 상태 및 실시간 동기화 레이어**
-   - 뷰어 헤더에 `disagall-btn-recommend` 버튼 렌더링
-   - 뷰어 오픈 시 최신 추천 수로 버튼 라벨 동기화
-   - 추천 실행 시 뷰어 토스트 피드백 (`"개념글 추천을 눌렀습니다! 👍"`)
-   - 500ms, 1200ms 후 추천 수 재조회하여 실시간 카운트 업 반영
-3. **단축키 바인딩 레이어**
-   - `handleKeyDown`에 `r`, `R`, `c`, `C` 핸들러 등록
-   - 하단 단축키 바에 `<kbd>R</kbd> 개추` 추가
+## 🎯 1. 도메인 개요 (Overview)
+디시 사진 뷰어로 사진을 감상하는 도중, 뷰어를 닫고 본문 하단으로 스크롤할 필요 없이 상단 헤더의 버튼이나 단축키(`r` / `c`)를 통해 현재 게시글에 개념글 추천(개추)을 누를 수 있는 편의 기능입니다.
 
-## 📋 구현 체크리스트
-- [x] 1. `getPostRecommendCount()` 및 `triggerPostRecommend()` DOM 헬퍼 함수 구현
-- [x] 2. `createOverlay()` 헤더에 추천 버튼 마크업 및 이벤트 리스너 추가
-- [x] 3. `handleKeyDown`에 `r` / `c` 단축키 바인딩 및 하단 키 힌트 추가
-- [x] 4. `content.css`에 추천 버튼 스타일링 (모던 블루 포인트, 호버/액티브 효과)
-- [x] 5. 단위 및 통합 테스트 작성 (`tests/recommend.test.js`) 및 PASS 검증
-- [x] 6. `disagall_viewer.user.js`, Safari extension, `disagall_viewer.zip` 리소스 동기화
+---
+
+## 🗺️ 2. 계층별 구현 로드맵 (Layer-Chunked Roadmap)
+
+### ✅ Baseline (As-Is 기구현 완료)
+
+- [x] **Step 1 [Schema & Types / Config & Constants]**: `RECOMMEND_THROTTLE_MS`(1500ms), 2단계 갱신 지연(`[500, 1200]`) 상수 및 추천 정보 구조체 정의
+  - 📂 구현: [`src/controller/recommend_controller.js`](../../../src/controller/recommend_controller.js) | 🧪 테스트: [`tests/recommend.test.js`](../../../tests/recommend.test.js) (`PASS`)
+- [x] **Step 2 [Data Access & API / Recommend Parser]**: 본문 추천 버튼 탐색(`findNativeRecommendButton`), 추천 수 파싱(`getPostRecommendCount`), 투표 가능 여부 검증
+  - 📂 구현: [`src/parser/recommend_parser.js`](../../../src/parser/recommend_parser.js) | 🧪 테스트: [`tests/recommend.test.js`](../../../tests/recommend.test.js) (`PASS`)
+- [x] **Step 3 [Domain Service & State / Recommend Controller]**: `triggerPostRecommend()`, 단일 클릭 디스패치(DEFECT-01), `on` 클래스 사전 가드 제거(DEFECT-02), 2단계 카운트 업 동기화
+  - 📂 구현: [`src/controller/recommend_controller.js`](../../../src/controller/recommend_controller.js) | 🧪 테스트: [`tests/recommend.test.js`](../../../tests/recommend.test.js) (`PASS`)
+- [x] **Step 4 [UI & Integration / Overlay & Styling]**: 헤더 개추 버튼 마크업(`#disagall-btn-recommend`), `r`/`c` 단축키 바인딩, 하단 키힌트 추가, `content.css` 모던 블루 포인트 스타일 적용
+  - 📂 구현: [`src/ui/overlay.js`](../../../src/ui/overlay.js), [`content.css`](../../../content.css) | 🧪 테스트: [`tests/recommend.test.js`](../../../tests/recommend.test.js) (`PASS`)
+
+---
+
+## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
+
+- **직전 완료 작업**: 2026-11-07 / `interactive-feature-planner` / `post-recommend` 도메인 위키 5대 문서군 표준화 완료
+- **생성/수정된 핵심 파일**:
+  - `src/parser/recommend_parser.js`: 데스크톱/모바일 추천 버튼 및 추천수 크롤러
+  - `src/controller/recommend_controller.js`: 단일 디스패치 및 2단계 비동기 갱신 컨트롤러
+  - `tests/recommend.test.js`: 통합 단위 테스트 7종 전원 검증 완료
+- **검증 완료된 테스트 실행 명령어**:
+  - `node tests/recommend.test.js`: 전 케이스 PASS
+- **다음 세션 포커스 및 주의사항 (Caveats)**:
+  - 데스크톱 디시 마크업은 기본적으로 버튼에 `on` 클래스가 있으므로 클래스로 추천 여부를 판단하지 말고 세션 카운트 증분으로 판단할 것.
+  - 이벤트 디스패치는 중복 호출 시 1일 1회 에러를 일으키므로 `btn.click()` 1회만 단독 실행해야 함.
