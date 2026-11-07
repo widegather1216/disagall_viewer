@@ -10,7 +10,7 @@
   "scripts": {
     "build": "node build.js",
     "pack": "npm run build && rm -f disagall_viewer.zip && zip -r -X disagall_viewer.zip manifest.json background.js content.js content.css popup.html popup.js icon16.png icon48.png icon128.png",
-    "test": "node tests/module_import.test.js && node tests/post_navigation.test.js && node tests/recommend.test.js"
+    "test": "node tests/module_import.test.js && node tests/post_navigation.test.js && node tests/recommend.test.js && node tests/immersion.test.js"
   },
   "repository": {
     "type": "git",
