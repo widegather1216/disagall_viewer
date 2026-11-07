@@ -130,6 +130,60 @@
       cursor: pointer;
     }
 
+    /* Toggle Switch */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider-toggle {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #334155;
+      transition: 0.2s ease;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .slider-toggle:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 2px;
+      bottom: 2px;
+      background-color: #f8fafc;
+      transition: 0.2s ease;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider-toggle {
+      background-color: var(--accent-color);
+      border-color: var(--accent-color);
+    }
+
+    input:checked + .slider-toggle:before {
+      transform: translateX(18px);
+    }
+
+    input:focus-visible + .slider-toggle {
+      outline: 2px solid var(--accent-color);
+      outline-offset: 2px;
+    }
+
     .footer {
       text-align: center;
       font-size: 11px;
@@ -184,6 +238,19 @@
       <span class="setting-val" id="padding-val">24px</span>
     </div>
     <input type="range" id="padding-slider" min="0" max="100" value="24">
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      🎬 몰입 모드 (UI 자동 숨김)
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">2.5초 미조작 시 UI 자동 숨김</span>
+      <label class="switch" title="마우스 미조작 2.5초 후 헤더 및 컨트롤 자동 숨김">
+        <input type="checkbox" id="auto-hide-ui-toggle" checked aria-label="몰입 모드 (UI 자동 숨김) 토글">
+        <span class="slider-toggle"></span>
+      </label>
+    </div>
   </div>
 
   <div class="footer">
