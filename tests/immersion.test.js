@@ -1,5 +1,7 @@
 // Unit tests for viewer-immersion (Disagall Viewer)
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 
 async function run() {
   console.log('🧪 Starting Viewer Immersion Unit Tests...\n');
@@ -664,6 +666,75 @@ async function run() {
     });
   });
   console.log('✅ Test 14: Controller storage init & chrome.storage.onChanged live sync verified');
+
+  // 15. Verify overlay.js buildOverlayHtml() keyhints include H (UI숨김) and F (전체화면)
+  const { buildOverlayHtml } = await import('../src/ui/overlay.js');
+  const overlayHtml = buildOverlayHtml();
+  assert(
+    overlayHtml.includes('<div class="disagall-keyhint"><span class="disagall-kbd">H</span> UI숨김</div>'),
+    'Overlay keyhints must include H UI숨김 badge'
+  );
+  assert(
+    overlayHtml.includes('<div class="disagall-keyhint"><span class="disagall-kbd">F</span> 전체화면</div>'),
+    'Overlay keyhints must include F 전체화면 badge'
+  );
+  assert(
+    overlayHtml.includes('<div class="disagall-keyhint"><span class="disagall-kbd">ESC</span> 닫기</div>'),
+    'Overlay keyhints must preserve ESC 닫기 badge'
+  );
+  console.log('✅ Test 15: Overlay HTML keyhints (H UI숨김, F 전체화면) verified');
+
+  // 16. Verify content.css immersion rules (.disagall-idle, .disagall-ui-hidden, transitions, drag-cursor guard)
+  const cssContent = fs.readFileSync(path.join(__dirname, '../content.css'), 'utf8');
+  assert(
+    cssContent.includes('#disagall-viewer-overlay.disagall-idle') &&
+      cssContent.includes('#disagall-viewer-overlay.disagall-ui-hidden'),
+    'content.css must define #disagall-viewer-overlay.disagall-idle and .disagall-ui-hidden selectors'
+  );
+  assert(
+    /\#disagall-viewer-overlay\.disagall-idle,\s*\#disagall-viewer-overlay\.disagall-ui-hidden\s*\{[^}]*cursor:\s*none;/s.test(cssContent),
+    'content.css must hide cursor (cursor: none;) on .disagall-idle and .disagall-ui-hidden'
+  );
+  assert(
+    cssContent.includes(':not([style*="grabbing"])'),
+    'content.css must preserve grabbing cursor while zoom-pan dragging'
+  );
+  assert(
+    cssContent.includes('#disagall-viewer-overlay.disagall-idle .disagall-header') &&
+      cssContent.includes('#disagall-viewer-overlay.disagall-ui-hidden .disagall-header') &&
+      cssContent.includes('#disagall-viewer-overlay.disagall-idle .disagall-footer') &&
+      cssContent.includes('#disagall-viewer-overlay.disagall-ui-hidden .disagall-footer') &&
+      cssContent.includes('#disagall-viewer-overlay.disagall-idle .disagall-nav-btn') &&
+      cssContent.includes('#disagall-viewer-overlay.disagall-ui-hidden .disagall-nav-btn'),
+    'content.css must target header, footer, and nav-btn for both .disagall-idle and .disagall-ui-hidden'
+  );
+  assert(
+    /opacity:\s*0;\s*pointer-events:\s*none;\s*transition:\s*opacity\s+0\.3s\s+ease;/s.test(cssContent),
+    'content.css hidden rule must apply opacity: 0; pointer-events: none; transition: opacity 0.3s ease;'
+  );
+  assert(
+    /\.disagall-header\s*\{[^}]*opacity:\s*1;\s*pointer-events:\s*auto;\s*transition:\s*opacity\s+0\.15s\s+ease;/s.test(cssContent),
+    '.disagall-header must restore opacity: 1 and pointer-events: auto within 0.15s'
+  );
+  assert(
+    /\.disagall-footer\s*\{[^}]*opacity:\s*1;\s*pointer-events:\s*auto;\s*transition:\s*opacity\s+0\.15s\s+ease;/s.test(cssContent),
+    '.disagall-footer must restore opacity: 1 and pointer-events: auto within 0.15s'
+  );
+  assert(
+    /\.disagall-nav-btn\s*\{[^}]*opacity:\s*1;\s*pointer-events:\s*auto;[^}]*opacity\s+0\.15s\s+ease;/s.test(cssContent),
+    '.disagall-nav-btn must restore opacity: 1 and pointer-events: auto with 0.15s opacity transition'
+  );
+  console.log('✅ Test 16: content.css immersion cursor, fade-out/restore transitions, and drag guard verified');
+
+  // 17. Verify popup.html immersion shortcut & timeout guidance consistency
+  const popupHtml = fs.readFileSync(path.join(__dirname, '../popup.html'), 'utf8');
+  assert(popupHtml.includes('id="auto-hide-ui-toggle"'), 'popup.html must include auto-hide-ui-toggle');
+  assert(popupHtml.includes('2.5초'), 'popup.html must describe 2.5s auto-hide timeout');
+  assert(
+    popupHtml.includes('>H<') && popupHtml.includes('>F<'),
+    'popup.html must document H and F immersion shortcuts'
+  );
+  console.log('✅ Test 17: popup.html immersion toggle and 2.5s/H/F guidance verified');
 
   console.log('\n🎉 ALL VIEWER IMMERSION UNIT TESTS PASSED! 🎉');
 }
