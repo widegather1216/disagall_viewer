@@ -1,7 +1,7 @@
 # 📦 [viewer-immersion] 몰입 모드 및 UI 클린 감상 패키지
 
-- **현재 상태 (Lifecycle)**: `🛠️ Implementing`
-- **구현 진척도**: `[■■■□] 3/4 Steps`
+- **현재 상태 (Lifecycle)**: `🧐 Auditing`
+- **구현 진척도**: `[■■■■] 4/4 Steps`
 - **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
@@ -26,31 +26,31 @@
   - 📂 구현: [`popup.html`](../../../popup.html), [`popup.js`](../../../popup.js) | 🧪 테스트: [`tests/immersion.test.js`](../../../tests/immersion.test.js) (`PASS`)
 - [x] **Step 3 [Domain Service & State / Controller & Timer]**: 마우스 이동(`mousemove`) 감지 기반 2.5초 유휴 타이머 라이프사이클 관리, 수동 숨김 토글(`H`), 브라우저 전체화면 토글(`F`), 드래그/호버 유예 가드레일 및 `closeViewer` 정리 구현 완료
   - 📂 구현: [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js) | 🧪 테스트: [`tests/immersion.test.js`](../../../tests/immersion.test.js) (`PASS`)
-- [ ] **Step 4 [UI & Integration / Overlay & Styling]**: `content.css`에 `.disagall-idle` 및 `.disagall-ui-hidden` 페이드아웃/커서 숨김 스타일 추가, 하단 키힌트 바 및 팝업 안내 업데이트, `npm run build` 번들 동기화
-  - 📂 구현: [`src/ui/overlay.js`](../../../src/ui/overlay.js), [`content.css`](../../../content.css) | 🧪 테스트: `tests/immersion.test.js` (`⏳ 대기`)
+- [x] **Step 4 [UI & Integration / Overlay & Styling]**: `content.css`에 `.disagall-idle` 및 `.disagall-ui-hidden` 페이드아웃/커서 숨김(드래그 커서 유지 포함) 스타일 추가, 하단 키힌트 바(`H UI숨김`, `F 전체화면`) 및 팝업 안내 업데이트, `npm run build` 번들 동기화 완료
+  - 📂 구현: [`src/ui/overlay.js`](../../../src/ui/overlay.js), [`content.css`](../../../content.css), [`popup.html`](../../../popup.html) | 🧪 테스트: [`tests/immersion.test.js`](../../../tests/immersion.test.js) (`PASS`)
 
 ---
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-18 / `clean-code-developer` / Step 3 `[Domain Service & State / Controller & Timer]` 구현 및 3단 검증(신규 단위 테스트 + 전역 회귀 + 번들 빌드 + 위키 헬스체크) 통과
+- **직전 완료 작업**: 2026-11-18 / `clean-code-developer` / Step 4 `[UI & Integration / Overlay & Styling]` 구현, 3단 검증(신규 단위 테스트 + 전역 회귀 + 번들 빌드 + 위키 헬스체크) 통과 및 최종 Step 완료에 따른 스펙/아키텍처 승격 병합 완료
 - **Recent Commits**:
+  - `f491117`: `feat(immersion): add idle fade-out styles, overlay keyhints, and popup shortcut guide`
+  - `e7f3748`: `test(immersion): add tests for overlay keyhints, css immersion rules, and popup hints`
+  - `90b47c1`: `docs(immersion): complete step 3 roadmap and advance control tower to step 4`
   - `a76071f`: `feat(immersion): implement idle timer, shortcut handlers, and storage sync in controller`
   - `42f57e5`: `test(immersion): add unit tests for controller timer, shortcuts, and guardrails`
-  - `cffaeac`: `docs(immersion): complete step 2 roadmap and advance control tower to step 3`
-  - `ba1f51e`: `feat(immersion): add auto hide ui toggle and storage sync in popup`
-  - `249468e`: `test(immersion): add unit tests for popup storage contracts and dom events`
 - **생성/수정된 핵심 파일**:
-  - `src/controller/viewer_controller.js`: `resetIdleTimer()`, `showUi()`, `hideUi()`, `toggleUiManual()`, `toggleFullscreen()`, `exitFullscreenSafely()`, `initImmersionSettings()`, `applyAutoHideUiSetting()` 구현, `KEY_ACTIONS`(`H`/`h`, `F`/`f`, 전체화면 중 `Escape`) 및 입력 필드/수정자/모달/비활성 가드, 드래그·슬라이더·헤더 호버 숨김 유예, `closeViewer()` 타이머/플래그/클래스/전체화면 해제 추가
-  - `tests/immersion.test.js`: 유휴 타이머 2.5초 리셋·만료, `H`/`F` 단축키 및 가드레일, 드래그·슬라이더·헤더 호버 유예, `closeViewer()` 자원 해제, 스토리지 초기화·실시간 동기화 테스트(Test 8~14) 추가
-  - `content.js`, `disagall_viewer.user.js`: `npm run build`를 통한 번들 재생성
+  - `content.css`: `#disagall-viewer-overlay.disagall-idle` / `.disagall-ui-hidden` 커서 숨김(`cursor: none`, 드래그 중 `style*="grabbing"` 예외 보존) 및 `.disagall-header`/`.disagall-footer`/`.disagall-nav-btn` 숨김(`opacity: 0; pointer-events: none; transition: opacity 0.3s ease;`)·복귀(`0.15s ease`) 스타일 추가, `.disagall-keyhints` 반응형 줄바꿈(`flex-wrap: wrap`) 적용
+  - `src/ui/overlay.js`: `buildOverlayHtml()` 내 `.disagall-keyhints` 바에 `H UI숨김`, `F 전체화면` 배지 추가
+  - `popup.html`: `몰입 모드 (UI 자동 숨김)` 카드 내 `H` UI 숨김 토글 · `F` 전체화면 전환 단축키 안내 추가
+  - `tests/immersion.test.js`: Step 4 오버레이 키힌트 배지, `content.css` 규칙/트랜지션/드래그 커서 가드, `popup.html` 안내 검증 테스트(Test 15~17) 추가
+  - `content.js`, `disagall_viewer.user.js`: `npm run build`를 통한 Chrome Extension 및 유저스크립트(CSS 인라인 포함) 번들 동기화
 - **검증 완료된 테스트 실행 명령어**:
-  - `node tests/immersion.test.js`: Step 1~3 전체 14개 단위/통합 테스트 PASS
+  - `node tests/immersion.test.js`: Step 1~4 전체 17개 단위/통합 테스트 PASS
   - `npm test`: `immersion.test.js` 포함 4개 테스트 스위트 전원 PASS
   - `npm run build`: esbuild 기반 Chrome Extension 및 유저스크립트 번들링 완료
   - `python3 -B ~/.gemini/config/skills/interactive-feature-planner/scripts/check_wiki_health.py docs`: exit code 0 확인
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `Step 4 [UI & Integration / Overlay & Styling]` 구현 진행
-  - `content.css`에 `#disagall-viewer-overlay.disagall-idle` 및 `.disagall-ui-hidden` 기반 커서 숨김(`cursor: none`)과 `.disagall-header`/`.disagall-footer`/`.disagall-nav-btn` 페이드아웃(`opacity: 0; pointer-events: none; transition: opacity 0.3s ease;`) 스타일 추가
-  - `src/ui/overlay.js` 하단 `.disagall-keyhints` 바에 `H UI숨김`, `F 전체화면` 배지 마크업 추가 및 `npm run build` 번들 동기화
-  - Step 4 완료 후 `spec.md` `[To-Be]`를 `[As-Is]`로 승격 병합하고 `architecture.md` 태그를 `[기존]`으로 갱신할 것.
+  - `viewer-immersion` 도메인 4/4 Steps 구현이 모두 완료되었으므로, 다음 표준 파이프라인은 `clean-code-auditor` 기반 클린코드 품질 감사(`"viewer-immersion 도메인 클린코드 품질 감사 진행해줘"`) 이후 `user-journey-tester` QA 검증 순으로 진행할 것.
+  - `zoom_pan.js`가 `#disagall-main-img`에 인라인 `style.cursor`를 직접 할당하므로, `content.css`의 `*:not([style*="grabbing"])` 커서 숨김 예외 규칙이 유지되어야 확대 이미지 위 유휴 숨김과 드래그 팬 커서 유지가 동시에 정상 동작함.

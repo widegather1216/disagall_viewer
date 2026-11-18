@@ -20,17 +20,17 @@ flowchart TD
 ## 2. 도메인 파일 트리 및 단일 책임 (File Tree & SRP)
 
 - **설정 및 상태 레이어**:
-  - `[수정]` `src/config.js`: `UI_IDLE_TIMEOUT`(2500), `STORAGE_KEY_AUTO_HIDE_UI` 상수 정의
-  - `[수정]` `src/state.js`: `idleTimer`, `autoHideUi`, `isUiHidden` 상태 관리 및 초기화
+  - `[기존]` `src/config.js`: `UI_IDLE_TIMEOUT`(2500), `STORAGE_KEY_AUTO_HIDE_UI` 상수 정의
+  - `[기존]` `src/state.js`: `idleTimer`, `autoHideUi`, `isUiHidden` 상태 관리 및 초기화
 - **사용자 제어 및 비즈니스 레이어**:
-  - `[수정]` `src/controller/viewer_controller.js`: 마우스 유휴 타이머 시작/리셋, `H` 수동 토글, `F` 전체화면 토글, 호버/드래그 가드레일 로직
-  - `[수정]` `popup.html`: 몰입 모드(자동 숨김) On/Off 스위치 UI 마크업
-  - `[수정]` `popup.js`: 스토리지 조회 및 토글 이벤트 처리
+  - `[기존]` `src/controller/viewer_controller.js`: 마우스 유휴 타이머 시작/리셋, `H` 수동 토글, `F` 전체화면 토글, 호버/드래그 가드레일 로직
+  - `[기존]` `popup.html`: 몰입 모드(자동 숨김) On/Off 스위치 UI 마크업 및 2.5초/H/F 단축키 안내
+  - `[기존]` `popup.js`: 스토리지 조회 및 토글 이벤트 처리
 - **UI 및 프레젠테이션 레이어**:
-  - `[수정]` `src/ui/overlay.js`: 하단 키힌트 바에 `H UI숨김`, `F 전체화면` 배지 추가
-  - `[수정]` `content.css`: `.disagall-idle` 및 `.disagall-ui-hidden` 클래스 스타일(opacity: 0, cursor: none, transition 0.3s) 정의
+  - `[기존]` `src/ui/overlay.js`: 하단 키힌트 바에 `H UI숨김`, `F 전체화면` 배지 추가
+  - `[기존]` `content.css`: `.disagall-idle` 및 `.disagall-ui-hidden` 클래스 스타일(opacity: 0, cursor: none, transition 0.3s/0.15s, 드래그 커서 유지) 정의
 - **테스트 레이어**:
-  - `[신규]` `tests/immersion.test.js`: 유휴 타이머, 토글 로직, 단축키 디스패치 단위 테스트
+  - `[기존]` `tests/immersion.test.js`: 유휴 타이머, 토글 로직, 단축키 디스패치, CSS/오버레이/팝업 통합 단위 테스트
 
 ## 3. 타 도메인 참조 및 경계 계약 (Cross-Domain Dependencies)
 - **참조 계약 (Inbound)**:

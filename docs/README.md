@@ -5,10 +5,10 @@
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
 - **Active 도메인**: [`viewer-immersion`](./features/viewer-immersion/README.md)
-- **현재 단계 (Stage)**: `🛠️ Implementing` (Step 3 완료, Step 4 오버레이 키힌트 및 CSS 페이드아웃 스타일링 개발 대기)
-- **직전 완료 작업**: `viewer-immersion` 도메인 Step 3 [Domain Service & State / Controller & Timer] 구현 및 3단 검증(신규 단위 테스트 + 전역 회귀 + 빌드 + 위키 헬스체크) 통과
+- **현재 단계 (Stage)**: `🧐 Auditing` (Step 1~4 구현 완료, 클린코드 품질 감사 대기)
+- **직전 완료 작업**: `viewer-immersion` 도메인 Step 4 [UI & Integration / Overlay & Styling] 구현, 3단 검증(17개 단위 테스트 + 전역 회귀 + 빌드 + 위키 헬스체크) 통과 및 위키 `[As-Is]` 승격 병합 완료
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `"viewer-immersion 도메인 Step 4 개발 진행해줘"`
+  > `"viewer-immersion 도메인 클린코드 품질 감사 진행해줘"`
 
 ---
 
@@ -21,7 +21,7 @@
 | [`post-navigation`](./features/post-navigation/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `5/5 (100%)` | `0 / 0` | 위/아래 방향키 게시글 탐색 및 연속 감상 모드 문서화 완료 |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `4/4 (100%)` | `0 / 0` | 뷰어 내 개념글 추천(개추) 연동 및 실시간 카운트 업 문서화 완료 |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 0` | esbuild 기반 멀티 플랫폼 번들러 파이프라인 문서화 완료 |
-| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🛠️ Implementing | `[■■■□] 3/4` | `⏳ Pending (0/4)` | `0 / 0` | 유휴 타이머(2.5초), 단축키 H/F 토글, 드래그·호버 유예 가드, closeViewer 자원 해제 및 스토리지 동기화 완료 |
+| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🧐 Auditing | `[■■■■] 4/4` | `⏳ Pending (0/4)` | `0 / 0` | CSS 페이드아웃·커서 숨김, 오버레이 `H`/`F` 키힌트, 팝업 안내 및 번들 동기화 완료 (Step 1~4 구현 완료) |
 
 *(※ 상태 범례: `📐 Planning` | `🛠️ Implementing` | `🧐 Auditing` | `🧪 QA Testing` | `🩹 Debugging` | `🟢 Sign-Off`)*
 *(※ 미해결 티켓: `🚨D` = Open `DEFECT-xx` 개수, `🧐R` = Open `REFACTOR-xx` 개수)*
@@ -30,6 +30,8 @@
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
 
+- **`[2026-11-18]` `[atomic-commit-crafter]` [`viewer-immersion`]**: `f491117`, `e7f3748` 커밋 완료 — Step 4 [UI & Integration / Overlay & Styling] 및 단위 테스트 반영.
+- **`[2026-11-18]` `[clean-code-developer]` [`viewer-immersion`]**: Step 4 [UI & Integration / Overlay & Styling] 구현, CSS/오버레이/팝업 연동, `tests/immersion.test.js` 17개 테스트·빌드 검증 및 스펙 `[As-Is]` 승격 병합 완료.
 - **`[2026-11-18]` `[atomic-commit-crafter]` [`viewer-immersion`]**: `a76071f`, `42f57e5` 커밋 완료 — Step 3 [Domain Service & State / Controller & Timer] 및 단위 테스트 반영.
 - **`[2026-11-18]` `[clean-code-developer]` [`viewer-immersion`]**: Step 3 [Domain Service & State / Controller & Timer] 구현, 유휴 타이머·단축키 H/F·가드레일 연동 및 `tests/immersion.test.js` 14개 테스트 검증 완료.
 - **`[2026-11-07]` `[atomic-commit-crafter]` [`viewer-immersion`]**: `ba1f51e`, `249468e` 커밋 완료 — Step 2 [Data Access & API / Storage & Popup] 및 단위 테스트 반영.

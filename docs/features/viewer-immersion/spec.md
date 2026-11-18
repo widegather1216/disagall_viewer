@@ -6,13 +6,14 @@
 - `CONFIG.DEFAULT_PADDING`: `24`
 - `CONFIG.STORAGE_KEY_PADDING`: `'defaultPadding'`
 - `CONFIG.STORAGE_KEY_AUTO_OPEN`: `'disagall_auto_open'`
-
-### 🟡 [To-Be 신규/마이그레이션 대상]
 - `CONFIG.UI_IDLE_TIMEOUT`: `2500` (ms, 마우스 유휴 판단 대기 시간)
 - `CONFIG.STORAGE_KEY_AUTO_HIDE_UI`: `'autoHideUi'` (boolean, 기본값 `true`)
-- `state.idleTimer`: `NodeJS.Timeout | null` (마우스 유휴 타이머 ID)
+- `state.idleTimer`: `NodeJS.Timeout | number | null` (마우스 유휴 타이머 ID)
 - `state.autoHideUi`: `boolean` (설정 저장소에서 로드된 자동 숨김 활성화 여부, 기본 `true`)
-- `state.isUiHidden`: `boolean` (현재 UI 숨김 상태 여부 플래그, 기본 `false`)
+- `state.isUiHidden`: `boolean` (현재 수동 UI 숨김 상태 여부 플래그, 기본 `false`)
+
+### 🟡 [To-Be 신규/마이그레이션 대상]
+- 현재 예정된 추가 변경사항 없음
 
 ## 2. 저장소 및 통신 계약 (Storage & Communication Contracts)
 - **Chrome Extension Storage**:
@@ -42,13 +43,15 @@
 
 ## 4. UI/UX 상태 전이 및 디자인 규칙 (UI States & Design Rules)
 - **Idle 자동 숨김 및 수동 숨김 상태 (`.disagall-idle`, `.disagall-ui-hidden`)**:
-  - `#disagall-viewer-overlay.disagall-idle, #disagall-viewer-overlay.disagall-ui-hidden`: `cursor: none;`
+  - `#disagall-viewer-overlay.disagall-idle, #disagall-viewer-overlay.disagall-ui-hidden`: `cursor: none;` (드래그 중 `style*="grabbing"` 예외 외 하위 요소 커서 포함 숨김)
   - `#disagall-viewer-overlay.disagall-idle .disagall-header, #disagall-viewer-overlay.disagall-ui-hidden .disagall-header, #disagall-viewer-overlay.disagall-idle .disagall-footer, #disagall-viewer-overlay.disagall-ui-hidden .disagall-footer, #disagall-viewer-overlay.disagall-idle .disagall-nav-btn, #disagall-viewer-overlay.disagall-ui-hidden .disagall-nav-btn`:
     `opacity: 0; pointer-events: none; transition: opacity 0.3s ease;`
 - **조작 복귀 상태**:
-  - `mousemove`, `keydown`, `click` 발생 시 0.15s 내로 `opacity: 1; pointer-events: auto;` 복귀
+  - `mousemove`, `keydown`, `click` 발생 시 `.disagall-header`, `.disagall-footer`, `.disagall-nav-btn` 기본 트랜지션(`opacity 0.15s ease`)으로 `opacity: 1; pointer-events: auto;` 복귀
+- **오버레이 키힌트 바 (`src/ui/overlay.js`)**:
+  - `.disagall-keyhints` 내 `H UI숨김`, `F 전체화면` 배지 렌더링
 - **팝업 설정 (`popup.html`) 디자인**:
-  - 카드 UI 내 스위치 토글 행 추가: `몰입 모드 (UI 자동 숨김)` + 체크박스 토글 스위치 (Accent Color `#3b82f6`)
+  - 카드 UI 내 스위치 토글 행: `몰입 모드 (UI 자동 숨김)` + 체크박스 토글 스위치 (Accent Color `#3b82f6`) 및 2.5초/`H`/`F` 단축키 안내 표기
 
 ## 5. 예외 처리 및 엣지 케이스 정책 (Edge Cases & Fallbacks)
 - **슬라이더 조작 및 헤더 호버**: 슬라이더를 마우스로 드래그 중이거나 헤더 버튼 위에 마우스가 위치한 경우 타이머 숨김 유예
