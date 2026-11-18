@@ -857,8 +857,180 @@
       }, CONFIG.POST_NAV_DELAY);
     }
   }
+  var isHeaderHovered = false;
+  var isSliderInteracting = false;
+  var hasBoundStorageSync = false;
+  function isOverlayActive() {
+    const { overlayEl } = state.elements;
+    return Boolean(overlayEl && overlayEl.classList.contains("active"));
+  }
+  function clearIdleTimer() {
+    if (state.idleTimer) {
+      clearTimeout(state.idleTimer);
+      state.idleTimer = null;
+    }
+  }
+  function isIdleHideDeferred() {
+    if (state.zoom.isDragging || isSliderInteracting || isHeaderHovered) {
+      return true;
+    }
+    const { overlayEl } = state.elements;
+    if (!overlayEl || typeof overlayEl.querySelector !== "function") {
+      return false;
+    }
+    const headerEl = overlayEl.querySelector(".disagall-header");
+    if (!headerEl || typeof headerEl.matches !== "function") {
+      return false;
+    }
+    try {
+      return headerEl.matches(":hover");
+    } catch (err) {
+      return false;
+    }
+  }
+  function showUi() {
+    state.isUiHidden = false;
+    const { overlayEl } = state.elements;
+    if (!overlayEl) return;
+    overlayEl.classList.remove("disagall-idle");
+    overlayEl.classList.remove("disagall-ui-hidden");
+  }
+  function hideUi(isManual = false) {
+    if (!isOverlayActive()) return false;
+    const { overlayEl } = state.elements;
+    if (isManual) {
+      clearIdleTimer();
+      state.isUiHidden = true;
+      overlayEl.classList.remove("disagall-idle");
+      overlayEl.classList.add("disagall-ui-hidden");
+      return true;
+    }
+    if (!state.autoHideUi || state.isUiHidden) return false;
+    if (isIdleHideDeferred()) {
+      resetIdleTimer();
+      return false;
+    }
+    overlayEl.classList.add("disagall-idle");
+    return true;
+  }
+  function resetIdleTimer() {
+    clearIdleTimer();
+    if (!isOverlayActive()) return;
+    const { overlayEl } = state.elements;
+    if (state.isUiHidden || overlayEl.classList.contains("disagall-idle") || overlayEl.classList.contains("disagall-ui-hidden")) {
+      showUi();
+    }
+    if (!state.autoHideUi) return;
+    state.idleTimer = setTimeout(() => {
+      state.idleTimer = null;
+      hideUi(false);
+    }, CONFIG.UI_IDLE_TIMEOUT);
+  }
+  function toggleUiManual() {
+    if (!isOverlayActive()) return false;
+    const { overlayEl } = state.elements;
+    const isHidden = state.isUiHidden || overlayEl.classList.contains("disagall-idle") || overlayEl.classList.contains("disagall-ui-hidden");
+    if (isHidden) {
+      showUi();
+      resetIdleTimer();
+      return false;
+    }
+    return hideUi(true);
+  }
+  function getFullscreenElement() {
+    if (typeof document === "undefined") return null;
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+  function handleFullscreenPromise(result) {
+    if (result && typeof result.catch === "function") {
+      result.catch((err) => {
+        return err;
+      });
+    }
+  }
+  function exitFullscreenSafely() {
+    if (!getFullscreenElement()) return false;
+    try {
+      if (typeof document.exitFullscreen === "function") {
+        handleFullscreenPromise(document.exitFullscreen());
+        return true;
+      }
+      if (typeof document.webkitExitFullscreen === "function") {
+        handleFullscreenPromise(document.webkitExitFullscreen());
+        return true;
+      }
+    } catch (err) {
+      return false;
+    }
+    return false;
+  }
+  function toggleFullscreen() {
+    if (!isOverlayActive()) return false;
+    if (getFullscreenElement()) {
+      return exitFullscreenSafely();
+    }
+    const { overlayEl } = state.elements;
+    try {
+      if (typeof overlayEl.requestFullscreen === "function") {
+        handleFullscreenPromise(overlayEl.requestFullscreen());
+        return true;
+      }
+      if (typeof overlayEl.webkitRequestFullscreen === "function") {
+        handleFullscreenPromise(overlayEl.webkitRequestFullscreen());
+        return true;
+      }
+    } catch (err) {
+      return false;
+    }
+    return false;
+  }
+  function applyAutoHideUiSetting(enabled) {
+    state.autoHideUi = Boolean(enabled);
+    if (!isOverlayActive()) return;
+    const { overlayEl } = state.elements;
+    if (!state.autoHideUi) {
+      clearIdleTimer();
+      if (overlayEl.classList.contains("disagall-idle") && !state.isUiHidden) {
+        showUi();
+      }
+      return;
+    }
+    if (!state.isUiHidden) {
+      resetIdleTimer();
+    }
+  }
+  function initImmersionSettings() {
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.get === "function") {
+      chrome.storage.sync.get({ [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: true }, (result) => {
+        if (result && typeof result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI] === "boolean") {
+          applyAutoHideUiSetting(result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI]);
+        }
+      });
+    } else if (typeof GM_getValue === "function") {
+      const savedAutoHide = GM_getValue(CONFIG.STORAGE_KEY_AUTO_HIDE_UI, true);
+      if (typeof savedAutoHide === "boolean") {
+        applyAutoHideUiSetting(savedAutoHide);
+      }
+    }
+    if (!hasBoundStorageSync && typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.addListener === "function") {
+      hasBoundStorageSync = true;
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName !== "sync" || !changes) return;
+        const change = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
+        if (change && typeof change.newValue === "boolean") {
+          applyAutoHideUiSetting(change.newValue);
+        }
+      });
+    }
+  }
   var KEY_ACTIONS = {
-    "Escape": () => closeViewer(),
+    "Escape": () => {
+      if (getFullscreenElement()) {
+        exitFullscreenSafely();
+        return;
+      }
+      closeViewer();
+    },
     "ArrowLeft": () => navigate(-1),
     "a": () => navigate(-1),
     "A": () => navigate(-1),
@@ -874,23 +1046,76 @@
     "r": () => triggerPostRecommend(),
     "R": () => triggerPostRecommend(),
     "c": () => triggerPostRecommend(),
-    "C": () => triggerPostRecommend()
+    "C": () => triggerPostRecommend(),
+    "h": () => toggleUiManual(),
+    "H": () => toggleUiManual(),
+    "f": () => toggleFullscreen(),
+    "F": () => toggleFullscreen()
   };
-  function handleKeyDown(e) {
+  function isEditableTarget(target) {
+    if (!target) return false;
+    const tag = typeof target.tagName === "string" ? target.tagName.toUpperCase() : "";
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || Boolean(target.isContentEditable);
+  }
+  function isExternalModalOpen() {
+    if (typeof document === "undefined" || typeof document.querySelector !== "function") {
+      return false;
+    }
+    const openModal = document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
+    if (!openModal) return false;
     const { overlayEl } = state.elements;
-    if (!overlayEl || !overlayEl.classList.contains("active")) return;
-    if (e.repeat) return;
-    if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable)) {
-      if (e.key === "Escape") {
+    return !overlayEl || typeof overlayEl.contains === "function" && !overlayEl.contains(openModal);
+  }
+  function handleKeyDown(e) {
+    if (!isOverlayActive()) return;
+    if (!e || e.repeat) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (isEditableTarget(e.target)) {
+      if (e.key === "Escape" && typeof e.target.blur === "function") {
         e.target.blur();
       }
       return;
     }
+    if (isExternalModalOpen()) return;
     const action = KEY_ACTIONS[e.key];
     if (action) {
-      e.preventDefault();
-      e.stopPropagation();
+      if (typeof e.preventDefault === "function") e.preventDefault();
+      if (typeof e.stopPropagation === "function") e.stopPropagation();
       action();
+    }
+  }
+  function bindImmersionEvents(overlayEl, sliderEl) {
+    overlayEl.addEventListener("mousemove", () => {
+      resetIdleTimer();
+    });
+    const headerEl = typeof overlayEl.querySelector === "function" ? overlayEl.querySelector(".disagall-header") : null;
+    if (headerEl) {
+      headerEl.addEventListener("mouseenter", () => {
+        isHeaderHovered = true;
+      });
+      headerEl.addEventListener("mouseleave", () => {
+        isHeaderHovered = false;
+        resetIdleTimer();
+      });
+    }
+    if (sliderEl) {
+      const startSliderInteraction = () => {
+        isSliderInteracting = true;
+        resetIdleTimer();
+      };
+      const endSliderInteraction = () => {
+        if (!isSliderInteracting) return;
+        isSliderInteracting = false;
+        resetIdleTimer();
+      };
+      sliderEl.addEventListener("mousedown", startSliderInteraction);
+      sliderEl.addEventListener("touchstart", startSliderInteraction, { passive: true });
+      sliderEl.addEventListener("change", endSliderInteraction);
+      sliderEl.addEventListener("mouseup", endSliderInteraction);
+      sliderEl.addEventListener("touchend", endSliderInteraction);
+      if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+        window.addEventListener("mouseup", endSliderInteraction);
+      }
     }
   }
   function createOverlay() {
@@ -901,7 +1126,10 @@
     document.body.appendChild(overlay);
     cacheOverlayElements();
     const { overlayEl, mainImgEl, prevBtnEl, nextBtnEl, sliderEl, sliderValEl, recommendBtnEl } = state.elements;
-    document.getElementById("disagall-close-btn").addEventListener("click", closeViewer);
+    const closeBtnEl = document.getElementById("disagall-close-btn");
+    if (closeBtnEl) {
+      closeBtnEl.addEventListener("click", closeViewer);
+    }
     if (recommendBtnEl) {
       recommendBtnEl.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -925,6 +1153,7 @@
         state.currentPadding = parseInt(e.target.value, 10);
         if (sliderValEl) sliderValEl.textContent = state.currentPadding + "px";
         applyFittingAndPadding();
+        resetIdleTimer();
         if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync) {
           chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: state.currentPadding });
         } else if (typeof GM_setValue !== "undefined") {
@@ -937,6 +1166,7 @@
         closeViewer();
       }
     });
+    bindImmersionEvents(overlayEl, sliderEl);
     setupZoomEvents(mainImgEl);
     window.addEventListener("keydown", handleKeyDown, true);
   }
@@ -962,15 +1192,23 @@
     overlayEl.classList.add("active");
     state.previousBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    showUi();
+    resetIdleTimer();
     updateRecommendButtonUi();
     showImage(targetIndex);
   }
   function closeViewer() {
+    clearIdleTimer();
+    isHeaderHovered = false;
+    isSliderInteracting = false;
+    showUi();
+    resetZoom();
     const { overlayEl } = state.elements;
     if (overlayEl) {
       overlayEl.classList.remove("active");
       document.body.style.overflow = state.previousBodyOverflow;
     }
+    exitFullscreenSafely();
   }
   function checkAutoOpen() {
     try {
@@ -996,6 +1234,7 @@
     }
   }
   function initViewerBase() {
+    initImmersionSettings();
     document.addEventListener("contextmenu", (e) => {
       const target = e.target;
       if (target && target.tagName === "IMG" && isPostBodyImage(target)) {
