@@ -1,7 +1,7 @@
 # 📦 [viewer-immersion] 몰입 모드 및 UI 클린 감상 패키지
 
 - **현재 상태 (Lifecycle)**: `🛠️ Implementing`
-- **구현 진척도**: `[■■□□] 2/4 Steps`
+- **구현 진척도**: `[■■■□] 3/4 Steps`
 - **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
@@ -24,8 +24,8 @@
   - 📂 구현: [`src/config.js`](../../../src/config.js), [`src/state.js`](../../../src/state.js) | 🧪 테스트: [`tests/immersion.test.js`](../../../tests/immersion.test.js) (`PASS`)
 - [x] **Step 2 [Data Access & API / Storage & Popup]**: 팝업창 UI(`popup.html`)에 자동 숨김 On/Off 토글 스위치 마크업 추가 및 `popup.js` / `chrome.storage.sync` 동기화 로직 구현 완료
   - 📂 구현: [`popup.html`](../../../popup.html), [`popup.js`](../../../popup.js) | 🧪 테스트: [`tests/immersion.test.js`](../../../tests/immersion.test.js) (`PASS`)
-- [ ] **Step 3 [Domain Service & State / Controller & Timer]**: 마우스 이동(`mousemove`) 감지 기반 2.5초 유휴 타이머 라이프사이클 관리, 수동 숨김 토글(`H`), 브라우저 전체화면 토글(`F`), 드래그/호버 유예 가드레일 구현
-  - 📂 구현: [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js) | 🧪 테스트: `tests/immersion.test.js` (`⏳ 대기`)
+- [x] **Step 3 [Domain Service & State / Controller & Timer]**: 마우스 이동(`mousemove`) 감지 기반 2.5초 유휴 타이머 라이프사이클 관리, 수동 숨김 토글(`H`), 브라우저 전체화면 토글(`F`), 드래그/호버 유예 가드레일 및 `closeViewer` 정리 구현 완료
+  - 📂 구현: [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js) | 🧪 테스트: [`tests/immersion.test.js`](../../../tests/immersion.test.js) (`PASS`)
 - [ ] **Step 4 [UI & Integration / Overlay & Styling]**: `content.css`에 `.disagall-idle` 및 `.disagall-ui-hidden` 페이드아웃/커서 숨김 스타일 추가, 하단 키힌트 바 및 팝업 안내 업데이트, `npm run build` 번들 동기화
   - 📂 구현: [`src/ui/overlay.js`](../../../src/ui/overlay.js), [`content.css`](../../../content.css) | 🧪 테스트: `tests/immersion.test.js` (`⏳ 대기`)
 
@@ -33,22 +33,24 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-07 / `clean-code-developer` / Step 2 `[Data Access & API / Storage & Popup]` 구현 및 3단 검증(신규 단위 테스트 + 전역 회귀 + 번들 빌드 + 위키 헬스체크) 통과
+- **직전 완료 작업**: 2026-11-18 / `clean-code-developer` / Step 3 `[Domain Service & State / Controller & Timer]` 구현 및 3단 검증(신규 단위 테스트 + 전역 회귀 + 번들 빌드 + 위키 헬스체크) 통과
 - **Recent Commits**:
+  - `a76071f`: `feat(immersion): implement idle timer, shortcut handlers, and storage sync in controller`
+  - `42f57e5`: `test(immersion): add unit tests for controller timer, shortcuts, and guardrails`
+  - `cffaeac`: `docs(immersion): complete step 2 roadmap and advance control tower to step 3`
   - `ba1f51e`: `feat(immersion): add auto hide ui toggle and storage sync in popup`
   - `249468e`: `test(immersion): add unit tests for popup storage contracts and dom events`
-  - `62e7e6e`: `docs(immersion): complete step 1 roadmap and sync master control tower`
-  - `2790e49`: `feat(immersion): define idle timeout config and runtime state`
 - **생성/수정된 핵심 파일**:
-  - `popup.html`: 몰입 모드 (UI 자동 숨김) 토글 스위치 마크업 및 switch CSS 스타일 추가
-  - `popup.js`: `autoHideUi` 설정 로드, 저장(`saveAutoHideUi`), `chrome.storage.onChanged` 동기화 리스너 구현
-  - `tests/immersion.test.js`: 스토리지 읽기/쓰기, 팝업 컨트롤러 초기화 및 이벤트 디스패치, 방어적 에러 핸들링 유닛 테스트 추가
+  - `src/controller/viewer_controller.js`: `resetIdleTimer()`, `showUi()`, `hideUi()`, `toggleUiManual()`, `toggleFullscreen()`, `exitFullscreenSafely()`, `initImmersionSettings()`, `applyAutoHideUiSetting()` 구현, `KEY_ACTIONS`(`H`/`h`, `F`/`f`, 전체화면 중 `Escape`) 및 입력 필드/수정자/모달/비활성 가드, 드래그·슬라이더·헤더 호버 숨김 유예, `closeViewer()` 타이머/플래그/클래스/전체화면 해제 추가
+  - `tests/immersion.test.js`: 유휴 타이머 2.5초 리셋·만료, `H`/`F` 단축키 및 가드레일, 드래그·슬라이더·헤더 호버 유예, `closeViewer()` 자원 해제, 스토리지 초기화·실시간 동기화 테스트(Test 8~14) 추가
+  - `content.js`, `disagall_viewer.user.js`: `npm run build`를 통한 번들 재생성
 - **검증 완료된 테스트 실행 명령어**:
-  - `node tests/immersion.test.js`: 유휴 타이머, 스토리지 및 팝업 연동 7개 단위 테스트 PASS
-  - `npm test`: 신규 `immersion.test.js` 포함 4개 테스트 스위트 전원 PASS
+  - `node tests/immersion.test.js`: Step 1~3 전체 14개 단위/통합 테스트 PASS
+  - `npm test`: `immersion.test.js` 포함 4개 테스트 스위트 전원 PASS
   - `npm run build`: esbuild 기반 Chrome Extension 및 유저스크립트 번들링 완료
   - `python3 -B ~/.gemini/config/skills/interactive-feature-planner/scripts/check_wiki_health.py docs`: exit code 0 확인
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `Step 3 [Domain Service & State / Controller & Timer]` 구현 진행
-  - `src/controller/viewer_controller.js`에서 마우스 이동(`mousemove`) 시 2.5초 유휴 타이머 리셋/등록 (`CONFIG.UI_IDLE_TIMEOUT`), 수동 숨김 토글(`H`), 브라우저 전체화면(`F`) 로직 구현
-  - 뷰어가 닫힐 때(`closeViewer`) `state.idleTimer`를 반드시 `clearTimeout`하여 유령 콜백을 방지할 것.
+  - `Step 4 [UI & Integration / Overlay & Styling]` 구현 진행
+  - `content.css`에 `#disagall-viewer-overlay.disagall-idle` 및 `.disagall-ui-hidden` 기반 커서 숨김(`cursor: none`)과 `.disagall-header`/`.disagall-footer`/`.disagall-nav-btn` 페이드아웃(`opacity: 0; pointer-events: none; transition: opacity 0.3s ease;`) 스타일 추가
+  - `src/ui/overlay.js` 하단 `.disagall-keyhints` 바에 `H UI숨김`, `F 전체화면` 배지 마크업 추가 및 `npm run build` 번들 동기화
+  - Step 4 완료 후 `spec.md` `[To-Be]`를 `[As-Is]`로 승격 병합하고 `architecture.md` 태그를 `[기존]`으로 갱신할 것.
