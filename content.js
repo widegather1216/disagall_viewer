@@ -387,6 +387,8 @@
         <div class="disagall-keyhint"><span class="disagall-kbd">\uB9C8\uC6B0\uC2A4 \uD720 / \uD2B8\uB799\uD328\uB4DC</span> \uD655\uB300/\uCD95\uC18C</div>
         <div class="disagall-keyhint"><span class="disagall-kbd">\uB4DC\uB798\uADF8</span> \uC0AC\uC9C4 \uC774\uB3D9</div>
         <div class="disagall-keyhint"><span class="disagall-kbd">\uB354\uBE14\uD074\uB9AD</span> \uD655\uB300 \uB9AC\uC14B</div>
+        <div class="disagall-keyhint"><span class="disagall-kbd">H</span> UI\uC228\uAE40</div>
+        <div class="disagall-keyhint"><span class="disagall-kbd">F</span> \uC804\uCCB4\uD654\uBA74</div>
         <div class="disagall-keyhint"><span class="disagall-kbd">ESC</span> \uB2EB\uAE30</div>
       </div>
     </div>

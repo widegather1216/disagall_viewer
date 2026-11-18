@@ -38,6 +38,9 @@
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);
   z-index: 10;
   box-sizing: border-box;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.15s ease;
 }
 
 .disagall-header-left {
@@ -274,7 +277,9 @@
   align-items: center;
   cursor: pointer;
   z-index: 20;
-  transition: all 0.2s ease;
+  opacity: 1;
+  pointer-events: auto;
+  transition: background 0.2s ease, border-color 0.2s ease, width 0.2s ease, opacity 0.15s ease;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -328,11 +333,16 @@
   background: linear-gradient(0deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);
   z-index: 10;
   box-sizing: border-box;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.15s ease;
 }
 
 .disagall-keyhints {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 16px;
   font-size: 12px;
   color: #94a3b8;
 }
@@ -494,5 +504,28 @@
 
 .disagall-notice-btn.close:hover {
   color: #ffffff;
+}
+
+/* Immersion Mode (Idle Auto-Hide & Manual Toggle) */
+#disagall-viewer-overlay.disagall-idle,
+#disagall-viewer-overlay.disagall-ui-hidden {
+  cursor: none;
+}
+
+/* Override inline cursor on image/controls while hidden, preserving grabbing cursor during zoom pan drag */
+#disagall-viewer-overlay.disagall-idle *:not([style*="grabbing"]),
+#disagall-viewer-overlay.disagall-ui-hidden *:not([style*="grabbing"]) {
+  cursor: none !important;
+}
+
+#disagall-viewer-overlay.disagall-idle .disagall-header,
+#disagall-viewer-overlay.disagall-ui-hidden .disagall-header,
+#disagall-viewer-overlay.disagall-idle .disagall-footer,
+#disagall-viewer-overlay.disagall-ui-hidden .disagall-footer,
+#disagall-viewer-overlay.disagall-idle .disagall-nav-btn,
+#disagall-viewer-overlay.disagall-ui-hidden .disagall-nav-btn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
 }
 

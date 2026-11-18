@@ -184,6 +184,26 @@
       outline-offset: 2px;
     }
 
+    .setting-hint {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .kbd-inline {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 4px;
+      padding: 0 5px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+
     .footer {
       text-align: center;
       font-size: 11px;
@@ -250,6 +270,9 @@
         <input type="checkbox" id="auto-hide-ui-toggle" checked aria-label="몰입 모드 (UI 자동 숨김) 토글">
         <span class="slider-toggle"></span>
       </label>
+    </div>
+    <div class="setting-hint">
+      단축키: <span class="kbd-inline">H</span> UI 숨김 토글 · <span class="kbd-inline">F</span> 전체화면 전환
     </div>
   </div>
 

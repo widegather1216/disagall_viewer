@@ -74,6 +74,8 @@ export function buildOverlayHtml() {
         <div class="disagall-keyhint"><span class="disagall-kbd">마우스 휠 / 트랙패드</span> 확대/축소</div>
         <div class="disagall-keyhint"><span class="disagall-kbd">드래그</span> 사진 이동</div>
         <div class="disagall-keyhint"><span class="disagall-kbd">더블클릭</span> 확대 리셋</div>
+        <div class="disagall-keyhint"><span class="disagall-kbd">H</span> UI숨김</div>
+        <div class="disagall-keyhint"><span class="disagall-kbd">F</span> 전체화면</div>
         <div class="disagall-keyhint"><span class="disagall-kbd">ESC</span> 닫기</div>
       </div>
     </div>
