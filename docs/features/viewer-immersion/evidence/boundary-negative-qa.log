@@ -1,0 +1,27 @@
+=== [TC-NG-01] Inactive (!active) & Negative Input Guards ===
+Before open state: {"overlayExists":false,"fullscreen":false}
+Inactive (!active) after mousemove + H/F + 2.7s: {"active":false,"idle":false,"uiHidden":false,"fullscreen":false}
+Editable/Modal negative guards: {"hiddenDuringInput":false,"activeAfterEsc":true,"focusedAfterEsc":false,"hiddenDuringModal":false}
+PASS: TC-NG-01
+
+=== [TC-BD-01] Padding Slider Drag & Header Hover Deferral ===
+After 2.7s hovering header: {"idle":false,"headerHover":true,"headerOpacity":"1"}
+After 2.7s dragging slider: {"idle":false,"headerOpacity":"1","sliderVal":"70px"}
+After slider release & header leave + 2.95s: {"idle":true,"headerOpacity":"0"}
+PASS: TC-BD-01
+
+=== [TC-BD-02] Zoom > 1.0 Pan Drag Deferral & Grabbing Cursor ===
+Main image rect: {"x":640,"y":409,"width":845,"height":563}
+During zoom pan drag after 2.7s: {"idle":false,"inlineCursor":"grabbing","computedCursor":"grabbing","transform":"translate(50px, 30px) scale(2)","badge":"🔍 확대: 200% (드래그로 이동 / 더블클릭 초기화)"}
+Pan dragging with .disagall-ui-hidden active (:not([style*="grabbing"]) check): {"uiHidden":true,"overlayComputedCursor":"none","imgComputedCursor":"grabbing"}
+After pan release + 2.7s idle: {"idle":true,"imgInlineCursor":"grab","imgComputedCursor":"none"}
+PASS: TC-BD-02
+
+=== [TC-NG-02] closeViewer Mid-Timer Cleanup & Ghost Callback Defense ===
+After Escape close + 2.8s wait: {"active":false,"idle":false,"uiHidden":false,"bodyOverflow":""}
+After backdrop click close + 2.8s wait: {"active":false,"idle":false,"bodyOverflow":""}
+After closeBtn click + 2.8s wait: {"active":false,"idle":false,"bodyOverflow":""}
+PASS: TC-NG-02
+
+Console/Runtime errors: 0
+ALL CHROME HEADLESS CDP BOUNDARY & NEGATIVE SCENARIOS (TC-BD-01, TC-BD-02, TC-NG-01, TC-NG-02) PASSED!

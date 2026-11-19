@@ -1,8 +1,8 @@
 # 📦 [viewer-immersion] 몰입 모드 및 UI 클린 감상 패키지
 
-- **현재 상태 (Lifecycle)**: `🧐 Auditing`
+- **현재 상태 (Lifecycle)**: `🧪 QA Testing`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -33,24 +33,19 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-18 / `clean-code-developer` / Step 4 `[UI & Integration / Overlay & Styling]` 구현, 3단 검증(신규 단위 테스트 + 전역 회귀 + 번들 빌드 + 위키 헬스체크) 통과 및 최종 Step 완료에 따른 스펙/아키텍처 승격 병합 완료
+- **직전 완료 작업**: 2026-11-18 / `user-journey-tester` / `viewer-immersion` 도메인 Boundary & Negative (`TC-BD-01`, `TC-BD-02`, `TC-NG-01`, `TC-NG-02`) QA 검증 완료 (`4/4 PASS` — 전체 QA `8/8 Scenarios PASS`, `AC 4/4 (100%)`, `DEFECT 0건`)
 - **Recent Commits**:
+  - `addff3a`: `test(immersion): add built-bundle E2E QA suite for immersion mode`
+  - `bd69c19`: `docs(immersion): promote spec/architecture to as-is and mark step 4 complete`
   - `f491117`: `feat(immersion): add idle fade-out styles, overlay keyhints, and popup shortcut guide`
   - `e7f3748`: `test(immersion): add tests for overlay keyhints, css immersion rules, and popup hints`
   - `90b47c1`: `docs(immersion): complete step 3 roadmap and advance control tower to step 4`
-  - `a76071f`: `feat(immersion): implement idle timer, shortcut handlers, and storage sync in controller`
-  - `42f57e5`: `test(immersion): add unit tests for controller timer, shortcuts, and guardrails`
-- **생성/수정된 핵심 파일**:
-  - `content.css`: `#disagall-viewer-overlay.disagall-idle` / `.disagall-ui-hidden` 커서 숨김(`cursor: none`, 드래그 중 `style*="grabbing"` 예외 보존) 및 `.disagall-header`/`.disagall-footer`/`.disagall-nav-btn` 숨김(`opacity: 0; pointer-events: none; transition: opacity 0.3s ease;`)·복귀(`0.15s ease`) 스타일 추가, `.disagall-keyhints` 반응형 줄바꿈(`flex-wrap: wrap`) 적용
-  - `src/ui/overlay.js`: `buildOverlayHtml()` 내 `.disagall-keyhints` 바에 `H UI숨김`, `F 전체화면` 배지 추가
-  - `popup.html`: `몰입 모드 (UI 자동 숨김)` 카드 내 `H` UI 숨김 토글 · `F` 전체화면 전환 단축키 안내 추가
-  - `tests/immersion.test.js`: Step 4 오버레이 키힌트 배지, `content.css` 규칙/트랜지션/드래그 커서 가드, `popup.html` 안내 검증 테스트(Test 15~17) 추가
-  - `content.js`, `disagall_viewer.user.js`: `npm run build`를 통한 Chrome Extension 및 유저스크립트(CSS 인라인 포함) 번들 동기화
-- **검증 완료된 테스트 실행 명령어**:
-  - `node tests/immersion.test.js`: Step 1~4 전체 17개 단위/통합 테스트 PASS
-  - `npm test`: `immersion.test.js` 포함 4개 테스트 스위트 전원 PASS
-  - `npm run build`: esbuild 기반 Chrome Extension 및 유저스크립트 번들링 완료
-  - `python3 -B ~/.gemini/config/skills/interactive-feature-planner/scripts/check_wiki_health.py docs`: exit code 0 확인
+- **실행 검증 명령 및 결과**:
+  - `npm test`: 4개 테스트 스위트(`module_import`, `post_navigation`, `recommend`, `immersion` 17개 테스트) 전원 PASS
+  - `node tests/immersion_e2e.test.js`: 실제 번들(`content.js`, `content.css`, `popup.js`, `test_page.html`) 기반 Happy Path 4건(`TC-HP-01`~`TC-HP-04`) + Boundary/Negative 4건(`TC-BD-01`~`TC-NG-02`) 총 8개 시나리오 전원 PASS
+  - Chrome Headless CDP E2E (`test_page.html`, `content.js`, `content.css`): Boundary & Negative 4건 실브라우저 DOM/computed style(`opacity`, `cursor: grabbing` 보존, `header:hover`)·타이머 정리·콘솔 에러 0건 PASS (증적: [`boundary-negative-qa.log`](./evidence/boundary-negative-qa.log), [`tc-bd-01-slider-deferred.png`](./evidence/tc-bd-01-slider-deferred.png), [`tc-bd-02-zoom-pan-dragging.png`](./evidence/tc-bd-02-zoom-pan-dragging.png); 기존 HP 증적: [`happy-path-qa.log`](./evidence/happy-path-qa.log))
+  - 미해결 감사 티켓 (`0 / 2` — `🚨 DEFECT: 0건`, `🧐 REFACTOR: 2건` 보류 중): `REFACTOR-02` (`viewer_controller.js` 리팩토링), `REFACTOR-03` (`popup.js` 리팩토링)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `viewer-immersion` 도메인 4/4 Steps 구현이 모두 완료되었으므로, 다음 표준 파이프라인은 `clean-code-auditor` 기반 클린코드 품질 감사(`"viewer-immersion 도메인 클린코드 품질 감사 진행해줘"`) 이후 `user-journey-tester` QA 검증 순으로 진행할 것.
-  - `zoom_pan.js`가 `#disagall-main-img`에 인라인 `style.cursor`를 직접 할당하므로, `content.css`의 `*:not([style*="grabbing"])` 커서 숨김 예외 규칙이 유지되어야 확대 이미지 위 유휴 숨김과 드래그 팬 커서 유지가 동시에 정상 동작함.
+  - QA 인수 조건은 `4/4 (100% — 8/8 Scenarios PASS)` 통과했으나, 보류된 클린코드 개선 티켓 2건(`REFACTOR-02`, `REFACTOR-03`)이 남아 있어 `🟢 Sign-Off` 전 처리가 필요함: `"viewer-immersion 도메인의 REFACTOR-02 티켓 해결해줘"` (또는 보류 티켓 처리 선택)
+  - 참고: 실제 오버레이 패딩 슬라이더의 DOM ID는 `#disagall-slider`(스펙 표기 `#disagall-padding-slider` 대신 실제 마크업 `src/ui/overlay.js#L30`)임.
+  - Chrome `--headless=new` 환경은 OS 전체화면 권한 제약(`TypeError: not granted`)이 있으므로, 전체화면 중 `closeViewer` 해제 경로는 `tests/immersion_e2e.test.js`의 Fullscreen API 계약 시뮬레이션과 실브라우저 `closeViewer` 경로를 병행해 검증함.

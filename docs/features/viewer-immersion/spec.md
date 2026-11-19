@@ -28,8 +28,8 @@
 ## 3. 클라이언트 상태 계약 (Client State & Lifecycle)
 - **`resetIdleTimer()`**:
   1. `state.idleTimer` 존재 시 `clearTimeout` 호출
-  2. UI가 숨겨져 있던 상태(`.disagall-idle` 또는 `state.isUiHidden === true`)라면 즉시 UI 복원 및 커서 복원
-  3. `state.autoHideUi`가 `true`이고 오버레이가 `active` 상태인 경우, `CONFIG.UI_IDLE_TIMEOUT` 후 `hideUi(false)`를 실행하는 신규 타이머 등록
+  2. `mousemove` 또는 슬라이더 조작 등으로 호출되며, UI가 숨겨져 있던 상태(`.disagall-idle` 또는 `state.isUiHidden === true`)라면 즉시 UI 복원 및 커서 복원
+  3. `state.autoHideUi`가 `true`이고 오버레이가 `active` 상태인 경우, `CONFIG.UI_IDLE_TIMEOUT` 후 `hideUi(false)`를 실행하는 신규 타이머 등록 (단, `keydown`·비종료 `click` 입력 시에는 숨김 상태를 유지하며 타이머를 강제 복원하지 않음)
 - **`hideUi(isManual = false)`**:
   - 상단 헤더(`.disagall-header`), 하단 푸터(`.disagall-footer`), 좌우 내비게이션 버튼(`.disagall-nav-btn`)에 페이드아웃 적용
   - 마우스 커서 숨김 (`cursor: none`)
@@ -47,7 +47,7 @@
   - `#disagall-viewer-overlay.disagall-idle .disagall-header, #disagall-viewer-overlay.disagall-ui-hidden .disagall-header, #disagall-viewer-overlay.disagall-idle .disagall-footer, #disagall-viewer-overlay.disagall-ui-hidden .disagall-footer, #disagall-viewer-overlay.disagall-idle .disagall-nav-btn, #disagall-viewer-overlay.disagall-ui-hidden .disagall-nav-btn`:
     `opacity: 0; pointer-events: none; transition: opacity 0.3s ease;`
 - **조작 복귀 상태**:
-  - `mousemove`, `keydown`, `click` 발생 시 `.disagall-header`, `.disagall-footer`, `.disagall-nav-btn` 기본 트랜지션(`opacity 0.15s ease`)으로 `opacity: 1; pointer-events: auto;` 복귀
+  - `mousemove` 발생(또는 단축키 `H` 수동 토글) 시 `.disagall-header`, `.disagall-footer`, `.disagall-nav-btn` 기본 트랜지션(`opacity 0.15s ease`)으로 `opacity: 1; pointer-events: auto;` 복귀 (`keydown`·비종료 `click` 입력 시에는 마우스를 움직이기 전까지 UI 숨김 상태 유지)
 - **오버레이 키힌트 바 (`src/ui/overlay.js`)**:
   - `.disagall-keyhints` 내 `H UI숨김`, `F 전체화면` 배지 렌더링
 - **팝업 설정 (`popup.html`) 디자인**:

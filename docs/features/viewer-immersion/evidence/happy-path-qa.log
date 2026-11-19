@@ -1,0 +1,28 @@
+=== [TC-HP-01] Idle Auto-Hide (2500ms) & Mousemove Restore ===
+Initial active viewer: {'active': True, 'idle': False, 'counter': '1 / 3', 'headerOpacity': '1', 'footerOpacity': '1', 'navOpacity': '1', 'keyhints': 'R 개추 ↑ ↓ 이전/다음 글 ← → 이전/다음 사진 마우스 휠 / 트랙패드 확대/축소 드래그 사진 이동 더블클릭 확대 리셋 H UI숨김 F 전체화면 ESC 닫기'}
+Before 2500ms (~1.9s) idle=False
+After >2500ms idle: {'classes': ['active', 'disagall-idle'], 'overlayCursor': 'none', 'imgCursor': 'none', 'headerOpacity': '0', 'headerPE': 'none', 'footerOpacity': '0', 'footerPE': 'none', 'prevOpacity': '0', 'nextOpacity': '0'}
+After mousemove restore: {'classes': ['active'], 'overlayCursor': 'auto', 'headerOpacity': '1', 'headerPE': 'auto', 'footerOpacity': '1', 'footerPE': 'auto'}
+PASS: TC-HP-01
+
+=== [TC-HP-02] Manual UI Toggle (H/h) & ADR-04 Arrow Key Persistence ===
+After 'h' key: {'classes': ['active', 'disagall-ui-hidden'], 'overlayCursor': 'none', 'headerOpacity': '0', 'headerPE': 'none', 'footerOpacity': '0'}
+After ArrowRight while hidden (ADR-04): {'classes': ['active', 'disagall-ui-hidden'], 'counter': '2 / 3'}
+After ArrowLeft while hidden (ADR-04): {'classes': ['active', 'disagall-ui-hidden'], 'counter': '1 / 3'}
+After 'H' restore: {'classes': ['active'], 'headerOpacity': '1', 'headerPE': 'auto'}
+PASS: TC-HP-02
+
+=== [TC-HP-03] Fullscreen Toggle (F/f) ===
+Headless Chrome native requestFullscreen trace=['requestFullscreen'], viewerActive=True (note: headless rejects OS fullscreen transition safely via handleFullscreenPromise)
+Simulated fullscreen grant toggle on real content.js: {'calls': ['enter', 'exit'], 'afterEnter': 'disagall-viewer-overlay', 'afterExit': None}
+PASS: TC-HP-03
+
+=== [TC-HP-04] Popup Toggle, Storage Sync & autoHideUi=false Behavior ===
+Popup initial state: {'checked': True, 'hintText': '단축키: H UI 숨김 토글 · F 전체화면 전환'}
+Popup after toggle click: {'checked': False, 'stored': {'autoHideUi': False}}
+Viewer after 2.8s with autoHideUi=false: {'classes': ['active'], 'headerOpacity': '1', 'stored': {'autoHideUi': False}}
+Viewer after live sync autoHideUi=true + 2.8s idle: {'classes': ['active', 'disagall-idle'], 'headerOpacity': '0'}
+PASS: TC-HP-04
+
+Console/Runtime errors: 0
+ALL CHROME 157 HEADLESS E2E HAPPY PATH SCENARIOS (TC-HP-01 ~ TC-HP-04) PASSED!
