@@ -1,8 +1,8 @@
 # 🧪 [viewer-immersion] Verification & Ticket Logs
 
-- **검증 상태**: `🧪 QA Testing` (QA 시나리오 `8/8 PASS` 완료; 잔여 보류 티켓 `REFACTOR-02`, `REFACTOR-03` 해결 대기)
+- **검증 상태**: `🧪 QA Testing` (QA 시나리오 `8/8 PASS` 완료; 잔여 보류 티켓 `REFACTOR-03` 해결 대기)
 - **인수 조건 통과율**: `4 / 4 (100% — 8/8 Scenarios PASS)`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
 
 ---
 
@@ -54,22 +54,11 @@
 - **현재 상태**: 🟢 RESOLVED — 사용자 컨펌([`ADR-04`](./decisions.md))으로 마우스 이동(`mousemove`) 외 키보드·클릭 입력 시 숨김 상태 유지를 의도된 스펙으로 확정하고 `spec.md` 역갱신 완료.
 
 ### [REFACTOR-02] `viewer_controller.js` 단일 파일 630줄·함수 길이 초과 및 슬라이더 스토리지 쓰기 디바운스/빈 `catch` 정리
-- **심각도**: 🟡 Should Fix (권장 조치)
-- **위치**: [`src/controller/viewer_controller.js#L1-L630`](../../../src/controller/viewer_controller.js#L1-L630) (`createOverlay` L451-L513 [63줄], `bindImmersionEvents` L411-L449 [39줄], `initViewerBase` L590-L630 [41줄], `initImmersionSettings` L311-L341 [31줄], 슬라이더 저장 L496-L500, 빈 `catch` L38·L124·L587)
-- **위반 규칙**: Single Responsibility Principle / File Size ≤ 300줄 / Function Length ≤ 30줄 / `00_core_foundation` §3 스토리지 I/O 최소화 / 빈 `catch` 금지
-- **발견된 문제**:
-  - 단일 컨트롤러 파일이 630줄로 비대해졌으며 뷰어 생명주기·이미지 로딩·몰입 모드 타이머/전체화면·단축키 디스패치가 혼재되어 있습니다.
-  - `sliderEl` `input` 핸들러가 드래그 매 틱마다 `chrome.storage.sync.set`을 호출하여 Chrome sync 쓰기 쿼터(`MAX_WRITE_OPERATIONS_PER_MINUTE`) 초과 위험이 있고, 기존 `catch (e) {}` 3곳이 주석/처리 없이 비어 있습니다.
-- **권장 개선안 (Suggested Diff)**:
-  ```text
-  // Before: viewer_controller.js (630L) 내 immersion 타이머/전체화면/스토리지 및 이벤트 바인딩 일체 포함
-  // After:
-  // 1) immersion 로직을 src/controller/immersion_controller.js로 분리(또는 re-export 유지)하고
-  //    createOverlay/bindImmersionEvents를 30줄 이하 단일 책임 헬퍼로 분할
-  // 2) 패딩 슬라이더 storage.sync.set은 change 이벤트 또는 디바운스로 통합
-  // 3) 빈 catch (e) {} 3곳에 의도 주석 또는 방어적 로깅 추가
-  ```
-- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **해결 내역**:
+  - **수정 파일**: [`src/controller/immersion_controller.js`](../../../src/controller/immersion_controller.js), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js), [`tests/immersion.test.js`](../../../tests/immersion.test.js)
+  - **원인 및 조치**: 몰입 모드 타이머·가드·전체화면·스토리지 동기화 책임을 `src/controller/immersion_controller.js`(279줄)로 분리하고 `viewer_controller.js`에 하위 호환 re-export를 유지했으며, `createOverlay`·`bindImmersionEvents`·`initViewerBase`·`initImmersionSettings` 등을 30줄 이하·2-depth 이내 Guard Clause 헬퍼로 분할함. 패딩 슬라이더(`#disagall-slider`) 저장을 250ms 디바운스(`input`) + `change` 즉시 커밋 + `closeViewer()` flush/해제로 최적화하고, 빈 `catch` 3곳에 비치명적 방어 주석을 보강함(`ADR-04` 숨김 유지 정책 준수).
+  - **회귀 테스트 결과**: `npm test` (19개 immersion 테스트 포함 4개 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`8/8 PASS`), `npm run build` (`PASS`)
 
 ### [REFACTOR-03] `popup.js` `initPopup` 복잡도(58줄·4-depth 중첩), `onChanged` 타입 가드 누락 및 슬라이더 쓰기 디바운스 미적용
 - **심각도**: 🟡 Should Fix (권장 조치)

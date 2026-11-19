@@ -6,7 +6,7 @@
 flowchart TD
     UserMouse["사용자 마우스/키보드 이벤트"] -->|mousemove / keydown| Controller["viewer_controller.js"]
     Controller -->|타이머 리셋 / 유휴 감지| Timer["Idle Timer (2500ms)"]
-    Controller -->|H / F 단축키 트리거| ImmersionHandler["Immersion Handler"]
+    Controller -->|H / F 및 몰입 상태 위임| ImmersionHandler["immersion_controller.js"]
     
     Timer -->|만료 시 (2.5초)| ImmersionHandler
     ImmersionHandler -->|클래스 토글 (.disagall-idle)| Overlay["#disagall-viewer-overlay"]
@@ -14,7 +14,7 @@ flowchart TD
     
     Storage["chrome.storage / GM_storage"] -->|autoHideUi 설정 로드| State["state.js (autoHideUi)"]
     Popup["popup.html / popup.js"] -->|설정 변경| Storage
-    State -->|자동 숨김 활성화 여부 참조| Controller
+    State -->|자동 숨김 활성화 여부 참조| ImmersionHandler
 ```
 
 ## 2. 도메인 파일 트리 및 단일 책임 (File Tree & SRP)
@@ -23,7 +23,8 @@ flowchart TD
   - `[기존]` `src/config.js`: `UI_IDLE_TIMEOUT`(2500), `STORAGE_KEY_AUTO_HIDE_UI` 상수 정의
   - `[기존]` `src/state.js`: `idleTimer`, `autoHideUi`, `isUiHidden` 상태 관리 및 초기화
 - **사용자 제어 및 비즈니스 레이어**:
-  - `[기존]` `src/controller/viewer_controller.js`: 마우스 유휴 타이머 시작/리셋, `H` 수동 토글, `F` 전체화면 토글, 호버/드래그 가드레일 로직
+  - `[신규]` `src/controller/immersion_controller.js`: 마우스 유휴 타이머 시작/리셋, 호버/드래그/슬라이더 가드레일, `H` 수동 토글, `F` 전체화면 토글, `autoHideUi` 스토리지 동기화
+  - `[기존]` `src/controller/viewer_controller.js`: 뷰어 생명주기(`openViewer`/`closeViewer`), 이미지/게시글 탐색, 단축키 디스패치, 패딩 슬라이더 디바운스/`change` 저장 및 `immersion_controller.js` re-export
   - `[기존]` `popup.html`: 몰입 모드(자동 숨김) On/Off 스위치 UI 마크업 및 2.5초/H/F 단축키 안내
   - `[기존]` `popup.js`: 스토리지 조회 및 토글 이벤트 처리
 - **UI 및 프레젠테이션 레이어**:
