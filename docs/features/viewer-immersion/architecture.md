@@ -26,7 +26,7 @@ flowchart TD
   - `[신규]` `src/controller/immersion_controller.js`: 마우스 유휴 타이머 시작/리셋, 호버/드래그/슬라이더 가드레일, `H` 수동 토글, `F` 전체화면 토글, `autoHideUi` 스토리지 동기화
   - `[기존]` `src/controller/viewer_controller.js`: 뷰어 생명주기(`openViewer`/`closeViewer`), 이미지/게시글 탐색, 단축키 디스패치, 패딩 슬라이더 디바운스/`change` 저장 및 `immersion_controller.js` re-export
   - `[기존]` `popup.html`: 몰입 모드(자동 숨김) On/Off 스위치 UI 마크업 및 2.5초/H/F 단축키 안내
-  - `[기존]` `popup.js`: 스토리지 조회 및 토글 이벤트 처리
+  - `[기존]` `popup.js`: 스토리지 조회, `bindPopupSlider`(250ms 디바운스/`change` 저장·`NaN` 가드)·`bindPopupToggle`·`bindStorageSync`(`onChanged` 타입 가드) 동기화 처리
 - **UI 및 프레젠테이션 레이어**:
   - `[기존]` `src/ui/overlay.js`: 하단 키힌트 바에 `H UI숨김`, `F 전체화면` 배지 추가
   - `[기존]` `content.css`: `.disagall-idle` 및 `.disagall-ui-hidden` 클래스 스타일(opacity: 0, cursor: none, transition 0.3s/0.15s, 드래그 커서 유지) 정의

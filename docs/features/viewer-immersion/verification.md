@@ -1,8 +1,8 @@
 # 🧪 [viewer-immersion] Verification & Ticket Logs
 
-- **검증 상태**: `🧪 QA Testing` (QA 시나리오 `8/8 PASS` 완료; 잔여 보류 티켓 `REFACTOR-03` 해결 대기)
+- **검증 상태**: `🟢 Sign-Off` (QA 시나리오 `8/8 PASS` · 감사 티켓 `REFACTOR-01~03` 전량 해결 완료)
 - **인수 조건 통과율**: `4 / 4 (100% — 8/8 Scenarios PASS)`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -61,19 +61,8 @@
   - **회귀 테스트 결과**: `npm test` (19개 immersion 테스트 포함 4개 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`8/8 PASS`), `npm run build` (`PASS`)
 
 ### [REFACTOR-03] `popup.js` `initPopup` 복잡도(58줄·4-depth 중첩), `onChanged` 타입 가드 누락 및 슬라이더 쓰기 디바운스 미적용
-- **심각도**: 🟡 Should Fix (권장 조치)
-- **위치**: [`popup.js#L62-L119`](../../../popup.js#L62-L119) (`initPopup` 58줄, `input` L84-L90, `onChanged` L104-L116)
-- **위반 규칙**: Function Length ≤ 30줄 / Nesting Depth ≤ 2 / Defensive Type Guard / `00_core_foundation` §3 스토리지 I/O 최소화
-- **발견된 문제**:
-  - `initPopup()`이 58줄이며 `chrome.storage.onChanged.addListener` 내부가 4-depth 중첩입니다.
-  - `loadSettings()`(L24-L30)와 달리 `onChanged` 리스너(L107-L113)에는 `typeof change.newValue` 검증이 없어 스토리지 키 삭제(`newValue === undefined`) 시 `valDisplay.textContent`가 `'undefinedpx'`로 오염될 수 있습니다.
-  - 패딩 슬라이더 `input` 리스너(L84-L90)가 매 드래그 이벤트마다 `savePadding()`을 호출하며 `parseInt` `NaN` 가드가 없습니다.
-- **권장 개선안 (Suggested Diff)**:
-  ```text
-  // Before: initPopup 내 DOM 바인딩·storage.onChanged 4-depth 인라인 처리 및 newValue 무검증 대입
-  // After:
-  // 1) bindPopupSlider / bindPopupToggle / bindStorageSync 헬퍼로 30줄 이하·Early Return 분리
-  // 2) onChanged에서 typeof newValue === 'boolean' / 'number' 검증 후 UI 반영
-  // 3) 패딩 슬라이더 스토리지 저장에 디바운스 또는 change 이벤트 적용
-  ```
-- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **해결 내역**:
+  - **수정 파일**: [`popup.js`](../../../popup.js#L13-L220), [`tests/immersion.test.js`](../../../tests/immersion.test.js#L123-L300)
+  - **원인 및 조치**: `initPopup`과 `chrome.storage.onChanged` 4-depth 인라인 로직을 `applyInitialSettings`, `bindPopupSlider`, `bindPopupToggle`, `handleStorageChange`, `bindStorageSync` 등 단일 책임 헬퍼(≤ 27줄, Early Return 기반 ≤ 2-depth)로 분할함. `onChanged` 및 `loadSettings`/`savePadding`에 `typeof === 'boolean'`/`'number'`·`!Number.isNaN` 가드를 추가해 키 삭제(`newValue === undefined`) 시 `'undefinedpx'` 오염을 차단했고, 패딩 슬라이더 `input`은 250ms 디바운스(`PADDING_SAVE_DEBOUNCE_MS`) + `change` 즉시 커밋 + `parseInt` `NaN` 가드로 `00_core_foundation` §3을 준수하도록 리팩토링함.
+  - **회귀 테스트 결과**: `node --check popup.js && node --check tests/immersion.test.js` (`PASS`), `npm test` (19개 immersion 테스트 포함 4개 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`8/8 PASS`), `npm run build` (`PASS`)

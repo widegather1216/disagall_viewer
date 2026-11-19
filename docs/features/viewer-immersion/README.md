@@ -1,8 +1,8 @@
 # 📦 [viewer-immersion] 몰입 모드 및 UI 클린 감상 패키지
 
-- **현재 상태 (Lifecycle)**: `🧪 QA Testing`
+- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -33,19 +33,20 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-19 / `systematic-debugger` / `viewer-immersion` 도메인 `REFACTOR-02` 해결 — `src/controller/immersion_controller.js` 분리(re-export 호환 유지), `viewer_controller.js` 헬퍼 분할, 패딩 슬라이더 250ms 디바운스+`change` 즉시 저장 최적화 및 빈 `catch` 3곳 보강 완료
+- **직전 완료 작업**: 2026-11-19 / `systematic-debugger` / `viewer-immersion` 도메인 `REFACTOR-03` 해결 및 최종 **`🟢 Sign-Off`** 전환 — `popup.js` 단일 책임 헬퍼 분할(`bindPopupSlider`, `bindPopupToggle`, `bindStorageSync`, `handleStorageChange`), `onChanged` 키 삭제/타입 가드, 슬라이더 250ms 디바운스+`change` 즉시 저장 및 `NaN` 가드 적용 완료
 - **Recent Commits**:
+  - `bd57dbd`: `refactor(popup): modularize popup bindings, debounce padding save, and guard storage types`
+  - `0cf815f`: `test(immersion): add popup debounce, NaN guard, and onChanged key-deletion tests`
+  - `f1f7912`: `docs(immersion): resolve REFACTOR-02 and sync architecture and control tower`
   - `955fc2e`: `refactor(immersion): extract immersion controller and debounce slider storage writes`
   - `8f52787`: `test(immersion): add regression tests for immersion controller split and slider debounce`
-  - `61ec718`: `docs(immersion): record ADR-04 spec amendment, audit tickets, and 8/8 QA evidence`
-  - `addff3a`: `test(immersion): add built-bundle E2E QA suite for immersion mode`
-  - `bd69c19`: `docs(immersion): promote spec/architecture to as-is and mark step 4 complete`
 - **실행 검증 명령 및 결과**:
+  - `node --check popup.js && node --check tests/immersion.test.js`: 문법 검증 PASS
   - `npm test`: 4개 테스트 스위트(`module_import`, `post_navigation`, `recommend`, `immersion` 19개 테스트) 전원 PASS
   - `node tests/immersion_e2e.test.js`: 실제 번들(`content.js`, `content.css`, `popup.js`, `test_page.html`) 기반 Happy Path 4건(`TC-HP-01`~`TC-HP-04`) + Boundary/Negative 4건(`TC-BD-01`~`TC-NG-02`) 총 8개 시나리오 전원 PASS
-  - `npm run build` & `node --check`: `content.js`, `disagall_viewer.user.js` 번들 생성 및 JS 문법 검증 PASS
-  - 미해결 감사 티켓 (`0 / 1` — `🚨 DEFECT: 0건`, `🧐 REFACTOR: 1건` 잔여): `REFACTOR-03` (`popup.js` 리팩토링)
+  - `npm run build`: `content.js`, `disagall_viewer.user.js` 번들 생성 PASS
+  - 미해결 감사 티켓 (`0 / 0` — `🚨 DEFECT: 0건`, `🧐 REFACTOR: 0건`)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - QA 인수 조건은 `4/4 (100% — 8/8 Scenarios PASS)` 통과했고 `REFACTOR-02`가 해결되었으며, 잔여 티켓 `REFACTOR-03`(`popup.js`) 1건 처리 시 `🟢 Sign-Off` 가능: `"viewer-immersion 도메인의 REFACTOR-03 티켓 해결해줘"`
+  - 모든 구현 Step(`4/4`), 동적 QA(`8/8 PASS`), 코드 감사 티켓(`REFACTOR-01~03` 전량 해결)이 완료되어 **`🟢 Sign-Off`** 상태입니다. 다음 추천 액션: `npm run pack`으로 배포용 ZIP 패키징 또는 신규 기능 기획(`interactive-feature-planner`).
   - 참고: 실제 오버레이 패딩 슬라이더의 DOM ID는 `#disagall-slider`(스펙 표기 `#disagall-padding-slider` 대신 실제 마크업 `src/ui/overlay.js#L30`)임.
   - Chrome `--headless=new` 환경은 OS 전체화면 권한 제약(`TypeError: not granted`)이 있으므로, 전체화면 중 `closeViewer` 해제 경로는 `tests/immersion_e2e.test.js`의 Fullscreen API 계약 시뮬레이션과 실브라우저 `closeViewer` 경로를 병행해 검증함.
