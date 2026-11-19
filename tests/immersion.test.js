@@ -120,69 +120,7 @@ async function run() {
   assert.strictEqual(updatedAutoHide, false, 'Updated autoHideUi should load false');
   console.log('✅ Test 5: Storage read/write contracts and fallback defaults verified');
 
-  // 6. Verify Popup Controller & DOM Event Integration (initPopup)
-  function createMockElement(id, initialProps = {}) {
-    const listeners = {};
-    return {
-      id,
-      ...initialProps,
-      addEventListener(event, fn) {
-        if (!listeners[event]) listeners[event] = [];
-        listeners[event].push(fn);
-      },
-      dispatchEvent(event, payload = {}) {
-        if (listeners[event]) {
-          listeners[event].forEach((fn) => fn({ target: this, ...payload }));
-        }
-      },
-    };
-  }
-
-  const mockSlider = createMockElement('padding-slider', { value: '24' });
-  const mockValDisplay = createMockElement('padding-val', { textContent: '24px' });
-  const mockToggle = createMockElement('auto-hide-ui-toggle', { checked: true });
-
-  const mockDoc = {
-    getElementById(id) {
-      if (id === 'padding-slider') return mockSlider;
-      if (id === 'padding-val') return mockValDisplay;
-      if (id === 'auto-hide-ui-toggle') return mockToggle;
-      return null;
-    },
-  };
-
-  const syncStorage = createMockStorage({ autoHideUi: false, defaultPadding: 32 });
-
-  // Initialize popup with pre-populated storage
-  popup.initPopup(mockDoc, syncStorage);
-
-  assert.strictEqual(mockSlider.value, 32, 'Slider value should initialize to storage value 32');
-  assert.strictEqual(mockValDisplay.textContent, '32px', 'ValDisplay should initialize to 32px');
-  assert.strictEqual(mockToggle.checked, false, 'Toggle should initialize to storage value false');
-
-  // Simulate user toggling immersion mode On
-  mockToggle.checked = true;
-  mockToggle.dispatchEvent('change');
-  assert.strictEqual(syncStorage.store.autoHideUi, true, 'Toggling switch should update storage to true');
-
-  // Simulate user dragging slider
-  mockSlider.value = '16';
-  mockSlider.dispatchEvent('input', { target: { value: '16' } });
-  assert.strictEqual(mockValDisplay.textContent, '16px', 'Slider input should update display to 16px');
-  assert.strictEqual(syncStorage.store.defaultPadding, 16, 'Slider input should update storage to 16');
-  console.log('✅ Test 6: Popup controller & DOM event integration verified');
-
-  // 7. Verify Defensive Error Handling & Guardrails
-  assert.doesNotThrow(() => {
-    popup.loadSettings(null);
-    popup.loadSettings({});
-    popup.saveAutoHideUi(null, true);
-    popup.savePadding(null, 24);
-    popup.initPopup(null, null);
-  }, 'Popup helper functions must safely guard against null/undefined storage and documents');
-  console.log('✅ Test 7: Popup storage defensive guardrails verified');
-
-  // Helper: Fake timer harness for deterministic idle timeout testing
+  // Helper: Fake timer harness for deterministic timeout & debounce testing
   async function withFakeTimers(fn) {
     const origSetTimeout = global.setTimeout;
     const origClearTimeout = global.clearTimeout;
@@ -225,6 +163,173 @@ async function run() {
       global.clearTimeout = origClearTimeout;
     }
   }
+
+  // 6. Verify Popup Controller, Slider Debounce/Change Commit & NaN Guard (initPopup)
+  function createMockElement(id, initialProps = {}) {
+    const listeners = {};
+    return {
+      id,
+      ...initialProps,
+      addEventListener(event, fn) {
+        if (!listeners[event]) listeners[event] = [];
+        listeners[event].push(fn);
+      },
+      dispatchEvent(event, payload = {}) {
+        if (listeners[event]) {
+          listeners[event].forEach((fn) => fn({ target: this, ...payload }));
+        }
+      },
+    };
+  }
+
+  function createPopupDoc(slider, valDisplay, toggle) {
+    return {
+      getElementById(id) {
+        if (id === 'padding-slider') return slider;
+        if (id === 'padding-val') return valDisplay;
+        if (id === 'auto-hide-ui-toggle') return toggle;
+        return null;
+      },
+    };
+  }
+
+  await withFakeTimers(async (timers) => {
+    const mockSlider = createMockElement('padding-slider', { value: '24' });
+    const mockValDisplay = createMockElement('padding-val', { textContent: '24px' });
+    const mockToggle = createMockElement('auto-hide-ui-toggle', { checked: true });
+    const mockDoc = createPopupDoc(mockSlider, mockValDisplay, mockToggle);
+
+    const syncStorage = createMockStorage({ autoHideUi: false, defaultPadding: 32 });
+    const paddingWrites = [];
+    const origSet = syncStorage.set;
+    syncStorage.set = (items, cb) => {
+      if (Object.prototype.hasOwnProperty.call(items, 'defaultPadding')) {
+        paddingWrites.push(items.defaultPadding);
+      }
+      origSet(items, cb);
+    };
+
+    // Initialize popup with pre-populated storage
+    popup.initPopup(mockDoc, syncStorage);
+
+    assert.strictEqual(mockSlider.value, 32, 'Slider value should initialize to storage value 32');
+    assert.strictEqual(mockValDisplay.textContent, '32px', 'ValDisplay should initialize to 32px');
+    assert.strictEqual(mockToggle.checked, false, 'Toggle should initialize to storage value false');
+
+    // Simulate user toggling immersion mode On
+    mockToggle.checked = true;
+    mockToggle.dispatchEvent('change');
+    assert.strictEqual(syncStorage.store.autoHideUi, true, 'Toggling switch should update storage to true');
+
+    // Simulate rapid user dragging slider -> immediate UI preview, debounced storage write
+    mockSlider.value = '12';
+    mockSlider.dispatchEvent('input', { target: { value: '12' } });
+    mockSlider.value = '20';
+    mockSlider.dispatchEvent('input', { target: { value: '20' } });
+    mockSlider.value = '16';
+    mockSlider.dispatchEvent('input', { target: { value: '16' } });
+    assert.strictEqual(mockValDisplay.textContent, '16px', 'Slider input should update display immediately to 16px');
+    assert.strictEqual(syncStorage.store.defaultPadding, 32, 'Rapid slider input must debounce storage writes');
+    assert.strictEqual(paddingWrites.length, 0, 'Rapid slider input must not write on every tick');
+    assert.strictEqual(timers.count, 1, 'Rapid slider input must coalesce into one debounce timer');
+    assert.strictEqual(timers.getAll()[0].delay, popup.PADDING_SAVE_DEBOUNCE_MS);
+
+    // Debounce timer fires -> persists final value once
+    timers.runNext();
+    assert.strictEqual(syncStorage.store.defaultPadding, 16, 'Debounce timer must persist final padding 16');
+    assert.deepStrictEqual(paddingWrites, [16], 'Debounced slider input must write once');
+
+    // Invalid NaN slider input must be ignored safely
+    mockSlider.dispatchEvent('input', { target: { value: 'not-a-number' } });
+    assert.strictEqual(mockValDisplay.textContent, '16px', 'NaN slider input must not overwrite display');
+    assert.strictEqual(timers.count, 0, 'NaN slider input must not schedule storage write');
+
+    // Slider change event cancels pending debounce and commits immediately
+    mockSlider.value = '48';
+    mockSlider.dispatchEvent('input', { target: { value: '48' } });
+    assert.strictEqual(timers.count, 1);
+    mockSlider.dispatchEvent('change', { target: { value: '48' } });
+    assert.strictEqual(timers.count, 0, 'Slider change must cancel pending debounce timer');
+    assert.strictEqual(syncStorage.store.defaultPadding, 48, 'Slider change must commit padding immediately');
+    assert.deepStrictEqual(paddingWrites, [16, 48]);
+  });
+  console.log('✅ Test 6: Popup controller, slider debounce/change commit & NaN guard verified');
+
+  // 7. Verify Defensive Error Handling, NaN Guard & onChanged Key-Deletion/Type Guardrails
+  assert.doesNotThrow(() => {
+    popup.loadSettings(null);
+    popup.loadSettings({});
+    popup.saveAutoHideUi(null, true);
+    popup.savePadding(null, 24);
+    popup.savePadding(emptyStorage, NaN);
+    popup.savePadding(emptyStorage, 'bad-value');
+    popup.initPopup(null, null);
+  }, 'Popup helper functions must safely guard against null/undefined/NaN inputs');
+  assert.strictEqual(emptyStorage.store.defaultPadding, 48, 'Invalid savePadding(NaN) must not corrupt storage');
+
+  const origGlobalChrome = global.chrome;
+  try {
+    let registeredPopupOnChanged = null;
+    global.chrome = {
+      storage: {
+        onChanged: {
+          addListener(fn) {
+            registeredPopupOnChanged = fn;
+          },
+        },
+      },
+    };
+
+    const syncSlider = createMockElement('padding-slider', { value: '24' });
+    const syncValDisplay = createMockElement('padding-val', { textContent: '24px' });
+    const syncToggle = createMockElement('auto-hide-ui-toggle', { checked: true });
+    const syncDoc = createPopupDoc(syncSlider, syncValDisplay, syncToggle);
+    const localStore = createMockStorage({ autoHideUi: true, defaultPadding: 24 });
+
+    popup.initPopup(syncDoc, localStore);
+    assert.strictEqual(typeof registeredPopupOnChanged, 'function', 'initPopup must register chrome.storage.onChanged listener');
+
+    // Valid sync update
+    registeredPopupOnChanged(
+      {
+        autoHideUi: { oldValue: true, newValue: false },
+        defaultPadding: { oldValue: 24, newValue: 40 },
+      },
+      'sync'
+    );
+    assert.strictEqual(syncToggle.checked, false, 'Valid sync boolean must update toggle');
+    assert.strictEqual(syncSlider.value, 40, 'Valid sync number must update slider');
+    assert.strictEqual(syncValDisplay.textContent, '40px', 'Valid sync number must update display');
+
+    // Key deletion (newValue === undefined) must NOT pollute UI with 'undefinedpx' or undefined
+    registeredPopupOnChanged(
+      {
+        autoHideUi: { oldValue: false, newValue: undefined },
+        defaultPadding: { oldValue: 40, newValue: undefined },
+      },
+      'sync'
+    );
+    assert.strictEqual(syncToggle.checked, false, 'Deleted autoHideUi key must not overwrite toggle with undefined');
+    assert.strictEqual(syncSlider.value, 40, 'Deleted padding key must not overwrite slider');
+    assert.strictEqual(syncValDisplay.textContent, '40px', 'Deleted padding key must not produce undefinedpx');
+
+    // Wrong types / NaN / non-sync area must be ignored
+    registeredPopupOnChanged(
+      {
+        autoHideUi: { newValue: 'true' },
+        defaultPadding: { newValue: Number.NaN },
+      },
+      'sync'
+    );
+    registeredPopupOnChanged({ defaultPadding: { newValue: '12' } }, 'sync');
+    registeredPopupOnChanged({ autoHideUi: { newValue: true }, defaultPadding: { newValue: 10 } }, 'local');
+    assert.strictEqual(syncToggle.checked, false, 'Invalid type or non-sync area must not mutate toggle');
+    assert.strictEqual(syncSlider.value, 40, 'Invalid type, NaN, or non-sync area must not mutate slider');
+    assert.strictEqual(syncValDisplay.textContent, '40px', 'Invalid type, NaN, or non-sync area must not mutate display');
+  } finally {
+    global.chrome = origGlobalChrome;
+  }
+  console.log('✅ Test 7: Popup defensive guardrails & onChanged type/key-deletion defense verified');
 
   // Helper: Lightweight DOM/Browser harness for controller tests
   function createMockDomNode(id = '') {
