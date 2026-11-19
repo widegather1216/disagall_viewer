@@ -284,6 +284,7 @@ async function run() {
     const origCancelRaf = global.cancelAnimationFrame;
     const origChrome = global.chrome;
     const origGmGetValue = global.GM_getValue;
+    const origGmSetValue = global.GM_setValue;
 
     const overlayNode = createMockDomNode('disagall-viewer-overlay');
     const headerNode = createMockDomNode('disagall-header');
@@ -383,6 +384,7 @@ async function run() {
         overlayNode,
         headerNode,
         sliderNode,
+        sliderValNode,
         mockDocument,
         mockWindow,
         getFullscreenCalls: () => fullscreenCalls,
@@ -395,6 +397,7 @@ async function run() {
       state.elements.overlayEl = null;
       state.autoHideUi = true;
       state.isUiHidden = false;
+      state.currentPadding = CONFIG.DEFAULT_PADDING;
       state.zoom.isDragging = false;
       global.document = origDocument;
       global.window = origWindow;
@@ -402,6 +405,7 @@ async function run() {
       global.cancelAnimationFrame = origCancelRaf;
       global.chrome = origChrome;
       global.GM_getValue = origGmGetValue;
+      global.GM_setValue = origGmSetValue;
     }
   }
 
@@ -735,6 +739,88 @@ async function run() {
     'popup.html must document H and F immersion shortcuts'
   );
   console.log('✅ Test 17: popup.html immersion toggle and 2.5s/H/F guidance verified');
+
+  // 18. Verify immersion_controller.js separation and viewer_controller.js backward-compatible re-exports
+  const immersionCtrl = await import('../src/controller/immersion_controller.js');
+  const viewerCtrl = await import('../src/controller/viewer_controller.js');
+  const expectedImmersionExports = [
+    'clearIdleTimer',
+    'showUi',
+    'hideUi',
+    'resetIdleTimer',
+    'toggleUiManual',
+    'exitFullscreenSafely',
+    'toggleFullscreen',
+    'applyAutoHideUiSetting',
+    'initImmersionSettings',
+  ];
+  for (const fnName of expectedImmersionExports) {
+    assert.strictEqual(typeof immersionCtrl[fnName], 'function', `immersion_controller must export ${fnName}`);
+    assert.strictEqual(
+      viewerCtrl[fnName],
+      immersionCtrl[fnName],
+      `viewer_controller must re-export ${fnName} from immersion_controller`
+    );
+  }
+  console.log('✅ Test 18: immersion_controller.js separation & viewer_controller.js re-exports verified');
+
+  // 19. Verify padding slider storage I/O optimization (debounce + change + closeViewer flush + NaN/GM fallback)
+  await withFakeTimers(async (timers) => {
+    await withControllerHarness(async ({ controller, overlayNode, sliderNode, sliderValNode }) => {
+      const chromeSaves = [];
+      global.chrome = {
+        storage: {
+          sync: {
+            set(payload) {
+              chromeSaves.push(payload);
+            }
+          }
+        }
+      };
+
+      controller.createOverlay();
+      overlayNode.classList.add('active');
+      state.autoHideUi = false;
+
+      // Rapid drag ticks must NOT trigger storage writes per tick
+      sliderNode.dispatchEvent('input', { target: { value: '12' } });
+      sliderNode.dispatchEvent('input', { target: { value: '20' } });
+      sliderNode.dispatchEvent('input', { target: { value: '36' } });
+      assert.strictEqual(state.currentPadding, 36, 'Slider input must update state.currentPadding immediately');
+      assert.strictEqual(sliderValNode.textContent, '36px', 'Slider input must update display immediately');
+      assert.strictEqual(chromeSaves.length, 0, 'Rapid slider input must not write to chrome.storage.sync on each tick');
+      assert.strictEqual(timers.count, 1, 'Slider input must coalesce into a single debounced save timer');
+
+      // Firing debounce timer commits once with final value
+      timers.runNext();
+      assert.deepStrictEqual(chromeSaves, [{ [CONFIG.STORAGE_KEY_PADDING]: 36 }], 'Debounce must persist final padding once');
+
+      // Invalid NaN input must be ignored safely
+      sliderNode.dispatchEvent('input', { target: { value: 'not-a-number' } });
+      assert.strictEqual(state.currentPadding, 36, 'NaN slider input must be ignored');
+      assert.strictEqual(timers.count, 0, 'NaN slider input must not schedule storage write');
+
+      // change event cancels pending debounce and writes immediately
+      sliderNode.dispatchEvent('input', { target: { value: '48' } });
+      assert.strictEqual(timers.count, 1);
+      sliderNode.dispatchEvent('change', { target: { value: '48' } });
+      assert.strictEqual(timers.count, 0, 'Slider change must cancel pending debounce timer');
+      assert.strictEqual(chromeSaves.length, 2);
+      assert.deepStrictEqual(chromeSaves[1], { [CONFIG.STORAGE_KEY_PADDING]: 48 });
+
+      // closeViewer() flushes pending debounced save (GM_setValue fallback) and leaves 0 timers
+      const gmSaves = [];
+      global.chrome = undefined;
+      global.GM_setValue = (key, val) => gmSaves.push([key, val]);
+      state.autoHideUi = true;
+      sliderNode.dispatchEvent('input', { target: { value: '64' } });
+      assert.strictEqual(timers.count, 2, 'Active viewer with autoHideUi=true has idle + debounce timers');
+      controller.closeViewer();
+      assert.strictEqual(timers.count, 0, 'closeViewer() must clear both idle and padding debounce timers');
+      assert.deepStrictEqual(gmSaves, [[CONFIG.STORAGE_KEY_PADDING, 64]], 'closeViewer() must flush pending padding via GM_setValue');
+    });
+  });
+  console.log('✅ Test 19: Padding slider debounce, change commit, closeViewer flush, and NaN/GM guard verified');
 
   console.log('\n🎉 ALL VIEWER IMMERSION UNIT TESTS PASSED! 🎉');
 }
