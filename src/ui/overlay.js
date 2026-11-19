@@ -39,6 +39,15 @@ export function buildOverlayHtml() {
           </svg>
           <span>개추</span>
         </button>
+        <button class="disagall-btn disagall-btn-fullscreen" id="disagall-btn-fullscreen" title="전체화면 전환 (단축키: F)" aria-pressed="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+          </svg>
+          <span>전체화면</span>
+        </button>
         <button class="disagall-btn disagall-btn-close" id="disagall-close-btn" title="닫기 (ESC)">✕ 닫기</button>
       </div>
     </div>
@@ -84,6 +93,7 @@ export function buildOverlayHtml() {
 
 export function cacheOverlayElements() {
   state.elements.overlayEl = document.getElementById('disagall-viewer-overlay');
+  state.elements.stageEl = document.getElementById('disagall-stage');
   state.elements.mainImgEl = document.getElementById('disagall-main-img');
   state.elements.counterEl = document.getElementById('disagall-counter');
   state.elements.infoBadgeEl = document.getElementById('disagall-info-badge');
@@ -94,6 +104,37 @@ export function cacheOverlayElements() {
   state.elements.loaderEl = document.getElementById('disagall-loader');
   state.elements.toastEl = document.getElementById('disagall-toast');
   state.elements.recommendBtnEl = document.getElementById('disagall-btn-recommend');
+  state.elements.fullscreenBtnEl = document.getElementById('disagall-btn-fullscreen');
+}
+
+function isUiHiddenState(overlayEl) {
+  if (state.isUiHidden) return true;
+  if (!overlayEl || !overlayEl.classList) return false;
+  return (
+    overlayEl.classList.contains('disagall-idle') ||
+    overlayEl.classList.contains('disagall-ui-hidden')
+  );
+}
+
+function getOverlayChromeHeights(overlayEl) {
+  if (isUiHiddenState(overlayEl)) {
+    return { headerHeight: 0, footerHeight: 0 };
+  }
+  const hasQuery = overlayEl && typeof overlayEl.querySelector === 'function';
+  const headerEl = hasQuery ? overlayEl.querySelector('.disagall-header') : null;
+  const footerEl = hasQuery ? overlayEl.querySelector('.disagall-footer') : null;
+  return {
+    headerHeight: headerEl && headerEl.offsetHeight ? headerEl.offsetHeight : 52,
+    footerHeight: footerEl && footerEl.offsetHeight ? footerEl.offsetHeight : 38,
+  };
+}
+
+function resolveStageElement(overlayEl) {
+  if (state.elements.stageEl) return state.elements.stageEl;
+  if (overlayEl && typeof overlayEl.querySelector === 'function') {
+    return overlayEl.querySelector('#disagall-stage') || overlayEl.querySelector('.disagall-stage');
+  }
+  return typeof document !== 'undefined' ? document.getElementById('disagall-stage') : null;
 }
 
 export function applyFittingAndPadding() {
@@ -104,12 +145,16 @@ export function applyFittingAndPadding() {
   const nh = mainImgEl.naturalHeight;
   const isPortrait = nh >= nw;
 
-  const headerEl = overlayEl ? overlayEl.querySelector('.disagall-header') : null;
-  const footerEl = overlayEl ? overlayEl.querySelector('.disagall-footer') : null;
-  const headerHeight = headerEl ? headerEl.offsetHeight : 52;
-  const footerHeight = footerEl ? footerEl.offsetHeight : 38;
-  const availableHeight = Math.max(100, window.innerHeight - headerHeight - footerHeight - (state.currentPadding * 2));
-  const availableWidth = Math.max(100, window.innerWidth - (state.currentPadding * 2));
+  const { headerHeight, footerHeight } = getOverlayChromeHeights(overlayEl);
+  const stageEl = resolveStageElement(overlayEl);
+  if (stageEl && stageEl.style) {
+    stageEl.style.paddingTop = `${headerHeight}px`;
+    stageEl.style.paddingBottom = `${footerHeight}px`;
+  }
+
+  const effectivePadding = state.isFullscreenMode ? 0 : state.currentPadding;
+  const availableHeight = Math.max(100, window.innerHeight - headerHeight - footerHeight - (effectivePadding * 2));
+  const availableWidth = Math.max(100, window.innerWidth - (effectivePadding * 2));
 
   const widthRatio = availableWidth / nw;
   const heightRatio = availableHeight / nh;

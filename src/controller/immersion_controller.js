@@ -1,10 +1,12 @@
 // Immersion Mode, Idle Timer, Fullscreen, and Storage Sync Controller
 import { CONFIG } from '../config.js';
 import { state } from '../state.js';
+import { applyFittingAndPadding, showViewerToast } from '../ui/overlay.js';
 
 let isHeaderHovered = false;
 let isSliderInteracting = false;
 let hasBoundStorageSync = false;
+let boundFullscreenDoc = null;
 
 export function isOverlayActive() {
   const { overlayEl } = state.elements;
@@ -51,6 +53,11 @@ function isAnyUiHiddenClass(overlayEl) {
   );
 }
 
+function syncFittingIfUnzoomed() {
+  if (state.zoom.scale > 1.001) return;
+  applyFittingAndPadding();
+}
+
 export function showUi() {
   state.isUiHidden = false;
   const { overlayEl } = state.elements;
@@ -58,6 +65,7 @@ export function showUi() {
 
   overlayEl.classList.remove('disagall-idle');
   overlayEl.classList.remove('disagall-ui-hidden');
+  syncFittingIfUnzoomed();
 }
 
 export function hideUi(isManual = false) {
@@ -69,6 +77,7 @@ export function hideUi(isManual = false) {
     state.isUiHidden = true;
     overlayEl.classList.remove('disagall-idle');
     overlayEl.classList.add('disagall-ui-hidden');
+    syncFittingIfUnzoomed();
     return true;
   }
 
@@ -79,6 +88,7 @@ export function hideUi(isManual = false) {
   }
 
   overlayEl.classList.add('disagall-idle');
+  syncFittingIfUnzoomed();
   return true;
 }
 
@@ -117,23 +127,128 @@ export function getFullscreenElement() {
   return document.fullscreenElement || document.webkitFullscreenElement || null;
 }
 
-function handleFullscreenPromise(result) {
-  if (!result || typeof result.catch !== 'function') return;
-  result.catch((err) => {
-    // Browser may reject fullscreen transitions outside direct user gestures
-    return err;
-  });
+function updateFullscreenButtonUi(active) {
+  const { fullscreenBtnEl } = state.elements;
+  if (!fullscreenBtnEl) return;
+
+  fullscreenBtnEl.classList.toggle('active', active);
+  if (typeof fullscreenBtnEl.setAttribute === 'function') {
+    fullscreenBtnEl.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+  fullscreenBtnEl.title = active ? '전체화면 해제 (단축키: F / ESC)' : '전체화면 전환 (단축키: F)';
+
+  if (typeof fullscreenBtnEl.querySelector === 'function') {
+    const labelEl = fullscreenBtnEl.querySelector('span');
+    if (labelEl) {
+      labelEl.textContent = active ? '전체화면 해제' : '전체화면';
+    }
+  }
+}
+
+function enterFullscreenVisualState() {
+  if (!isOverlayActive()) return;
+  const { overlayEl } = state.elements;
+  if (state.isFullscreenMode && overlayEl.classList.contains('disagall-fullscreen')) {
+    updateFullscreenButtonUi(true);
+    return;
+  }
+
+  state.isFullscreenMode = true;
+  overlayEl.classList.add('disagall-fullscreen');
+  updateFullscreenButtonUi(true);
+  hideUi(true);
+}
+
+function exitFullscreenVisualState() {
+  const { overlayEl } = state.elements;
+  const wasActive = Boolean(
+    state.isFullscreenMode || (overlayEl && overlayEl.classList.contains('disagall-fullscreen'))
+  );
+
+  state.isFullscreenMode = false;
+  if (overlayEl) {
+    overlayEl.classList.remove('disagall-fullscreen');
+  }
+  updateFullscreenButtonUi(false);
+
+  if (wasActive && isOverlayActive()) {
+    showUi();
+    resetIdleTimer();
+  }
+}
+
+export function resetFullscreenState() {
+  state.isFullscreenMode = false;
+  const { overlayEl } = state.elements;
+  if (overlayEl) {
+    overlayEl.classList.remove('disagall-fullscreen');
+  }
+  updateFullscreenButtonUi(false);
+}
+
+function syncFullscreenState() {
+  if (!isOverlayActive()) return;
+  if (getFullscreenElement()) {
+    enterFullscreenVisualState();
+    return;
+  }
+  if (state.isFullscreenMode) {
+    exitFullscreenVisualState();
+  }
+}
+
+function bindFullscreenChangeListener() {
+  if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+  if (boundFullscreenDoc === document) return;
+
+  boundFullscreenDoc = document;
+  document.addEventListener('fullscreenchange', syncFullscreenState);
+  document.addEventListener('webkitfullscreenchange', syncFullscreenState);
+}
+
+function handleFullscreenPromise(result, onSuccess, onFailure) {
+  if (!result || typeof result.then !== 'function') {
+    if (typeof onSuccess === 'function') onSuccess();
+    return;
+  }
+  result
+    .then(() => {
+      if (typeof onSuccess === 'function') onSuccess();
+    })
+    .catch((err) => {
+      // Browser may reject fullscreen transitions outside direct user gestures
+      if (typeof onFailure === 'function') onFailure(err);
+      return err;
+    });
+}
+
+function requestOverlayFullscreen(overlayEl, { onSuccess, onFailure } = {}) {
+  try {
+    if (overlayEl && typeof overlayEl.requestFullscreen === 'function') {
+      handleFullscreenPromise(overlayEl.requestFullscreen(), onSuccess, onFailure);
+      return true;
+    }
+    if (overlayEl && typeof overlayEl.webkitRequestFullscreen === 'function') {
+      handleFullscreenPromise(overlayEl.webkitRequestFullscreen(), onSuccess, onFailure);
+      return true;
+    }
+  } catch (err) {
+    if (typeof onFailure === 'function') onFailure(err);
+    return false;
+  }
+  if (typeof onFailure === 'function') onFailure(new Error('Fullscreen API unavailable'));
+  return false;
 }
 
 export function exitFullscreenSafely() {
   if (!getFullscreenElement()) return false;
   try {
     if (typeof document.exitFullscreen === 'function') {
-      handleFullscreenPromise(document.exitFullscreen());
+      handleFullscreenPromise(document.exitFullscreen(), exitFullscreenVisualState);
       return true;
     }
     if (typeof document.webkitExitFullscreen === 'function') {
-      handleFullscreenPromise(document.webkitExitFullscreen());
+      handleFullscreenPromise(document.webkitExitFullscreen(), exitFullscreenVisualState);
       return true;
     }
   } catch (err) {
@@ -150,20 +265,39 @@ export function toggleFullscreen() {
   }
 
   const { overlayEl } = state.elements;
-  try {
-    if (typeof overlayEl.requestFullscreen === 'function') {
-      handleFullscreenPromise(overlayEl.requestFullscreen());
-      return true;
-    }
-    if (typeof overlayEl.webkitRequestFullscreen === 'function') {
-      handleFullscreenPromise(overlayEl.webkitRequestFullscreen());
-      return true;
-    }
-  } catch (err) {
-    // Safely ignore unsupported or disallowed fullscreen request errors
-    return false;
+  const wasFallback = state.isFullscreenMode;
+  return requestOverlayFullscreen(overlayEl, {
+    onSuccess: enterFullscreenVisualState,
+    onFailure: () => {
+      if (!isOverlayActive()) return;
+      if (wasFallback) {
+        exitFullscreenVisualState();
+        return;
+      }
+      enterFullscreenVisualState();
+      showViewerToast('OS 전체화면이 제한되어 창 전체 채움 모드로 전환했습니다.');
+    },
+  });
+}
+
+export function enterAutoFullscreenOnOpen() {
+  if (!isOverlayActive()) return false;
+  const { overlayEl } = state.elements;
+  return requestOverlayFullscreen(overlayEl, {
+    onSuccess: enterFullscreenVisualState,
+    onFailure: () => {
+      if (!isOverlayActive()) return;
+      enterFullscreenVisualState();
+      showViewerToast('여백 0px·UI 숨김으로 전체 채움 (F 키로 OS 전체화면)');
+    },
+  });
+}
+
+export function applyAutoFullscreenSetting(enabled) {
+  state.autoFullscreen = Boolean(enabled);
+  if (!state.autoFullscreen && state.isFullscreenMode && !getFullscreenElement() && isOverlayActive()) {
+    exitFullscreenVisualState();
   }
-  return false;
 }
 
 export function applyAutoHideUiSetting(enabled) {
@@ -192,11 +326,21 @@ function loadInitialAutoHideSetting() {
     typeof chrome.storage.sync.get === 'function';
 
   if (hasChromeSync) {
-    chrome.storage.sync.get({ [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: true }, (result) => {
-      if (result && typeof result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI] === 'boolean') {
-        applyAutoHideUiSetting(result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI]);
+    chrome.storage.sync.get(
+      {
+        [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: true,
+        [CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]: false,
+      },
+      (result) => {
+        if (!result) return;
+        if (typeof result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI] === 'boolean') {
+          applyAutoHideUiSetting(result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI]);
+        }
+        if (typeof result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN] === 'boolean') {
+          applyAutoFullscreenSetting(result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]);
+        }
       }
-    });
+    );
     return;
   }
 
@@ -204,6 +348,10 @@ function loadInitialAutoHideSetting() {
     const savedAutoHide = GM_getValue(CONFIG.STORAGE_KEY_AUTO_HIDE_UI, true);
     if (typeof savedAutoHide === 'boolean') {
       applyAutoHideUiSetting(savedAutoHide);
+    }
+    const savedAutoFullscreen = GM_getValue(CONFIG.STORAGE_KEY_AUTO_FULLSCREEN, false);
+    if (typeof savedAutoFullscreen === 'boolean') {
+      applyAutoFullscreenSetting(savedAutoFullscreen);
     }
   }
 }
@@ -221,9 +369,13 @@ function bindAutoHideStorageListener() {
   hasBoundStorageSync = true;
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'sync' || !changes) return;
-    const change = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
-    if (change && typeof change.newValue === 'boolean') {
-      applyAutoHideUiSetting(change.newValue);
+    const autoHideChange = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
+    if (autoHideChange && typeof autoHideChange.newValue === 'boolean') {
+      applyAutoHideUiSetting(autoHideChange.newValue);
+    }
+    const autoFullscreenChange = changes[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN];
+    if (autoFullscreenChange && typeof autoFullscreenChange.newValue === 'boolean') {
+      applyAutoFullscreenSetting(autoFullscreenChange.newValue);
     }
   });
 }
@@ -231,6 +383,7 @@ function bindAutoHideStorageListener() {
 export function initImmersionSettings() {
   loadInitialAutoHideSetting();
   bindAutoHideStorageListener();
+  bindFullscreenChangeListener();
 }
 
 function bindHeaderHoverEvents(overlayEl) {
@@ -271,6 +424,7 @@ function bindSliderInteractionEvents(sliderEl) {
 }
 
 export function bindImmersionEvents(overlayEl, sliderEl) {
+  bindFullscreenChangeListener();
   overlayEl.addEventListener('mousemove', () => {
     resetIdleTimer();
   });

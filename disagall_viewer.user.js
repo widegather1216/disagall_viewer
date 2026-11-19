@@ -28,7 +28,8 @@
     NO_PHOTO_NOTICE_DURATION: 8e3,
     // Immersion & UI Auto-Hide
     UI_IDLE_TIMEOUT: 2500,
-    STORAGE_KEY_AUTO_HIDE_UI: "autoHideUi"
+    STORAGE_KEY_AUTO_HIDE_UI: "autoHideUi",
+    STORAGE_KEY_AUTO_FULLSCREEN: "autoFullscreen"
   };
 
   // src/state.js
@@ -41,6 +42,7 @@
     // DOM Elements Cache
     elements: {
       overlayEl: null,
+      stageEl: null,
       mainImgEl: null,
       counterEl: null,
       infoBadgeEl: null,
@@ -50,13 +52,16 @@
       nextBtnEl: null,
       loaderEl: null,
       toastEl: null,
-      recommendBtnEl: null
+      recommendBtnEl: null,
+      fullscreenBtnEl: null
     },
     toastTimer: null,
     // Immersion & UI Auto-Hide
     idleTimer: null,
     autoHideUi: true,
+    autoFullscreen: false,
     isUiHidden: false,
+    isFullscreenMode: false,
     // Zoom & Pan
     zoom: {
       scale: 1,
@@ -365,6 +370,15 @@
           </svg>
           <span>\uAC1C\uCD94</span>
         </button>
+        <button class="disagall-btn disagall-btn-fullscreen" id="disagall-btn-fullscreen" title="\uC804\uCCB4\uD654\uBA74 \uC804\uD658 (\uB2E8\uCD95\uD0A4: F)" aria-pressed="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+          </svg>
+          <span>\uC804\uCCB4\uD654\uBA74</span>
+        </button>
         <button class="disagall-btn disagall-btn-close" id="disagall-close-btn" title="\uB2EB\uAE30 (ESC)">\u2715 \uB2EB\uAE30</button>
       </div>
     </div>
@@ -409,6 +423,7 @@
   }
   function cacheOverlayElements() {
     state.elements.overlayEl = document.getElementById("disagall-viewer-overlay");
+    state.elements.stageEl = document.getElementById("disagall-stage");
     state.elements.mainImgEl = document.getElementById("disagall-main-img");
     state.elements.counterEl = document.getElementById("disagall-counter");
     state.elements.infoBadgeEl = document.getElementById("disagall-info-badge");
@@ -419,6 +434,31 @@
     state.elements.loaderEl = document.getElementById("disagall-loader");
     state.elements.toastEl = document.getElementById("disagall-toast");
     state.elements.recommendBtnEl = document.getElementById("disagall-btn-recommend");
+    state.elements.fullscreenBtnEl = document.getElementById("disagall-btn-fullscreen");
+  }
+  function isUiHiddenState(overlayEl) {
+    if (state.isUiHidden) return true;
+    if (!overlayEl || !overlayEl.classList) return false;
+    return overlayEl.classList.contains("disagall-idle") || overlayEl.classList.contains("disagall-ui-hidden");
+  }
+  function getOverlayChromeHeights(overlayEl) {
+    if (isUiHiddenState(overlayEl)) {
+      return { headerHeight: 0, footerHeight: 0 };
+    }
+    const hasQuery = overlayEl && typeof overlayEl.querySelector === "function";
+    const headerEl = hasQuery ? overlayEl.querySelector(".disagall-header") : null;
+    const footerEl = hasQuery ? overlayEl.querySelector(".disagall-footer") : null;
+    return {
+      headerHeight: headerEl && headerEl.offsetHeight ? headerEl.offsetHeight : 52,
+      footerHeight: footerEl && footerEl.offsetHeight ? footerEl.offsetHeight : 38
+    };
+  }
+  function resolveStageElement(overlayEl) {
+    if (state.elements.stageEl) return state.elements.stageEl;
+    if (overlayEl && typeof overlayEl.querySelector === "function") {
+      return overlayEl.querySelector("#disagall-stage") || overlayEl.querySelector(".disagall-stage");
+    }
+    return typeof document !== "undefined" ? document.getElementById("disagall-stage") : null;
   }
   function applyFittingAndPadding() {
     const { mainImgEl, overlayEl, infoBadgeEl } = state.elements;
@@ -426,12 +466,15 @@
     const nw = mainImgEl.naturalWidth;
     const nh = mainImgEl.naturalHeight;
     const isPortrait = nh >= nw;
-    const headerEl = overlayEl ? overlayEl.querySelector(".disagall-header") : null;
-    const footerEl = overlayEl ? overlayEl.querySelector(".disagall-footer") : null;
-    const headerHeight = headerEl ? headerEl.offsetHeight : 52;
-    const footerHeight = footerEl ? footerEl.offsetHeight : 38;
-    const availableHeight = Math.max(100, window.innerHeight - headerHeight - footerHeight - state.currentPadding * 2);
-    const availableWidth = Math.max(100, window.innerWidth - state.currentPadding * 2);
+    const { headerHeight, footerHeight } = getOverlayChromeHeights(overlayEl);
+    const stageEl = resolveStageElement(overlayEl);
+    if (stageEl && stageEl.style) {
+      stageEl.style.paddingTop = `${headerHeight}px`;
+      stageEl.style.paddingBottom = `${footerHeight}px`;
+    }
+    const effectivePadding = state.isFullscreenMode ? 0 : state.currentPadding;
+    const availableHeight = Math.max(100, window.innerHeight - headerHeight - footerHeight - effectivePadding * 2);
+    const availableWidth = Math.max(100, window.innerWidth - effectivePadding * 2);
     const widthRatio = availableWidth / nw;
     const heightRatio = availableHeight / nh;
     const scale = Math.min(widthRatio, heightRatio);
@@ -559,6 +602,7 @@
       window.removeEventListener("mouseup", onWindowMouseUp);
     }
     updateImgTransform();
+    applyFittingAndPadding();
   }
   function setupZoomEvents(mainImgEl) {
     if (!mainImgEl) return;
@@ -575,6 +619,10 @@
         state.zoom.panY = 0;
       }
       updateImgTransform();
+      if (oldScale > 1.001 && state.zoom.scale <= 1.001) {
+        state.zoom.scale = 1;
+        applyFittingAndPadding();
+      }
     }, { passive: false });
     mainImgEl.addEventListener("mousedown", (e) => {
       if (state.zoom.scale > 1 && e.button === 0) {
@@ -772,6 +820,7 @@
   var isHeaderHovered = false;
   var isSliderInteracting = false;
   var hasBoundStorageSync = false;
+  var boundFullscreenDoc = null;
   function isOverlayActive() {
     const { overlayEl } = state.elements;
     return Boolean(overlayEl && overlayEl.classList.contains("active"));
@@ -805,12 +854,17 @@
   function isAnyUiHiddenClass(overlayEl) {
     return state.isUiHidden || overlayEl.classList.contains("disagall-idle") || overlayEl.classList.contains("disagall-ui-hidden");
   }
+  function syncFittingIfUnzoomed() {
+    if (state.zoom.scale > 1.001) return;
+    applyFittingAndPadding();
+  }
   function showUi() {
     state.isUiHidden = false;
     const { overlayEl } = state.elements;
     if (!overlayEl) return;
     overlayEl.classList.remove("disagall-idle");
     overlayEl.classList.remove("disagall-ui-hidden");
+    syncFittingIfUnzoomed();
   }
   function hideUi(isManual = false) {
     if (!isOverlayActive()) return false;
@@ -820,6 +874,7 @@
       state.isUiHidden = true;
       overlayEl.classList.remove("disagall-idle");
       overlayEl.classList.add("disagall-ui-hidden");
+      syncFittingIfUnzoomed();
       return true;
     }
     if (!state.autoHideUi || state.isUiHidden) return false;
@@ -828,6 +883,7 @@
       return false;
     }
     overlayEl.classList.add("disagall-idle");
+    syncFittingIfUnzoomed();
     return true;
   }
   function resetIdleTimer() {
@@ -857,21 +913,111 @@
     if (typeof document === "undefined") return null;
     return document.fullscreenElement || document.webkitFullscreenElement || null;
   }
-  function handleFullscreenPromise(result) {
-    if (!result || typeof result.catch !== "function") return;
-    result.catch((err) => {
+  function updateFullscreenButtonUi(active) {
+    const { fullscreenBtnEl } = state.elements;
+    if (!fullscreenBtnEl) return;
+    fullscreenBtnEl.classList.toggle("active", active);
+    if (typeof fullscreenBtnEl.setAttribute === "function") {
+      fullscreenBtnEl.setAttribute("aria-pressed", active ? "true" : "false");
+    }
+    fullscreenBtnEl.title = active ? "\uC804\uCCB4\uD654\uBA74 \uD574\uC81C (\uB2E8\uCD95\uD0A4: F / ESC)" : "\uC804\uCCB4\uD654\uBA74 \uC804\uD658 (\uB2E8\uCD95\uD0A4: F)";
+    if (typeof fullscreenBtnEl.querySelector === "function") {
+      const labelEl = fullscreenBtnEl.querySelector("span");
+      if (labelEl) {
+        labelEl.textContent = active ? "\uC804\uCCB4\uD654\uBA74 \uD574\uC81C" : "\uC804\uCCB4\uD654\uBA74";
+      }
+    }
+  }
+  function enterFullscreenVisualState() {
+    if (!isOverlayActive()) return;
+    const { overlayEl } = state.elements;
+    if (state.isFullscreenMode && overlayEl.classList.contains("disagall-fullscreen")) {
+      updateFullscreenButtonUi(true);
+      return;
+    }
+    state.isFullscreenMode = true;
+    overlayEl.classList.add("disagall-fullscreen");
+    updateFullscreenButtonUi(true);
+    hideUi(true);
+  }
+  function exitFullscreenVisualState() {
+    const { overlayEl } = state.elements;
+    const wasActive = Boolean(
+      state.isFullscreenMode || overlayEl && overlayEl.classList.contains("disagall-fullscreen")
+    );
+    state.isFullscreenMode = false;
+    if (overlayEl) {
+      overlayEl.classList.remove("disagall-fullscreen");
+    }
+    updateFullscreenButtonUi(false);
+    if (wasActive && isOverlayActive()) {
+      showUi();
+      resetIdleTimer();
+    }
+  }
+  function resetFullscreenState() {
+    state.isFullscreenMode = false;
+    const { overlayEl } = state.elements;
+    if (overlayEl) {
+      overlayEl.classList.remove("disagall-fullscreen");
+    }
+    updateFullscreenButtonUi(false);
+  }
+  function syncFullscreenState() {
+    if (!isOverlayActive()) return;
+    if (getFullscreenElement()) {
+      enterFullscreenVisualState();
+      return;
+    }
+    if (state.isFullscreenMode) {
+      exitFullscreenVisualState();
+    }
+  }
+  function bindFullscreenChangeListener() {
+    if (typeof document === "undefined" || typeof document.addEventListener !== "function") return;
+    if (boundFullscreenDoc === document) return;
+    boundFullscreenDoc = document;
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    document.addEventListener("webkitfullscreenchange", syncFullscreenState);
+  }
+  function handleFullscreenPromise(result, onSuccess, onFailure) {
+    if (!result || typeof result.then !== "function") {
+      if (typeof onSuccess === "function") onSuccess();
+      return;
+    }
+    result.then(() => {
+      if (typeof onSuccess === "function") onSuccess();
+    }).catch((err) => {
+      if (typeof onFailure === "function") onFailure(err);
       return err;
     });
+  }
+  function requestOverlayFullscreen(overlayEl, { onSuccess, onFailure } = {}) {
+    try {
+      if (overlayEl && typeof overlayEl.requestFullscreen === "function") {
+        handleFullscreenPromise(overlayEl.requestFullscreen(), onSuccess, onFailure);
+        return true;
+      }
+      if (overlayEl && typeof overlayEl.webkitRequestFullscreen === "function") {
+        handleFullscreenPromise(overlayEl.webkitRequestFullscreen(), onSuccess, onFailure);
+        return true;
+      }
+    } catch (err) {
+      if (typeof onFailure === "function") onFailure(err);
+      return false;
+    }
+    if (typeof onFailure === "function") onFailure(new Error("Fullscreen API unavailable"));
+    return false;
   }
   function exitFullscreenSafely() {
     if (!getFullscreenElement()) return false;
     try {
       if (typeof document.exitFullscreen === "function") {
-        handleFullscreenPromise(document.exitFullscreen());
+        handleFullscreenPromise(document.exitFullscreen(), exitFullscreenVisualState);
         return true;
       }
       if (typeof document.webkitExitFullscreen === "function") {
-        handleFullscreenPromise(document.webkitExitFullscreen());
+        handleFullscreenPromise(document.webkitExitFullscreen(), exitFullscreenVisualState);
         return true;
       }
     } catch (err) {
@@ -885,19 +1031,37 @@
       return exitFullscreenSafely();
     }
     const { overlayEl } = state.elements;
-    try {
-      if (typeof overlayEl.requestFullscreen === "function") {
-        handleFullscreenPromise(overlayEl.requestFullscreen());
-        return true;
+    const wasFallback = state.isFullscreenMode;
+    return requestOverlayFullscreen(overlayEl, {
+      onSuccess: enterFullscreenVisualState,
+      onFailure: () => {
+        if (!isOverlayActive()) return;
+        if (wasFallback) {
+          exitFullscreenVisualState();
+          return;
+        }
+        enterFullscreenVisualState();
+        showViewerToast("OS \uC804\uCCB4\uD654\uBA74\uC774 \uC81C\uD55C\uB418\uC5B4 \uCC3D \uC804\uCCB4 \uCC44\uC6C0 \uBAA8\uB4DC\uB85C \uC804\uD658\uD588\uC2B5\uB2C8\uB2E4.");
       }
-      if (typeof overlayEl.webkitRequestFullscreen === "function") {
-        handleFullscreenPromise(overlayEl.webkitRequestFullscreen());
-        return true;
+    });
+  }
+  function enterAutoFullscreenOnOpen() {
+    if (!isOverlayActive()) return false;
+    const { overlayEl } = state.elements;
+    return requestOverlayFullscreen(overlayEl, {
+      onSuccess: enterFullscreenVisualState,
+      onFailure: () => {
+        if (!isOverlayActive()) return;
+        enterFullscreenVisualState();
+        showViewerToast("\uC5EC\uBC31 0px\xB7UI \uC228\uAE40\uC73C\uB85C \uC804\uCCB4 \uCC44\uC6C0 (F \uD0A4\uB85C OS \uC804\uCCB4\uD654\uBA74)");
       }
-    } catch (err) {
-      return false;
+    });
+  }
+  function applyAutoFullscreenSetting(enabled) {
+    state.autoFullscreen = Boolean(enabled);
+    if (!state.autoFullscreen && state.isFullscreenMode && !getFullscreenElement() && isOverlayActive()) {
+      exitFullscreenVisualState();
     }
-    return false;
   }
   function applyAutoHideUiSetting(enabled) {
     state.autoHideUi = Boolean(enabled);
@@ -917,17 +1081,31 @@
   function loadInitialAutoHideSetting() {
     const hasChromeSync = typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.get === "function";
     if (hasChromeSync) {
-      chrome.storage.sync.get({ [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: true }, (result) => {
-        if (result && typeof result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI] === "boolean") {
-          applyAutoHideUiSetting(result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI]);
+      chrome.storage.sync.get(
+        {
+          [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: true,
+          [CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]: false
+        },
+        (result) => {
+          if (!result) return;
+          if (typeof result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI] === "boolean") {
+            applyAutoHideUiSetting(result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI]);
+          }
+          if (typeof result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN] === "boolean") {
+            applyAutoFullscreenSetting(result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]);
+          }
         }
-      });
+      );
       return;
     }
     if (typeof GM_getValue === "function") {
       const savedAutoHide = GM_getValue(CONFIG.STORAGE_KEY_AUTO_HIDE_UI, true);
       if (typeof savedAutoHide === "boolean") {
         applyAutoHideUiSetting(savedAutoHide);
+      }
+      const savedAutoFullscreen = GM_getValue(CONFIG.STORAGE_KEY_AUTO_FULLSCREEN, false);
+      if (typeof savedAutoFullscreen === "boolean") {
+        applyAutoFullscreenSetting(savedAutoFullscreen);
       }
     }
   }
@@ -937,15 +1115,20 @@
     hasBoundStorageSync = true;
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "sync" || !changes) return;
-      const change = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
-      if (change && typeof change.newValue === "boolean") {
-        applyAutoHideUiSetting(change.newValue);
+      const autoHideChange = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
+      if (autoHideChange && typeof autoHideChange.newValue === "boolean") {
+        applyAutoHideUiSetting(autoHideChange.newValue);
+      }
+      const autoFullscreenChange = changes[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN];
+      if (autoFullscreenChange && typeof autoFullscreenChange.newValue === "boolean") {
+        applyAutoFullscreenSetting(autoFullscreenChange.newValue);
       }
     });
   }
   function initImmersionSettings() {
     loadInitialAutoHideSetting();
     bindAutoHideStorageListener();
+    bindFullscreenChangeListener();
   }
   function bindHeaderHoverEvents(overlayEl) {
     if (typeof overlayEl.querySelector !== "function") return;
@@ -980,6 +1163,7 @@
     }
   }
   function bindImmersionEvents(overlayEl, sliderEl) {
+    bindFullscreenChangeListener();
     overlayEl.addEventListener("mousemove", () => {
       resetIdleTimer();
     });
@@ -1110,10 +1294,35 @@
     "f": () => toggleFullscreen(),
     "F": () => toggleFullscreen()
   };
+  var CODE_ACTIONS = {
+    "KeyA": () => navigate(-1),
+    "KeyD": () => navigate(1),
+    "KeyW": () => navigatePost("up"),
+    "KeyS": () => navigatePost("down"),
+    "KeyR": () => triggerPostRecommend(),
+    "KeyC": () => triggerPostRecommend(),
+    "KeyH": () => toggleUiManual(),
+    "KeyF": () => toggleFullscreen()
+  };
+  var NON_TEXT_INPUT_TYPES = /* @__PURE__ */ new Set([
+    "range",
+    "checkbox",
+    "radio",
+    "button",
+    "submit",
+    "reset",
+    "color",
+    "file",
+    "hidden"
+  ]);
   function isEditableTarget(target) {
     if (!target) return false;
     const tag = typeof target.tagName === "string" ? target.tagName.toUpperCase() : "";
-    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || Boolean(target.isContentEditable);
+    if (tag === "INPUT") {
+      const inputType = typeof target.type === "string" ? target.type.toLowerCase() : "text";
+      return !NON_TEXT_INPUT_TYPES.has(inputType);
+    }
+    return tag === "TEXTAREA" || tag === "SELECT" || Boolean(target.isContentEditable);
   }
   function isExternalModalOpen() {
     if (typeof document === "undefined" || typeof document.querySelector !== "function") {
@@ -1135,7 +1344,7 @@
       return;
     }
     if (isExternalModalOpen()) return;
-    const action = KEY_ACTIONS[e.key];
+    const action = KEY_ACTIONS[e.key] || (e.code ? CODE_ACTIONS[e.code] : null);
     if (action) {
       if (typeof e.preventDefault === "function") e.preventDefault();
       if (typeof e.stopPropagation === "function") e.stopPropagation();
@@ -1177,12 +1386,13 @@
     });
   }
   function bindOverlayButtons() {
-    const { prevBtnEl, nextBtnEl, recommendBtnEl } = state.elements;
+    const { prevBtnEl, nextBtnEl, recommendBtnEl, fullscreenBtnEl } = state.elements;
     const closeBtnEl = document.getElementById("disagall-close-btn");
     if (closeBtnEl) {
       closeBtnEl.addEventListener("click", closeViewer);
     }
     bindStopPropagationClick(recommendBtnEl, triggerPostRecommend);
+    bindStopPropagationClick(fullscreenBtnEl, toggleFullscreen);
     bindStopPropagationClick(prevBtnEl, () => navigate(-1));
     bindStopPropagationClick(nextBtnEl, () => navigate(1));
   }
@@ -1244,6 +1454,9 @@
     createOverlay();
     const targetIndex = findTargetImageIndex(targetSrc);
     const { overlayEl } = state.elements;
+    if (typeof document !== "undefined" && isEditableTarget(document.activeElement) && typeof document.activeElement.blur === "function") {
+      document.activeElement.blur();
+    }
     overlayEl.classList.add("active");
     state.previousBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -1251,11 +1464,15 @@
     resetIdleTimer();
     updateRecommendButtonUi();
     showImage(targetIndex);
+    if (state.autoFullscreen) {
+      enterAutoFullscreenOnOpen();
+    }
   }
   function closeViewer() {
     clearIdleTimer();
     flushPaddingSave();
     resetImmersionGuards();
+    resetFullscreenState();
     showUi();
     resetZoom();
     const { overlayEl } = state.elements;
@@ -1342,10 +1559,10 @@
     "use strict";
     if (true) {
       if (typeof GM_addStyle !== "undefined") {
-        GM_addStyle('/* Disagall Viewer Overlay Styles */\n#disagall-viewer-overlay {\n  position: fixed;\n  top: 0;\n  left: 0;\n  width: 100vw;\n  height: 100vh;\n  background-color: rgba(8, 9, 12, 0.96);\n  backdrop-filter: blur(16px);\n  -webkit-backdrop-filter: blur(16px);\n  z-index: 99999999;\n  display: flex;\n  flex-direction: column;\n  justify-content: space-between;\n  align-items: center;\n  user-select: none;\n  opacity: 0;\n  visibility: hidden;\n  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s;\n  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;\n  box-sizing: border-box;\n  color: #f0f2f5;\n  overflow: hidden;\n}\n\n#disagall-viewer-overlay.active {\n  opacity: 1;\n  visibility: visible;\n}\n\n/* Header Controls Bar */\n.disagall-header {\n  width: 100%;\n  padding: 12px 24px;\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);\n  z-index: 10;\n  box-sizing: border-box;\n  opacity: 1;\n  pointer-events: auto;\n  transition: opacity 0.15s ease;\n}\n\n.disagall-header-left {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n}\n\n.disagall-title {\n  font-size: 15px;\n  font-weight: 700;\n  letter-spacing: -0.3px;\n  color: #3b82f6;\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.disagall-counter {\n  font-size: 14px;\n  font-weight: 600;\n  background: rgba(255, 255, 255, 0.12);\n  padding: 4px 10px;\n  border-radius: 20px;\n  color: #e2e8f0;\n}\n\n.disagall-info-badge {\n  font-size: 12px;\n  font-weight: 500;\n  color: #94a3b8;\n  background: rgba(255, 255, 255, 0.06);\n  padding: 3px 8px;\n  border-radius: 6px;\n  border: 1px solid rgba(255, 255, 255, 0.08);\n}\n\n.disagall-header-center {\n  display: flex;\n  align-items: center;\n  gap: 16px;\n  background: rgba(20, 24, 33, 0.85);\n  border: 1px solid rgba(255, 255, 255, 0.1);\n  padding: 6px 16px;\n  border-radius: 30px;\n  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);\n}\n\n.disagall-padding-control {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 13px;\n  color: #cbd5e1;\n}\n\n.disagall-slider-label {\n  font-weight: 500;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n\n.disagall-slider {\n  -webkit-appearance: none;\n  appearance: none;\n  width: 110px;\n  height: 4px;\n  border-radius: 2px;\n  background: #334155;\n  outline: none;\n  cursor: pointer;\n}\n\n.disagall-slider::-webkit-slider-thumb {\n  -webkit-appearance: none;\n  appearance: none;\n  width: 14px;\n  height: 14px;\n  border-radius: 50%;\n  background: #3b82f6;\n  cursor: pointer;\n  transition: transform 0.15s ease, background-color 0.15s ease;\n}\n\n.disagall-slider::-webkit-slider-thumb:hover {\n  transform: scale(1.25);\n  background: #60a5fa;\n}\n\n.disagall-padding-val {\n  min-width: 38px;\n  font-weight: 600;\n  font-size: 12px;\n  color: #60a5fa;\n  text-align: right;\n}\n\n.disagall-header-right {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n\n.disagall-btn {\n  background: rgba(255, 255, 255, 0.08);\n  border: 1px solid rgba(255, 255, 255, 0.12);\n  color: #f1f5f9;\n  border-radius: 8px;\n  padding: 6px 12px;\n  font-size: 13px;\n  font-weight: 500;\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 5px;\n  transition: all 0.15s ease;\n}\n\n.disagall-btn:hover {\n  background: rgba(255, 255, 255, 0.18);\n  border-color: rgba(255, 255, 255, 0.25);\n  transform: translateY(-1px);\n}\n\n.disagall-btn-recommend {\n  background: rgba(59, 130, 246, 0.2);\n  border-color: rgba(96, 165, 250, 0.45);\n  color: #93c5fd;\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  font-weight: 600;\n  padding: 6px 13px;\n  transition: all 0.2s ease;\n}\n\n.disagall-btn-recommend:hover {\n  background: rgba(59, 130, 246, 0.38);\n  border-color: rgba(96, 165, 250, 0.75);\n  color: #ffffff;\n  transform: translateY(-1px);\n}\n\n.disagall-btn-recommend:active,\n.disagall-btn-recommend.voted {\n  background: #2563eb;\n  border-color: #3b82f6;\n  color: #ffffff;\n  transform: scale(0.96);\n}\n\n.disagall-btn-recommend svg {\n  flex-shrink: 0;\n  transition: transform 0.2s ease;\n}\n\n.disagall-btn-recommend:hover svg {\n  transform: scale(1.18) rotate(-6deg);\n}\n\n.disagall-btn-close {\n  background: rgba(239, 68, 68, 0.2);\n  border-color: rgba(239, 68, 68, 0.35);\n  color: #fca5a5;\n  font-size: 16px;\n  font-weight: bold;\n  padding: 6px 14px;\n}\n\n.disagall-btn-close:hover {\n  background: rgba(239, 68, 68, 0.4);\n  color: #ffffff;\n}\n\n/* Stage & Main Photo Area */\n.disagall-stage {\n  flex: 1;\n  width: 100%;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n  overflow: hidden;\n  box-sizing: border-box;\n  /* Dynamic padding set via JS based on slider & aspect ratio */\n}\n\n.disagall-img-wrapper {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  width: 100%;\n  height: 100%;\n  position: relative;\n  transition: all 0.2s ease-out;\n}\n\n.disagall-img {\n  display: block;\n  object-fit: contain;\n  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);\n  border-radius: 2px;\n  transition: max-width 0.15s ease, max-height 0.15s ease, opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);\n  will-change: transform, max-width, max-height;\n}\n\n/* Orientation Specific Fitting Helper Classes */\n.disagall-img.portrait {\n  /* Vertical photo: strictly fit height, horizontal padding automatic */\n  height: 100%;\n  width: auto;\n}\n\n.disagall-img.landscape {\n  /* Horizontal photo: strictly fit width, vertical padding automatic */\n  width: 100%;\n  height: auto;\n}\n\n/* Navigation Arrow Buttons */\n.disagall-nav-btn {\n  position: absolute;\n  top: 50%;\n  transform: translateY(-50%);\n  width: 54px;\n  height: 90px;\n  background: rgba(15, 17, 23, 0.4);\n  border: 1px solid rgba(255, 255, 255, 0.08);\n  color: #ffffff;\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  cursor: pointer;\n  z-index: 20;\n  opacity: 1;\n  pointer-events: auto;\n  transition: background 0.2s ease, border-color 0.2s ease, width 0.2s ease, opacity 0.15s ease;\n  backdrop-filter: blur(8px);\n  -webkit-backdrop-filter: blur(8px);\n}\n\n.disagall-nav-btn-prev {\n  left: 0;\n  border-top-right-radius: 12px;\n  border-bottom-right-radius: 12px;\n  border-left: none;\n}\n\n.disagall-nav-btn-next {\n  right: 0;\n  border-top-left-radius: 12px;\n  border-bottom-left-radius: 12px;\n  border-right: none;\n}\n\n.disagall-nav-btn:hover {\n  background: rgba(30, 41, 59, 0.85);\n  border-color: rgba(59, 130, 246, 0.4);\n  width: 64px;\n}\n\n.disagall-nav-btn svg {\n  width: 24px;\n  height: 24px;\n  fill: currentColor;\n}\n\n.disagall-nav-hint {\n  font-size: 10px;\n  font-weight: 600;\n  color: #94a3b8;\n  margin-top: 4px;\n}\n\n.disagall-nav-btn.disabled {\n  opacity: 0.25;\n  cursor: not-allowed;\n  pointer-events: none;\n}\n\n/* Footer & Hints */\n.disagall-footer {\n  width: 100%;\n  padding: 10px 24px;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);\n  z-index: 10;\n  box-sizing: border-box;\n  opacity: 1;\n  pointer-events: auto;\n  transition: opacity 0.15s ease;\n}\n\n.disagall-keyhints {\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: center;\n  gap: 8px 16px;\n  font-size: 12px;\n  color: #94a3b8;\n}\n\n.disagall-keyhint {\n  display: flex;\n  align-items: center;\n  gap: 5px;\n}\n\n.disagall-kbd {\n  background: rgba(255, 255, 255, 0.12);\n  border: 1px solid rgba(255, 255, 255, 0.18);\n  border-radius: 4px;\n  padding: 2px 6px;\n  font-size: 11px;\n  font-weight: 600;\n  color: #f1f5f9;\n  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);\n}\n\n/* Loader Animation */\n.disagall-loader {\n  position: absolute;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 12px;\n  color: #60a5fa;\n  font-size: 14px;\n  font-weight: 500;\n  z-index: 15;\n}\n\n.disagall-spinner {\n  width: 40px;\n  height: 40px;\n  border: 3px solid rgba(59, 130, 246, 0.2);\n  border-top-color: #3b82f6;\n  border-radius: 50%;\n  animation: disagall-spin 0.8s linear infinite;\n}\n\n@keyframes disagall-spin {\n  to { transform: rotate(360deg); }\n}\n\n/* Toast Notification */\n.disagall-toast {\n  position: absolute;\n  top: 72px;\n  left: 50%;\n  transform: translateX(-50%) translateY(-10px);\n  background: rgba(15, 23, 42, 0.92);\n  border: 1px solid rgba(255, 255, 255, 0.18);\n  color: #f8fafc;\n  padding: 8px 18px;\n  border-radius: 20px;\n  font-size: 13px;\n  font-weight: 500;\n  letter-spacing: -0.3px;\n  pointer-events: none;\n  opacity: 0;\n  visibility: hidden;\n  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;\n  z-index: 100;\n  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);\n}\n\n.disagall-toast.show {\n  opacity: 1;\n  visibility: visible;\n  transform: translateX(-50%) translateY(0);\n}\n\n/* No Photo Notice Floating Banner (When navigating into a post without photos / no photo tab) */\n.disagall-no-photo-notice {\n  position: fixed;\n  top: 24px;\n  left: 50%;\n  transform: translateX(-50%);\n  background: rgba(15, 23, 42, 0.94);\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n  border: 1px solid rgba(255, 255, 255, 0.15);\n  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.2);\n  color: #f8fafc;\n  padding: 10px 18px;\n  border-radius: 30px;\n  display: flex;\n  align-items: center;\n  gap: 16px;\n  z-index: 99999999;\n  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;\n  font-size: 13px;\n  font-weight: 500;\n  animation: disagall-slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1);\n}\n\n@keyframes disagall-slide-down {\n  from {\n    opacity: 0;\n    transform: translateX(-50%) translateY(-12px);\n  }\n  to {\n    opacity: 1;\n    transform: translateX(-50%) translateY(0);\n  }\n}\n\n.disagall-notice-content {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.disagall-notice-icon {\n  font-size: 16px;\n}\n\n.disagall-notice-text {\n  color: #e2e8f0;\n  letter-spacing: -0.2px;\n}\n\n.disagall-notice-btns {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.disagall-notice-btn {\n  background: rgba(255, 255, 255, 0.1);\n  border: 1px solid rgba(255, 255, 255, 0.14);\n  color: #f1f5f9;\n  border-radius: 14px;\n  padding: 4px 10px;\n  font-size: 12px;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.15s ease;\n}\n\n.disagall-notice-btn:hover {\n  background: #3b82f6;\n  border-color: #60a5fa;\n  color: #ffffff;\n}\n\n.disagall-notice-btn.close {\n  background: transparent;\n  border: none;\n  color: #94a3b8;\n  padding: 4px 8px;\n}\n\n.disagall-notice-btn.close:hover {\n  color: #ffffff;\n}\n\n/* Immersion Mode (Idle Auto-Hide & Manual Toggle) */\n#disagall-viewer-overlay.disagall-idle,\n#disagall-viewer-overlay.disagall-ui-hidden {\n  cursor: none;\n}\n\n/* Override inline cursor on image/controls while hidden, preserving grabbing cursor during zoom pan drag */\n#disagall-viewer-overlay.disagall-idle *:not([style*="grabbing"]),\n#disagall-viewer-overlay.disagall-ui-hidden *:not([style*="grabbing"]) {\n  cursor: none !important;\n}\n\n#disagall-viewer-overlay.disagall-idle .disagall-header,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-header,\n#disagall-viewer-overlay.disagall-idle .disagall-footer,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-footer,\n#disagall-viewer-overlay.disagall-idle .disagall-nav-btn,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-nav-btn {\n  opacity: 0;\n  pointer-events: none;\n  transition: opacity 0.3s ease;\n}\n\n');
+        GM_addStyle('/* Disagall Viewer Overlay Styles */\n#disagall-viewer-overlay {\n  position: fixed;\n  top: 0;\n  left: 0;\n  width: 100vw;\n  height: 100vh;\n  background-color: rgba(8, 9, 12, 0.96);\n  backdrop-filter: blur(16px);\n  -webkit-backdrop-filter: blur(16px);\n  z-index: 99999999;\n  display: flex;\n  flex-direction: column;\n  justify-content: space-between;\n  align-items: center;\n  user-select: none;\n  opacity: 0;\n  visibility: hidden;\n  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s;\n  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;\n  box-sizing: border-box;\n  color: #f0f2f5;\n  overflow: hidden;\n}\n\n#disagall-viewer-overlay.active {\n  opacity: 1;\n  visibility: visible;\n}\n\n/* Header Controls Bar */\n.disagall-header {\n  position: absolute;\n  top: 0;\n  left: 0;\n  width: 100%;\n  padding: 12px 24px;\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);\n  z-index: 10;\n  box-sizing: border-box;\n  opacity: 1;\n  pointer-events: auto;\n  transition: opacity 0.15s ease;\n}\n\n.disagall-header-left {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n}\n\n.disagall-title {\n  font-size: 15px;\n  font-weight: 700;\n  letter-spacing: -0.3px;\n  color: #3b82f6;\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.disagall-counter {\n  font-size: 14px;\n  font-weight: 600;\n  background: rgba(255, 255, 255, 0.12);\n  padding: 4px 10px;\n  border-radius: 20px;\n  color: #e2e8f0;\n}\n\n.disagall-info-badge {\n  font-size: 12px;\n  font-weight: 500;\n  color: #94a3b8;\n  background: rgba(255, 255, 255, 0.06);\n  padding: 3px 8px;\n  border-radius: 6px;\n  border: 1px solid rgba(255, 255, 255, 0.08);\n}\n\n.disagall-header-center {\n  display: flex;\n  align-items: center;\n  gap: 16px;\n  background: rgba(20, 24, 33, 0.85);\n  border: 1px solid rgba(255, 255, 255, 0.1);\n  padding: 6px 16px;\n  border-radius: 30px;\n  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);\n}\n\n.disagall-padding-control {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 13px;\n  color: #cbd5e1;\n}\n\n.disagall-slider-label {\n  font-weight: 500;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n\n.disagall-slider {\n  -webkit-appearance: none;\n  appearance: none;\n  width: 110px;\n  height: 4px;\n  border-radius: 2px;\n  background: #334155;\n  outline: none;\n  cursor: pointer;\n}\n\n.disagall-slider::-webkit-slider-thumb {\n  -webkit-appearance: none;\n  appearance: none;\n  width: 14px;\n  height: 14px;\n  border-radius: 50%;\n  background: #3b82f6;\n  cursor: pointer;\n  transition: transform 0.15s ease, background-color 0.15s ease;\n}\n\n.disagall-slider::-webkit-slider-thumb:hover {\n  transform: scale(1.25);\n  background: #60a5fa;\n}\n\n.disagall-padding-val {\n  min-width: 38px;\n  font-weight: 600;\n  font-size: 12px;\n  color: #60a5fa;\n  text-align: right;\n}\n\n.disagall-header-right {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n\n.disagall-btn {\n  background: rgba(255, 255, 255, 0.08);\n  border: 1px solid rgba(255, 255, 255, 0.12);\n  color: #f1f5f9;\n  border-radius: 8px;\n  padding: 6px 12px;\n  font-size: 13px;\n  font-weight: 500;\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 5px;\n  transition: all 0.15s ease;\n}\n\n.disagall-btn:hover {\n  background: rgba(255, 255, 255, 0.18);\n  border-color: rgba(255, 255, 255, 0.25);\n  transform: translateY(-1px);\n}\n\n.disagall-btn-recommend {\n  background: rgba(59, 130, 246, 0.2);\n  border-color: rgba(96, 165, 250, 0.45);\n  color: #93c5fd;\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  font-weight: 600;\n  padding: 6px 13px;\n  transition: all 0.2s ease;\n}\n\n.disagall-btn-recommend:hover {\n  background: rgba(59, 130, 246, 0.38);\n  border-color: rgba(96, 165, 250, 0.75);\n  color: #ffffff;\n  transform: translateY(-1px);\n}\n\n.disagall-btn-recommend:active,\n.disagall-btn-recommend.voted {\n  background: #2563eb;\n  border-color: #3b82f6;\n  color: #ffffff;\n  transform: scale(0.96);\n}\n\n.disagall-btn-recommend svg {\n  flex-shrink: 0;\n  transition: transform 0.2s ease;\n}\n\n.disagall-btn-recommend:hover svg {\n  transform: scale(1.18) rotate(-6deg);\n}\n\n.disagall-btn-fullscreen {\n  background: rgba(255, 255, 255, 0.08);\n  border-color: rgba(255, 255, 255, 0.14);\n  color: #e2e8f0;\n}\n\n.disagall-btn-fullscreen.active {\n  background: rgba(59, 130, 246, 0.3);\n  border-color: rgba(96, 165, 250, 0.65);\n  color: #ffffff;\n}\n\n.disagall-btn-close {\n  background: rgba(239, 68, 68, 0.2);\n  border-color: rgba(239, 68, 68, 0.35);\n  color: #fca5a5;\n  font-size: 16px;\n  font-weight: bold;\n  padding: 6px 14px;\n}\n\n.disagall-btn-close:hover {\n  background: rgba(239, 68, 68, 0.4);\n  color: #ffffff;\n}\n\n/* Stage & Main Photo Area */\n.disagall-stage {\n  flex: 1;\n  width: 100%;\n  height: 100%;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n  overflow: hidden;\n  box-sizing: border-box;\n  transition: padding-top 0.25s ease, padding-bottom 0.25s ease;\n  /* Dynamic padding set via JS based on UI visibility, slider & aspect ratio */\n}\n\n.disagall-img-wrapper {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  width: 100%;\n  height: 100%;\n  position: relative;\n  transition: all 0.2s ease-out;\n}\n\n.disagall-img {\n  display: block;\n  object-fit: contain;\n  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);\n  border-radius: 2px;\n  transition: max-width 0.15s ease, max-height 0.15s ease, opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);\n  will-change: transform, max-width, max-height;\n}\n\n/* Orientation Specific Fitting Helper Classes */\n.disagall-img.portrait {\n  /* Vertical photo: strictly fit height, horizontal padding automatic */\n  height: 100%;\n  width: auto;\n}\n\n.disagall-img.landscape {\n  /* Horizontal photo: strictly fit width, vertical padding automatic */\n  width: 100%;\n  height: auto;\n}\n\n/* Navigation Arrow Buttons */\n.disagall-nav-btn {\n  position: absolute;\n  top: 50%;\n  transform: translateY(-50%);\n  width: 54px;\n  height: 90px;\n  background: rgba(15, 17, 23, 0.4);\n  border: 1px solid rgba(255, 255, 255, 0.08);\n  color: #ffffff;\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  cursor: pointer;\n  z-index: 20;\n  opacity: 1;\n  pointer-events: auto;\n  transition: background 0.2s ease, border-color 0.2s ease, width 0.2s ease, opacity 0.15s ease;\n  backdrop-filter: blur(8px);\n  -webkit-backdrop-filter: blur(8px);\n}\n\n.disagall-nav-btn-prev {\n  left: 0;\n  border-top-right-radius: 12px;\n  border-bottom-right-radius: 12px;\n  border-left: none;\n}\n\n.disagall-nav-btn-next {\n  right: 0;\n  border-top-left-radius: 12px;\n  border-bottom-left-radius: 12px;\n  border-right: none;\n}\n\n.disagall-nav-btn:hover {\n  background: rgba(30, 41, 59, 0.85);\n  border-color: rgba(59, 130, 246, 0.4);\n  width: 64px;\n}\n\n.disagall-nav-btn svg {\n  width: 24px;\n  height: 24px;\n  fill: currentColor;\n}\n\n.disagall-nav-hint {\n  font-size: 10px;\n  font-weight: 600;\n  color: #94a3b8;\n  margin-top: 4px;\n}\n\n.disagall-nav-btn.disabled {\n  opacity: 0.25;\n  cursor: not-allowed;\n  pointer-events: none;\n}\n\n/* Footer & Hints */\n.disagall-footer {\n  position: absolute;\n  bottom: 0;\n  left: 0;\n  width: 100%;\n  padding: 10px 24px;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);\n  z-index: 10;\n  box-sizing: border-box;\n  opacity: 1;\n  pointer-events: auto;\n  transition: opacity 0.15s ease;\n}\n\n.disagall-keyhints {\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: center;\n  gap: 8px 16px;\n  font-size: 12px;\n  color: #94a3b8;\n}\n\n.disagall-keyhint {\n  display: flex;\n  align-items: center;\n  gap: 5px;\n}\n\n.disagall-kbd {\n  background: rgba(255, 255, 255, 0.12);\n  border: 1px solid rgba(255, 255, 255, 0.18);\n  border-radius: 4px;\n  padding: 2px 6px;\n  font-size: 11px;\n  font-weight: 600;\n  color: #f1f5f9;\n  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);\n}\n\n/* Loader Animation */\n.disagall-loader {\n  position: absolute;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 12px;\n  color: #60a5fa;\n  font-size: 14px;\n  font-weight: 500;\n  z-index: 15;\n}\n\n.disagall-spinner {\n  width: 40px;\n  height: 40px;\n  border: 3px solid rgba(59, 130, 246, 0.2);\n  border-top-color: #3b82f6;\n  border-radius: 50%;\n  animation: disagall-spin 0.8s linear infinite;\n}\n\n@keyframes disagall-spin {\n  to { transform: rotate(360deg); }\n}\n\n/* Toast Notification */\n.disagall-toast {\n  position: absolute;\n  top: 72px;\n  left: 50%;\n  transform: translateX(-50%) translateY(-10px);\n  background: rgba(15, 23, 42, 0.92);\n  border: 1px solid rgba(255, 255, 255, 0.18);\n  color: #f8fafc;\n  padding: 8px 18px;\n  border-radius: 20px;\n  font-size: 13px;\n  font-weight: 500;\n  letter-spacing: -0.3px;\n  pointer-events: none;\n  opacity: 0;\n  visibility: hidden;\n  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;\n  z-index: 100;\n  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);\n}\n\n.disagall-toast.show {\n  opacity: 1;\n  visibility: visible;\n  transform: translateX(-50%) translateY(0);\n}\n\n/* No Photo Notice Floating Banner (When navigating into a post without photos / no photo tab) */\n.disagall-no-photo-notice {\n  position: fixed;\n  top: 24px;\n  left: 50%;\n  transform: translateX(-50%);\n  background: rgba(15, 23, 42, 0.94);\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n  border: 1px solid rgba(255, 255, 255, 0.15);\n  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.2);\n  color: #f8fafc;\n  padding: 10px 18px;\n  border-radius: 30px;\n  display: flex;\n  align-items: center;\n  gap: 16px;\n  z-index: 99999999;\n  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;\n  font-size: 13px;\n  font-weight: 500;\n  animation: disagall-slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1);\n}\n\n@keyframes disagall-slide-down {\n  from {\n    opacity: 0;\n    transform: translateX(-50%) translateY(-12px);\n  }\n  to {\n    opacity: 1;\n    transform: translateX(-50%) translateY(0);\n  }\n}\n\n.disagall-notice-content {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.disagall-notice-icon {\n  font-size: 16px;\n}\n\n.disagall-notice-text {\n  color: #e2e8f0;\n  letter-spacing: -0.2px;\n}\n\n.disagall-notice-btns {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.disagall-notice-btn {\n  background: rgba(255, 255, 255, 0.1);\n  border: 1px solid rgba(255, 255, 255, 0.14);\n  color: #f1f5f9;\n  border-radius: 14px;\n  padding: 4px 10px;\n  font-size: 12px;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.15s ease;\n}\n\n.disagall-notice-btn:hover {\n  background: #3b82f6;\n  border-color: #60a5fa;\n  color: #ffffff;\n}\n\n.disagall-notice-btn.close {\n  background: transparent;\n  border: none;\n  color: #94a3b8;\n  padding: 4px 8px;\n}\n\n.disagall-notice-btn.close:hover {\n  color: #ffffff;\n}\n\n/* Immersion Mode (Idle Auto-Hide & Manual Toggle) */\n#disagall-viewer-overlay.disagall-idle,\n#disagall-viewer-overlay.disagall-ui-hidden {\n  cursor: none;\n}\n\n/* Override inline cursor on image/controls while hidden, preserving grabbing cursor during zoom pan drag */\n#disagall-viewer-overlay.disagall-idle *:not([style*="grabbing"]),\n#disagall-viewer-overlay.disagall-ui-hidden *:not([style*="grabbing"]) {\n  cursor: none !important;\n}\n\n#disagall-viewer-overlay.disagall-idle .disagall-header,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-header,\n#disagall-viewer-overlay.disagall-idle .disagall-footer,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-footer,\n#disagall-viewer-overlay.disagall-idle .disagall-nav-btn,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-nav-btn {\n  opacity: 0;\n  pointer-events: none;\n  transition: opacity 0.3s ease;\n}\n\n');
       } else {
         const style = document.createElement("style");
-        style.textContent = '/* Disagall Viewer Overlay Styles */\n#disagall-viewer-overlay {\n  position: fixed;\n  top: 0;\n  left: 0;\n  width: 100vw;\n  height: 100vh;\n  background-color: rgba(8, 9, 12, 0.96);\n  backdrop-filter: blur(16px);\n  -webkit-backdrop-filter: blur(16px);\n  z-index: 99999999;\n  display: flex;\n  flex-direction: column;\n  justify-content: space-between;\n  align-items: center;\n  user-select: none;\n  opacity: 0;\n  visibility: hidden;\n  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s;\n  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;\n  box-sizing: border-box;\n  color: #f0f2f5;\n  overflow: hidden;\n}\n\n#disagall-viewer-overlay.active {\n  opacity: 1;\n  visibility: visible;\n}\n\n/* Header Controls Bar */\n.disagall-header {\n  width: 100%;\n  padding: 12px 24px;\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);\n  z-index: 10;\n  box-sizing: border-box;\n  opacity: 1;\n  pointer-events: auto;\n  transition: opacity 0.15s ease;\n}\n\n.disagall-header-left {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n}\n\n.disagall-title {\n  font-size: 15px;\n  font-weight: 700;\n  letter-spacing: -0.3px;\n  color: #3b82f6;\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.disagall-counter {\n  font-size: 14px;\n  font-weight: 600;\n  background: rgba(255, 255, 255, 0.12);\n  padding: 4px 10px;\n  border-radius: 20px;\n  color: #e2e8f0;\n}\n\n.disagall-info-badge {\n  font-size: 12px;\n  font-weight: 500;\n  color: #94a3b8;\n  background: rgba(255, 255, 255, 0.06);\n  padding: 3px 8px;\n  border-radius: 6px;\n  border: 1px solid rgba(255, 255, 255, 0.08);\n}\n\n.disagall-header-center {\n  display: flex;\n  align-items: center;\n  gap: 16px;\n  background: rgba(20, 24, 33, 0.85);\n  border: 1px solid rgba(255, 255, 255, 0.1);\n  padding: 6px 16px;\n  border-radius: 30px;\n  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);\n}\n\n.disagall-padding-control {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 13px;\n  color: #cbd5e1;\n}\n\n.disagall-slider-label {\n  font-weight: 500;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n\n.disagall-slider {\n  -webkit-appearance: none;\n  appearance: none;\n  width: 110px;\n  height: 4px;\n  border-radius: 2px;\n  background: #334155;\n  outline: none;\n  cursor: pointer;\n}\n\n.disagall-slider::-webkit-slider-thumb {\n  -webkit-appearance: none;\n  appearance: none;\n  width: 14px;\n  height: 14px;\n  border-radius: 50%;\n  background: #3b82f6;\n  cursor: pointer;\n  transition: transform 0.15s ease, background-color 0.15s ease;\n}\n\n.disagall-slider::-webkit-slider-thumb:hover {\n  transform: scale(1.25);\n  background: #60a5fa;\n}\n\n.disagall-padding-val {\n  min-width: 38px;\n  font-weight: 600;\n  font-size: 12px;\n  color: #60a5fa;\n  text-align: right;\n}\n\n.disagall-header-right {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n\n.disagall-btn {\n  background: rgba(255, 255, 255, 0.08);\n  border: 1px solid rgba(255, 255, 255, 0.12);\n  color: #f1f5f9;\n  border-radius: 8px;\n  padding: 6px 12px;\n  font-size: 13px;\n  font-weight: 500;\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 5px;\n  transition: all 0.15s ease;\n}\n\n.disagall-btn:hover {\n  background: rgba(255, 255, 255, 0.18);\n  border-color: rgba(255, 255, 255, 0.25);\n  transform: translateY(-1px);\n}\n\n.disagall-btn-recommend {\n  background: rgba(59, 130, 246, 0.2);\n  border-color: rgba(96, 165, 250, 0.45);\n  color: #93c5fd;\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  font-weight: 600;\n  padding: 6px 13px;\n  transition: all 0.2s ease;\n}\n\n.disagall-btn-recommend:hover {\n  background: rgba(59, 130, 246, 0.38);\n  border-color: rgba(96, 165, 250, 0.75);\n  color: #ffffff;\n  transform: translateY(-1px);\n}\n\n.disagall-btn-recommend:active,\n.disagall-btn-recommend.voted {\n  background: #2563eb;\n  border-color: #3b82f6;\n  color: #ffffff;\n  transform: scale(0.96);\n}\n\n.disagall-btn-recommend svg {\n  flex-shrink: 0;\n  transition: transform 0.2s ease;\n}\n\n.disagall-btn-recommend:hover svg {\n  transform: scale(1.18) rotate(-6deg);\n}\n\n.disagall-btn-close {\n  background: rgba(239, 68, 68, 0.2);\n  border-color: rgba(239, 68, 68, 0.35);\n  color: #fca5a5;\n  font-size: 16px;\n  font-weight: bold;\n  padding: 6px 14px;\n}\n\n.disagall-btn-close:hover {\n  background: rgba(239, 68, 68, 0.4);\n  color: #ffffff;\n}\n\n/* Stage & Main Photo Area */\n.disagall-stage {\n  flex: 1;\n  width: 100%;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n  overflow: hidden;\n  box-sizing: border-box;\n  /* Dynamic padding set via JS based on slider & aspect ratio */\n}\n\n.disagall-img-wrapper {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  width: 100%;\n  height: 100%;\n  position: relative;\n  transition: all 0.2s ease-out;\n}\n\n.disagall-img {\n  display: block;\n  object-fit: contain;\n  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);\n  border-radius: 2px;\n  transition: max-width 0.15s ease, max-height 0.15s ease, opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);\n  will-change: transform, max-width, max-height;\n}\n\n/* Orientation Specific Fitting Helper Classes */\n.disagall-img.portrait {\n  /* Vertical photo: strictly fit height, horizontal padding automatic */\n  height: 100%;\n  width: auto;\n}\n\n.disagall-img.landscape {\n  /* Horizontal photo: strictly fit width, vertical padding automatic */\n  width: 100%;\n  height: auto;\n}\n\n/* Navigation Arrow Buttons */\n.disagall-nav-btn {\n  position: absolute;\n  top: 50%;\n  transform: translateY(-50%);\n  width: 54px;\n  height: 90px;\n  background: rgba(15, 17, 23, 0.4);\n  border: 1px solid rgba(255, 255, 255, 0.08);\n  color: #ffffff;\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  cursor: pointer;\n  z-index: 20;\n  opacity: 1;\n  pointer-events: auto;\n  transition: background 0.2s ease, border-color 0.2s ease, width 0.2s ease, opacity 0.15s ease;\n  backdrop-filter: blur(8px);\n  -webkit-backdrop-filter: blur(8px);\n}\n\n.disagall-nav-btn-prev {\n  left: 0;\n  border-top-right-radius: 12px;\n  border-bottom-right-radius: 12px;\n  border-left: none;\n}\n\n.disagall-nav-btn-next {\n  right: 0;\n  border-top-left-radius: 12px;\n  border-bottom-left-radius: 12px;\n  border-right: none;\n}\n\n.disagall-nav-btn:hover {\n  background: rgba(30, 41, 59, 0.85);\n  border-color: rgba(59, 130, 246, 0.4);\n  width: 64px;\n}\n\n.disagall-nav-btn svg {\n  width: 24px;\n  height: 24px;\n  fill: currentColor;\n}\n\n.disagall-nav-hint {\n  font-size: 10px;\n  font-weight: 600;\n  color: #94a3b8;\n  margin-top: 4px;\n}\n\n.disagall-nav-btn.disabled {\n  opacity: 0.25;\n  cursor: not-allowed;\n  pointer-events: none;\n}\n\n/* Footer & Hints */\n.disagall-footer {\n  width: 100%;\n  padding: 10px 24px;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);\n  z-index: 10;\n  box-sizing: border-box;\n  opacity: 1;\n  pointer-events: auto;\n  transition: opacity 0.15s ease;\n}\n\n.disagall-keyhints {\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: center;\n  gap: 8px 16px;\n  font-size: 12px;\n  color: #94a3b8;\n}\n\n.disagall-keyhint {\n  display: flex;\n  align-items: center;\n  gap: 5px;\n}\n\n.disagall-kbd {\n  background: rgba(255, 255, 255, 0.12);\n  border: 1px solid rgba(255, 255, 255, 0.18);\n  border-radius: 4px;\n  padding: 2px 6px;\n  font-size: 11px;\n  font-weight: 600;\n  color: #f1f5f9;\n  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);\n}\n\n/* Loader Animation */\n.disagall-loader {\n  position: absolute;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 12px;\n  color: #60a5fa;\n  font-size: 14px;\n  font-weight: 500;\n  z-index: 15;\n}\n\n.disagall-spinner {\n  width: 40px;\n  height: 40px;\n  border: 3px solid rgba(59, 130, 246, 0.2);\n  border-top-color: #3b82f6;\n  border-radius: 50%;\n  animation: disagall-spin 0.8s linear infinite;\n}\n\n@keyframes disagall-spin {\n  to { transform: rotate(360deg); }\n}\n\n/* Toast Notification */\n.disagall-toast {\n  position: absolute;\n  top: 72px;\n  left: 50%;\n  transform: translateX(-50%) translateY(-10px);\n  background: rgba(15, 23, 42, 0.92);\n  border: 1px solid rgba(255, 255, 255, 0.18);\n  color: #f8fafc;\n  padding: 8px 18px;\n  border-radius: 20px;\n  font-size: 13px;\n  font-weight: 500;\n  letter-spacing: -0.3px;\n  pointer-events: none;\n  opacity: 0;\n  visibility: hidden;\n  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;\n  z-index: 100;\n  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);\n}\n\n.disagall-toast.show {\n  opacity: 1;\n  visibility: visible;\n  transform: translateX(-50%) translateY(0);\n}\n\n/* No Photo Notice Floating Banner (When navigating into a post without photos / no photo tab) */\n.disagall-no-photo-notice {\n  position: fixed;\n  top: 24px;\n  left: 50%;\n  transform: translateX(-50%);\n  background: rgba(15, 23, 42, 0.94);\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n  border: 1px solid rgba(255, 255, 255, 0.15);\n  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.2);\n  color: #f8fafc;\n  padding: 10px 18px;\n  border-radius: 30px;\n  display: flex;\n  align-items: center;\n  gap: 16px;\n  z-index: 99999999;\n  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;\n  font-size: 13px;\n  font-weight: 500;\n  animation: disagall-slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1);\n}\n\n@keyframes disagall-slide-down {\n  from {\n    opacity: 0;\n    transform: translateX(-50%) translateY(-12px);\n  }\n  to {\n    opacity: 1;\n    transform: translateX(-50%) translateY(0);\n  }\n}\n\n.disagall-notice-content {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.disagall-notice-icon {\n  font-size: 16px;\n}\n\n.disagall-notice-text {\n  color: #e2e8f0;\n  letter-spacing: -0.2px;\n}\n\n.disagall-notice-btns {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.disagall-notice-btn {\n  background: rgba(255, 255, 255, 0.1);\n  border: 1px solid rgba(255, 255, 255, 0.14);\n  color: #f1f5f9;\n  border-radius: 14px;\n  padding: 4px 10px;\n  font-size: 12px;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.15s ease;\n}\n\n.disagall-notice-btn:hover {\n  background: #3b82f6;\n  border-color: #60a5fa;\n  color: #ffffff;\n}\n\n.disagall-notice-btn.close {\n  background: transparent;\n  border: none;\n  color: #94a3b8;\n  padding: 4px 8px;\n}\n\n.disagall-notice-btn.close:hover {\n  color: #ffffff;\n}\n\n/* Immersion Mode (Idle Auto-Hide & Manual Toggle) */\n#disagall-viewer-overlay.disagall-idle,\n#disagall-viewer-overlay.disagall-ui-hidden {\n  cursor: none;\n}\n\n/* Override inline cursor on image/controls while hidden, preserving grabbing cursor during zoom pan drag */\n#disagall-viewer-overlay.disagall-idle *:not([style*="grabbing"]),\n#disagall-viewer-overlay.disagall-ui-hidden *:not([style*="grabbing"]) {\n  cursor: none !important;\n}\n\n#disagall-viewer-overlay.disagall-idle .disagall-header,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-header,\n#disagall-viewer-overlay.disagall-idle .disagall-footer,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-footer,\n#disagall-viewer-overlay.disagall-idle .disagall-nav-btn,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-nav-btn {\n  opacity: 0;\n  pointer-events: none;\n  transition: opacity 0.3s ease;\n}\n\n';
+        style.textContent = '/* Disagall Viewer Overlay Styles */\n#disagall-viewer-overlay {\n  position: fixed;\n  top: 0;\n  left: 0;\n  width: 100vw;\n  height: 100vh;\n  background-color: rgba(8, 9, 12, 0.96);\n  backdrop-filter: blur(16px);\n  -webkit-backdrop-filter: blur(16px);\n  z-index: 99999999;\n  display: flex;\n  flex-direction: column;\n  justify-content: space-between;\n  align-items: center;\n  user-select: none;\n  opacity: 0;\n  visibility: hidden;\n  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s;\n  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;\n  box-sizing: border-box;\n  color: #f0f2f5;\n  overflow: hidden;\n}\n\n#disagall-viewer-overlay.active {\n  opacity: 1;\n  visibility: visible;\n}\n\n/* Header Controls Bar */\n.disagall-header {\n  position: absolute;\n  top: 0;\n  left: 0;\n  width: 100%;\n  padding: 12px 24px;\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);\n  z-index: 10;\n  box-sizing: border-box;\n  opacity: 1;\n  pointer-events: auto;\n  transition: opacity 0.15s ease;\n}\n\n.disagall-header-left {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n}\n\n.disagall-title {\n  font-size: 15px;\n  font-weight: 700;\n  letter-spacing: -0.3px;\n  color: #3b82f6;\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.disagall-counter {\n  font-size: 14px;\n  font-weight: 600;\n  background: rgba(255, 255, 255, 0.12);\n  padding: 4px 10px;\n  border-radius: 20px;\n  color: #e2e8f0;\n}\n\n.disagall-info-badge {\n  font-size: 12px;\n  font-weight: 500;\n  color: #94a3b8;\n  background: rgba(255, 255, 255, 0.06);\n  padding: 3px 8px;\n  border-radius: 6px;\n  border: 1px solid rgba(255, 255, 255, 0.08);\n}\n\n.disagall-header-center {\n  display: flex;\n  align-items: center;\n  gap: 16px;\n  background: rgba(20, 24, 33, 0.85);\n  border: 1px solid rgba(255, 255, 255, 0.1);\n  padding: 6px 16px;\n  border-radius: 30px;\n  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);\n}\n\n.disagall-padding-control {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 13px;\n  color: #cbd5e1;\n}\n\n.disagall-slider-label {\n  font-weight: 500;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n\n.disagall-slider {\n  -webkit-appearance: none;\n  appearance: none;\n  width: 110px;\n  height: 4px;\n  border-radius: 2px;\n  background: #334155;\n  outline: none;\n  cursor: pointer;\n}\n\n.disagall-slider::-webkit-slider-thumb {\n  -webkit-appearance: none;\n  appearance: none;\n  width: 14px;\n  height: 14px;\n  border-radius: 50%;\n  background: #3b82f6;\n  cursor: pointer;\n  transition: transform 0.15s ease, background-color 0.15s ease;\n}\n\n.disagall-slider::-webkit-slider-thumb:hover {\n  transform: scale(1.25);\n  background: #60a5fa;\n}\n\n.disagall-padding-val {\n  min-width: 38px;\n  font-weight: 600;\n  font-size: 12px;\n  color: #60a5fa;\n  text-align: right;\n}\n\n.disagall-header-right {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n\n.disagall-btn {\n  background: rgba(255, 255, 255, 0.08);\n  border: 1px solid rgba(255, 255, 255, 0.12);\n  color: #f1f5f9;\n  border-radius: 8px;\n  padding: 6px 12px;\n  font-size: 13px;\n  font-weight: 500;\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 5px;\n  transition: all 0.15s ease;\n}\n\n.disagall-btn:hover {\n  background: rgba(255, 255, 255, 0.18);\n  border-color: rgba(255, 255, 255, 0.25);\n  transform: translateY(-1px);\n}\n\n.disagall-btn-recommend {\n  background: rgba(59, 130, 246, 0.2);\n  border-color: rgba(96, 165, 250, 0.45);\n  color: #93c5fd;\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  font-weight: 600;\n  padding: 6px 13px;\n  transition: all 0.2s ease;\n}\n\n.disagall-btn-recommend:hover {\n  background: rgba(59, 130, 246, 0.38);\n  border-color: rgba(96, 165, 250, 0.75);\n  color: #ffffff;\n  transform: translateY(-1px);\n}\n\n.disagall-btn-recommend:active,\n.disagall-btn-recommend.voted {\n  background: #2563eb;\n  border-color: #3b82f6;\n  color: #ffffff;\n  transform: scale(0.96);\n}\n\n.disagall-btn-recommend svg {\n  flex-shrink: 0;\n  transition: transform 0.2s ease;\n}\n\n.disagall-btn-recommend:hover svg {\n  transform: scale(1.18) rotate(-6deg);\n}\n\n.disagall-btn-fullscreen {\n  background: rgba(255, 255, 255, 0.08);\n  border-color: rgba(255, 255, 255, 0.14);\n  color: #e2e8f0;\n}\n\n.disagall-btn-fullscreen.active {\n  background: rgba(59, 130, 246, 0.3);\n  border-color: rgba(96, 165, 250, 0.65);\n  color: #ffffff;\n}\n\n.disagall-btn-close {\n  background: rgba(239, 68, 68, 0.2);\n  border-color: rgba(239, 68, 68, 0.35);\n  color: #fca5a5;\n  font-size: 16px;\n  font-weight: bold;\n  padding: 6px 14px;\n}\n\n.disagall-btn-close:hover {\n  background: rgba(239, 68, 68, 0.4);\n  color: #ffffff;\n}\n\n/* Stage & Main Photo Area */\n.disagall-stage {\n  flex: 1;\n  width: 100%;\n  height: 100%;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n  overflow: hidden;\n  box-sizing: border-box;\n  transition: padding-top 0.25s ease, padding-bottom 0.25s ease;\n  /* Dynamic padding set via JS based on UI visibility, slider & aspect ratio */\n}\n\n.disagall-img-wrapper {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  width: 100%;\n  height: 100%;\n  position: relative;\n  transition: all 0.2s ease-out;\n}\n\n.disagall-img {\n  display: block;\n  object-fit: contain;\n  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);\n  border-radius: 2px;\n  transition: max-width 0.15s ease, max-height 0.15s ease, opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);\n  will-change: transform, max-width, max-height;\n}\n\n/* Orientation Specific Fitting Helper Classes */\n.disagall-img.portrait {\n  /* Vertical photo: strictly fit height, horizontal padding automatic */\n  height: 100%;\n  width: auto;\n}\n\n.disagall-img.landscape {\n  /* Horizontal photo: strictly fit width, vertical padding automatic */\n  width: 100%;\n  height: auto;\n}\n\n/* Navigation Arrow Buttons */\n.disagall-nav-btn {\n  position: absolute;\n  top: 50%;\n  transform: translateY(-50%);\n  width: 54px;\n  height: 90px;\n  background: rgba(15, 17, 23, 0.4);\n  border: 1px solid rgba(255, 255, 255, 0.08);\n  color: #ffffff;\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  cursor: pointer;\n  z-index: 20;\n  opacity: 1;\n  pointer-events: auto;\n  transition: background 0.2s ease, border-color 0.2s ease, width 0.2s ease, opacity 0.15s ease;\n  backdrop-filter: blur(8px);\n  -webkit-backdrop-filter: blur(8px);\n}\n\n.disagall-nav-btn-prev {\n  left: 0;\n  border-top-right-radius: 12px;\n  border-bottom-right-radius: 12px;\n  border-left: none;\n}\n\n.disagall-nav-btn-next {\n  right: 0;\n  border-top-left-radius: 12px;\n  border-bottom-left-radius: 12px;\n  border-right: none;\n}\n\n.disagall-nav-btn:hover {\n  background: rgba(30, 41, 59, 0.85);\n  border-color: rgba(59, 130, 246, 0.4);\n  width: 64px;\n}\n\n.disagall-nav-btn svg {\n  width: 24px;\n  height: 24px;\n  fill: currentColor;\n}\n\n.disagall-nav-hint {\n  font-size: 10px;\n  font-weight: 600;\n  color: #94a3b8;\n  margin-top: 4px;\n}\n\n.disagall-nav-btn.disabled {\n  opacity: 0.25;\n  cursor: not-allowed;\n  pointer-events: none;\n}\n\n/* Footer & Hints */\n.disagall-footer {\n  position: absolute;\n  bottom: 0;\n  left: 0;\n  width: 100%;\n  padding: 10px 24px;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);\n  z-index: 10;\n  box-sizing: border-box;\n  opacity: 1;\n  pointer-events: auto;\n  transition: opacity 0.15s ease;\n}\n\n.disagall-keyhints {\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: center;\n  gap: 8px 16px;\n  font-size: 12px;\n  color: #94a3b8;\n}\n\n.disagall-keyhint {\n  display: flex;\n  align-items: center;\n  gap: 5px;\n}\n\n.disagall-kbd {\n  background: rgba(255, 255, 255, 0.12);\n  border: 1px solid rgba(255, 255, 255, 0.18);\n  border-radius: 4px;\n  padding: 2px 6px;\n  font-size: 11px;\n  font-weight: 600;\n  color: #f1f5f9;\n  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);\n}\n\n/* Loader Animation */\n.disagall-loader {\n  position: absolute;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 12px;\n  color: #60a5fa;\n  font-size: 14px;\n  font-weight: 500;\n  z-index: 15;\n}\n\n.disagall-spinner {\n  width: 40px;\n  height: 40px;\n  border: 3px solid rgba(59, 130, 246, 0.2);\n  border-top-color: #3b82f6;\n  border-radius: 50%;\n  animation: disagall-spin 0.8s linear infinite;\n}\n\n@keyframes disagall-spin {\n  to { transform: rotate(360deg); }\n}\n\n/* Toast Notification */\n.disagall-toast {\n  position: absolute;\n  top: 72px;\n  left: 50%;\n  transform: translateX(-50%) translateY(-10px);\n  background: rgba(15, 23, 42, 0.92);\n  border: 1px solid rgba(255, 255, 255, 0.18);\n  color: #f8fafc;\n  padding: 8px 18px;\n  border-radius: 20px;\n  font-size: 13px;\n  font-weight: 500;\n  letter-spacing: -0.3px;\n  pointer-events: none;\n  opacity: 0;\n  visibility: hidden;\n  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;\n  z-index: 100;\n  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);\n}\n\n.disagall-toast.show {\n  opacity: 1;\n  visibility: visible;\n  transform: translateX(-50%) translateY(0);\n}\n\n/* No Photo Notice Floating Banner (When navigating into a post without photos / no photo tab) */\n.disagall-no-photo-notice {\n  position: fixed;\n  top: 24px;\n  left: 50%;\n  transform: translateX(-50%);\n  background: rgba(15, 23, 42, 0.94);\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n  border: 1px solid rgba(255, 255, 255, 0.15);\n  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.2);\n  color: #f8fafc;\n  padding: 10px 18px;\n  border-radius: 30px;\n  display: flex;\n  align-items: center;\n  gap: 16px;\n  z-index: 99999999;\n  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;\n  font-size: 13px;\n  font-weight: 500;\n  animation: disagall-slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1);\n}\n\n@keyframes disagall-slide-down {\n  from {\n    opacity: 0;\n    transform: translateX(-50%) translateY(-12px);\n  }\n  to {\n    opacity: 1;\n    transform: translateX(-50%) translateY(0);\n  }\n}\n\n.disagall-notice-content {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.disagall-notice-icon {\n  font-size: 16px;\n}\n\n.disagall-notice-text {\n  color: #e2e8f0;\n  letter-spacing: -0.2px;\n}\n\n.disagall-notice-btns {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.disagall-notice-btn {\n  background: rgba(255, 255, 255, 0.1);\n  border: 1px solid rgba(255, 255, 255, 0.14);\n  color: #f1f5f9;\n  border-radius: 14px;\n  padding: 4px 10px;\n  font-size: 12px;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.15s ease;\n}\n\n.disagall-notice-btn:hover {\n  background: #3b82f6;\n  border-color: #60a5fa;\n  color: #ffffff;\n}\n\n.disagall-notice-btn.close {\n  background: transparent;\n  border: none;\n  color: #94a3b8;\n  padding: 4px 8px;\n}\n\n.disagall-notice-btn.close:hover {\n  color: #ffffff;\n}\n\n/* Immersion Mode (Idle Auto-Hide & Manual Toggle) */\n#disagall-viewer-overlay.disagall-idle,\n#disagall-viewer-overlay.disagall-ui-hidden {\n  cursor: none;\n}\n\n/* Override inline cursor on image/controls while hidden, preserving grabbing cursor during zoom pan drag */\n#disagall-viewer-overlay.disagall-idle *:not([style*="grabbing"]),\n#disagall-viewer-overlay.disagall-ui-hidden *:not([style*="grabbing"]) {\n  cursor: none !important;\n}\n\n#disagall-viewer-overlay.disagall-idle .disagall-header,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-header,\n#disagall-viewer-overlay.disagall-idle .disagall-footer,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-footer,\n#disagall-viewer-overlay.disagall-idle .disagall-nav-btn,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-nav-btn {\n  opacity: 0;\n  pointer-events: none;\n  transition: opacity 0.3s ease;\n}\n\n';
         document.head.appendChild(style);
       }
     }
@@ -1377,7 +1594,7 @@
       if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA" || activeEl.isContentEditable)) {
         return;
       }
-      if ((e.key === "v" || e.key === "V") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if ((e.key === "v" || e.key === "V" || e.code === "KeyV") && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const { overlayEl } = state.elements;
         if (!overlayEl || !overlayEl.classList.contains("active")) {
           openViewer();

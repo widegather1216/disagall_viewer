@@ -10,6 +10,7 @@ export const state = {
   // DOM Elements Cache
   elements: {
     overlayEl: null,
+    stageEl: null,
     mainImgEl: null,
     counterEl: null,
     infoBadgeEl: null,
@@ -20,6 +21,7 @@ export const state = {
     loaderEl: null,
     toastEl: null,
     recommendBtnEl: null,
+    fullscreenBtnEl: null,
   },
 
   toastTimer: null,
@@ -27,7 +29,9 @@ export const state = {
   // Immersion & UI Auto-Hide
   idleTimer: null,
   autoHideUi: true,
+  autoFullscreen: false,
   isUiHidden: false,
+  isFullscreenMode: false,
 
   // Zoom & Pan
   zoom: {

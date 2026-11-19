@@ -15,7 +15,8 @@
     NO_PHOTO_NOTICE_DURATION: 8e3,
     // Immersion & UI Auto-Hide
     UI_IDLE_TIMEOUT: 2500,
-    STORAGE_KEY_AUTO_HIDE_UI: "autoHideUi"
+    STORAGE_KEY_AUTO_HIDE_UI: "autoHideUi",
+    STORAGE_KEY_AUTO_FULLSCREEN: "autoFullscreen"
   };
 
   // src/state.js
@@ -28,6 +29,7 @@
     // DOM Elements Cache
     elements: {
       overlayEl: null,
+      stageEl: null,
       mainImgEl: null,
       counterEl: null,
       infoBadgeEl: null,
@@ -37,13 +39,16 @@
       nextBtnEl: null,
       loaderEl: null,
       toastEl: null,
-      recommendBtnEl: null
+      recommendBtnEl: null,
+      fullscreenBtnEl: null
     },
     toastTimer: null,
     // Immersion & UI Auto-Hide
     idleTimer: null,
     autoHideUi: true,
+    autoFullscreen: false,
     isUiHidden: false,
+    isFullscreenMode: false,
     // Zoom & Pan
     zoom: {
       scale: 1,
@@ -352,6 +357,15 @@
           </svg>
           <span>\uAC1C\uCD94</span>
         </button>
+        <button class="disagall-btn disagall-btn-fullscreen" id="disagall-btn-fullscreen" title="\uC804\uCCB4\uD654\uBA74 \uC804\uD658 (\uB2E8\uCD95\uD0A4: F)" aria-pressed="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+          </svg>
+          <span>\uC804\uCCB4\uD654\uBA74</span>
+        </button>
         <button class="disagall-btn disagall-btn-close" id="disagall-close-btn" title="\uB2EB\uAE30 (ESC)">\u2715 \uB2EB\uAE30</button>
       </div>
     </div>
@@ -396,6 +410,7 @@
   }
   function cacheOverlayElements() {
     state.elements.overlayEl = document.getElementById("disagall-viewer-overlay");
+    state.elements.stageEl = document.getElementById("disagall-stage");
     state.elements.mainImgEl = document.getElementById("disagall-main-img");
     state.elements.counterEl = document.getElementById("disagall-counter");
     state.elements.infoBadgeEl = document.getElementById("disagall-info-badge");
@@ -406,6 +421,31 @@
     state.elements.loaderEl = document.getElementById("disagall-loader");
     state.elements.toastEl = document.getElementById("disagall-toast");
     state.elements.recommendBtnEl = document.getElementById("disagall-btn-recommend");
+    state.elements.fullscreenBtnEl = document.getElementById("disagall-btn-fullscreen");
+  }
+  function isUiHiddenState(overlayEl) {
+    if (state.isUiHidden) return true;
+    if (!overlayEl || !overlayEl.classList) return false;
+    return overlayEl.classList.contains("disagall-idle") || overlayEl.classList.contains("disagall-ui-hidden");
+  }
+  function getOverlayChromeHeights(overlayEl) {
+    if (isUiHiddenState(overlayEl)) {
+      return { headerHeight: 0, footerHeight: 0 };
+    }
+    const hasQuery = overlayEl && typeof overlayEl.querySelector === "function";
+    const headerEl = hasQuery ? overlayEl.querySelector(".disagall-header") : null;
+    const footerEl = hasQuery ? overlayEl.querySelector(".disagall-footer") : null;
+    return {
+      headerHeight: headerEl && headerEl.offsetHeight ? headerEl.offsetHeight : 52,
+      footerHeight: footerEl && footerEl.offsetHeight ? footerEl.offsetHeight : 38
+    };
+  }
+  function resolveStageElement(overlayEl) {
+    if (state.elements.stageEl) return state.elements.stageEl;
+    if (overlayEl && typeof overlayEl.querySelector === "function") {
+      return overlayEl.querySelector("#disagall-stage") || overlayEl.querySelector(".disagall-stage");
+    }
+    return typeof document !== "undefined" ? document.getElementById("disagall-stage") : null;
   }
   function applyFittingAndPadding() {
     const { mainImgEl, overlayEl, infoBadgeEl } = state.elements;
@@ -413,12 +453,15 @@
     const nw = mainImgEl.naturalWidth;
     const nh = mainImgEl.naturalHeight;
     const isPortrait = nh >= nw;
-    const headerEl = overlayEl ? overlayEl.querySelector(".disagall-header") : null;
-    const footerEl = overlayEl ? overlayEl.querySelector(".disagall-footer") : null;
-    const headerHeight = headerEl ? headerEl.offsetHeight : 52;
-    const footerHeight = footerEl ? footerEl.offsetHeight : 38;
-    const availableHeight = Math.max(100, window.innerHeight - headerHeight - footerHeight - state.currentPadding * 2);
-    const availableWidth = Math.max(100, window.innerWidth - state.currentPadding * 2);
+    const { headerHeight, footerHeight } = getOverlayChromeHeights(overlayEl);
+    const stageEl = resolveStageElement(overlayEl);
+    if (stageEl && stageEl.style) {
+      stageEl.style.paddingTop = `${headerHeight}px`;
+      stageEl.style.paddingBottom = `${footerHeight}px`;
+    }
+    const effectivePadding = state.isFullscreenMode ? 0 : state.currentPadding;
+    const availableHeight = Math.max(100, window.innerHeight - headerHeight - footerHeight - effectivePadding * 2);
+    const availableWidth = Math.max(100, window.innerWidth - effectivePadding * 2);
     const widthRatio = availableWidth / nw;
     const heightRatio = availableHeight / nh;
     const scale = Math.min(widthRatio, heightRatio);
@@ -546,6 +589,7 @@
       window.removeEventListener("mouseup", onWindowMouseUp);
     }
     updateImgTransform();
+    applyFittingAndPadding();
   }
   function setupZoomEvents(mainImgEl) {
     if (!mainImgEl) return;
@@ -562,6 +606,10 @@
         state.zoom.panY = 0;
       }
       updateImgTransform();
+      if (oldScale > 1.001 && state.zoom.scale <= 1.001) {
+        state.zoom.scale = 1;
+        applyFittingAndPadding();
+      }
     }, { passive: false });
     mainImgEl.addEventListener("mousedown", (e) => {
       if (state.zoom.scale > 1 && e.button === 0) {
@@ -759,6 +807,7 @@
   var isHeaderHovered = false;
   var isSliderInteracting = false;
   var hasBoundStorageSync = false;
+  var boundFullscreenDoc = null;
   function isOverlayActive() {
     const { overlayEl } = state.elements;
     return Boolean(overlayEl && overlayEl.classList.contains("active"));
@@ -792,12 +841,17 @@
   function isAnyUiHiddenClass(overlayEl) {
     return state.isUiHidden || overlayEl.classList.contains("disagall-idle") || overlayEl.classList.contains("disagall-ui-hidden");
   }
+  function syncFittingIfUnzoomed() {
+    if (state.zoom.scale > 1.001) return;
+    applyFittingAndPadding();
+  }
   function showUi() {
     state.isUiHidden = false;
     const { overlayEl } = state.elements;
     if (!overlayEl) return;
     overlayEl.classList.remove("disagall-idle");
     overlayEl.classList.remove("disagall-ui-hidden");
+    syncFittingIfUnzoomed();
   }
   function hideUi(isManual = false) {
     if (!isOverlayActive()) return false;
@@ -807,6 +861,7 @@
       state.isUiHidden = true;
       overlayEl.classList.remove("disagall-idle");
       overlayEl.classList.add("disagall-ui-hidden");
+      syncFittingIfUnzoomed();
       return true;
     }
     if (!state.autoHideUi || state.isUiHidden) return false;
@@ -815,6 +870,7 @@
       return false;
     }
     overlayEl.classList.add("disagall-idle");
+    syncFittingIfUnzoomed();
     return true;
   }
   function resetIdleTimer() {
@@ -844,21 +900,111 @@
     if (typeof document === "undefined") return null;
     return document.fullscreenElement || document.webkitFullscreenElement || null;
   }
-  function handleFullscreenPromise(result) {
-    if (!result || typeof result.catch !== "function") return;
-    result.catch((err) => {
+  function updateFullscreenButtonUi(active) {
+    const { fullscreenBtnEl } = state.elements;
+    if (!fullscreenBtnEl) return;
+    fullscreenBtnEl.classList.toggle("active", active);
+    if (typeof fullscreenBtnEl.setAttribute === "function") {
+      fullscreenBtnEl.setAttribute("aria-pressed", active ? "true" : "false");
+    }
+    fullscreenBtnEl.title = active ? "\uC804\uCCB4\uD654\uBA74 \uD574\uC81C (\uB2E8\uCD95\uD0A4: F / ESC)" : "\uC804\uCCB4\uD654\uBA74 \uC804\uD658 (\uB2E8\uCD95\uD0A4: F)";
+    if (typeof fullscreenBtnEl.querySelector === "function") {
+      const labelEl = fullscreenBtnEl.querySelector("span");
+      if (labelEl) {
+        labelEl.textContent = active ? "\uC804\uCCB4\uD654\uBA74 \uD574\uC81C" : "\uC804\uCCB4\uD654\uBA74";
+      }
+    }
+  }
+  function enterFullscreenVisualState() {
+    if (!isOverlayActive()) return;
+    const { overlayEl } = state.elements;
+    if (state.isFullscreenMode && overlayEl.classList.contains("disagall-fullscreen")) {
+      updateFullscreenButtonUi(true);
+      return;
+    }
+    state.isFullscreenMode = true;
+    overlayEl.classList.add("disagall-fullscreen");
+    updateFullscreenButtonUi(true);
+    hideUi(true);
+  }
+  function exitFullscreenVisualState() {
+    const { overlayEl } = state.elements;
+    const wasActive = Boolean(
+      state.isFullscreenMode || overlayEl && overlayEl.classList.contains("disagall-fullscreen")
+    );
+    state.isFullscreenMode = false;
+    if (overlayEl) {
+      overlayEl.classList.remove("disagall-fullscreen");
+    }
+    updateFullscreenButtonUi(false);
+    if (wasActive && isOverlayActive()) {
+      showUi();
+      resetIdleTimer();
+    }
+  }
+  function resetFullscreenState() {
+    state.isFullscreenMode = false;
+    const { overlayEl } = state.elements;
+    if (overlayEl) {
+      overlayEl.classList.remove("disagall-fullscreen");
+    }
+    updateFullscreenButtonUi(false);
+  }
+  function syncFullscreenState() {
+    if (!isOverlayActive()) return;
+    if (getFullscreenElement()) {
+      enterFullscreenVisualState();
+      return;
+    }
+    if (state.isFullscreenMode) {
+      exitFullscreenVisualState();
+    }
+  }
+  function bindFullscreenChangeListener() {
+    if (typeof document === "undefined" || typeof document.addEventListener !== "function") return;
+    if (boundFullscreenDoc === document) return;
+    boundFullscreenDoc = document;
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    document.addEventListener("webkitfullscreenchange", syncFullscreenState);
+  }
+  function handleFullscreenPromise(result, onSuccess, onFailure) {
+    if (!result || typeof result.then !== "function") {
+      if (typeof onSuccess === "function") onSuccess();
+      return;
+    }
+    result.then(() => {
+      if (typeof onSuccess === "function") onSuccess();
+    }).catch((err) => {
+      if (typeof onFailure === "function") onFailure(err);
       return err;
     });
+  }
+  function requestOverlayFullscreen(overlayEl, { onSuccess, onFailure } = {}) {
+    try {
+      if (overlayEl && typeof overlayEl.requestFullscreen === "function") {
+        handleFullscreenPromise(overlayEl.requestFullscreen(), onSuccess, onFailure);
+        return true;
+      }
+      if (overlayEl && typeof overlayEl.webkitRequestFullscreen === "function") {
+        handleFullscreenPromise(overlayEl.webkitRequestFullscreen(), onSuccess, onFailure);
+        return true;
+      }
+    } catch (err) {
+      if (typeof onFailure === "function") onFailure(err);
+      return false;
+    }
+    if (typeof onFailure === "function") onFailure(new Error("Fullscreen API unavailable"));
+    return false;
   }
   function exitFullscreenSafely() {
     if (!getFullscreenElement()) return false;
     try {
       if (typeof document.exitFullscreen === "function") {
-        handleFullscreenPromise(document.exitFullscreen());
+        handleFullscreenPromise(document.exitFullscreen(), exitFullscreenVisualState);
         return true;
       }
       if (typeof document.webkitExitFullscreen === "function") {
-        handleFullscreenPromise(document.webkitExitFullscreen());
+        handleFullscreenPromise(document.webkitExitFullscreen(), exitFullscreenVisualState);
         return true;
       }
     } catch (err) {
@@ -872,19 +1018,37 @@
       return exitFullscreenSafely();
     }
     const { overlayEl } = state.elements;
-    try {
-      if (typeof overlayEl.requestFullscreen === "function") {
-        handleFullscreenPromise(overlayEl.requestFullscreen());
-        return true;
+    const wasFallback = state.isFullscreenMode;
+    return requestOverlayFullscreen(overlayEl, {
+      onSuccess: enterFullscreenVisualState,
+      onFailure: () => {
+        if (!isOverlayActive()) return;
+        if (wasFallback) {
+          exitFullscreenVisualState();
+          return;
+        }
+        enterFullscreenVisualState();
+        showViewerToast("OS \uC804\uCCB4\uD654\uBA74\uC774 \uC81C\uD55C\uB418\uC5B4 \uCC3D \uC804\uCCB4 \uCC44\uC6C0 \uBAA8\uB4DC\uB85C \uC804\uD658\uD588\uC2B5\uB2C8\uB2E4.");
       }
-      if (typeof overlayEl.webkitRequestFullscreen === "function") {
-        handleFullscreenPromise(overlayEl.webkitRequestFullscreen());
-        return true;
+    });
+  }
+  function enterAutoFullscreenOnOpen() {
+    if (!isOverlayActive()) return false;
+    const { overlayEl } = state.elements;
+    return requestOverlayFullscreen(overlayEl, {
+      onSuccess: enterFullscreenVisualState,
+      onFailure: () => {
+        if (!isOverlayActive()) return;
+        enterFullscreenVisualState();
+        showViewerToast("\uC5EC\uBC31 0px\xB7UI \uC228\uAE40\uC73C\uB85C \uC804\uCCB4 \uCC44\uC6C0 (F \uD0A4\uB85C OS \uC804\uCCB4\uD654\uBA74)");
       }
-    } catch (err) {
-      return false;
+    });
+  }
+  function applyAutoFullscreenSetting(enabled) {
+    state.autoFullscreen = Boolean(enabled);
+    if (!state.autoFullscreen && state.isFullscreenMode && !getFullscreenElement() && isOverlayActive()) {
+      exitFullscreenVisualState();
     }
-    return false;
   }
   function applyAutoHideUiSetting(enabled) {
     state.autoHideUi = Boolean(enabled);
@@ -904,17 +1068,31 @@
   function loadInitialAutoHideSetting() {
     const hasChromeSync = typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.get === "function";
     if (hasChromeSync) {
-      chrome.storage.sync.get({ [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: true }, (result) => {
-        if (result && typeof result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI] === "boolean") {
-          applyAutoHideUiSetting(result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI]);
+      chrome.storage.sync.get(
+        {
+          [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: true,
+          [CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]: false
+        },
+        (result) => {
+          if (!result) return;
+          if (typeof result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI] === "boolean") {
+            applyAutoHideUiSetting(result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI]);
+          }
+          if (typeof result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN] === "boolean") {
+            applyAutoFullscreenSetting(result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]);
+          }
         }
-      });
+      );
       return;
     }
     if (typeof GM_getValue === "function") {
       const savedAutoHide = GM_getValue(CONFIG.STORAGE_KEY_AUTO_HIDE_UI, true);
       if (typeof savedAutoHide === "boolean") {
         applyAutoHideUiSetting(savedAutoHide);
+      }
+      const savedAutoFullscreen = GM_getValue(CONFIG.STORAGE_KEY_AUTO_FULLSCREEN, false);
+      if (typeof savedAutoFullscreen === "boolean") {
+        applyAutoFullscreenSetting(savedAutoFullscreen);
       }
     }
   }
@@ -924,15 +1102,20 @@
     hasBoundStorageSync = true;
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "sync" || !changes) return;
-      const change = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
-      if (change && typeof change.newValue === "boolean") {
-        applyAutoHideUiSetting(change.newValue);
+      const autoHideChange = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
+      if (autoHideChange && typeof autoHideChange.newValue === "boolean") {
+        applyAutoHideUiSetting(autoHideChange.newValue);
+      }
+      const autoFullscreenChange = changes[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN];
+      if (autoFullscreenChange && typeof autoFullscreenChange.newValue === "boolean") {
+        applyAutoFullscreenSetting(autoFullscreenChange.newValue);
       }
     });
   }
   function initImmersionSettings() {
     loadInitialAutoHideSetting();
     bindAutoHideStorageListener();
+    bindFullscreenChangeListener();
   }
   function bindHeaderHoverEvents(overlayEl) {
     if (typeof overlayEl.querySelector !== "function") return;
@@ -967,6 +1150,7 @@
     }
   }
   function bindImmersionEvents(overlayEl, sliderEl) {
+    bindFullscreenChangeListener();
     overlayEl.addEventListener("mousemove", () => {
       resetIdleTimer();
     });
@@ -1097,10 +1281,35 @@
     "f": () => toggleFullscreen(),
     "F": () => toggleFullscreen()
   };
+  var CODE_ACTIONS = {
+    "KeyA": () => navigate(-1),
+    "KeyD": () => navigate(1),
+    "KeyW": () => navigatePost("up"),
+    "KeyS": () => navigatePost("down"),
+    "KeyR": () => triggerPostRecommend(),
+    "KeyC": () => triggerPostRecommend(),
+    "KeyH": () => toggleUiManual(),
+    "KeyF": () => toggleFullscreen()
+  };
+  var NON_TEXT_INPUT_TYPES = /* @__PURE__ */ new Set([
+    "range",
+    "checkbox",
+    "radio",
+    "button",
+    "submit",
+    "reset",
+    "color",
+    "file",
+    "hidden"
+  ]);
   function isEditableTarget(target) {
     if (!target) return false;
     const tag = typeof target.tagName === "string" ? target.tagName.toUpperCase() : "";
-    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || Boolean(target.isContentEditable);
+    if (tag === "INPUT") {
+      const inputType = typeof target.type === "string" ? target.type.toLowerCase() : "text";
+      return !NON_TEXT_INPUT_TYPES.has(inputType);
+    }
+    return tag === "TEXTAREA" || tag === "SELECT" || Boolean(target.isContentEditable);
   }
   function isExternalModalOpen() {
     if (typeof document === "undefined" || typeof document.querySelector !== "function") {
@@ -1122,7 +1331,7 @@
       return;
     }
     if (isExternalModalOpen()) return;
-    const action = KEY_ACTIONS[e.key];
+    const action = KEY_ACTIONS[e.key] || (e.code ? CODE_ACTIONS[e.code] : null);
     if (action) {
       if (typeof e.preventDefault === "function") e.preventDefault();
       if (typeof e.stopPropagation === "function") e.stopPropagation();
@@ -1164,12 +1373,13 @@
     });
   }
   function bindOverlayButtons() {
-    const { prevBtnEl, nextBtnEl, recommendBtnEl } = state.elements;
+    const { prevBtnEl, nextBtnEl, recommendBtnEl, fullscreenBtnEl } = state.elements;
     const closeBtnEl = document.getElementById("disagall-close-btn");
     if (closeBtnEl) {
       closeBtnEl.addEventListener("click", closeViewer);
     }
     bindStopPropagationClick(recommendBtnEl, triggerPostRecommend);
+    bindStopPropagationClick(fullscreenBtnEl, toggleFullscreen);
     bindStopPropagationClick(prevBtnEl, () => navigate(-1));
     bindStopPropagationClick(nextBtnEl, () => navigate(1));
   }
@@ -1231,6 +1441,9 @@
     createOverlay();
     const targetIndex = findTargetImageIndex(targetSrc);
     const { overlayEl } = state.elements;
+    if (typeof document !== "undefined" && isEditableTarget(document.activeElement) && typeof document.activeElement.blur === "function") {
+      document.activeElement.blur();
+    }
     overlayEl.classList.add("active");
     state.previousBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -1238,11 +1451,15 @@
     resetIdleTimer();
     updateRecommendButtonUi();
     showImage(targetIndex);
+    if (state.autoFullscreen) {
+      enterAutoFullscreenOnOpen();
+    }
   }
   function closeViewer() {
     clearIdleTimer();
     flushPaddingSave();
     resetImmersionGuards();
+    resetFullscreenState();
     showUi();
     resetZoom();
     const { overlayEl } = state.elements;

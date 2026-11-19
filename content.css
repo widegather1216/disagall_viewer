@@ -30,6 +30,9 @@
 
 /* Header Controls Bar */
 .disagall-header {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   padding: 12px 24px;
   display: flex;
@@ -202,6 +205,18 @@
   transform: scale(1.18) rotate(-6deg);
 }
 
+.disagall-btn-fullscreen {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
+}
+
+.disagall-btn-fullscreen.active {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(96, 165, 250, 0.65);
+  color: #ffffff;
+}
+
 .disagall-btn-close {
   background: rgba(239, 68, 68, 0.2);
   border-color: rgba(239, 68, 68, 0.35);
@@ -220,13 +235,15 @@
 .disagall-stage {
   flex: 1;
   width: 100%;
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
   position: relative;
   overflow: hidden;
   box-sizing: border-box;
-  /* Dynamic padding set via JS based on slider & aspect ratio */
+  transition: padding-top 0.25s ease, padding-bottom 0.25s ease;
+  /* Dynamic padding set via JS based on UI visibility, slider & aspect ratio */
 }
 
 .disagall-img-wrapper {
@@ -325,6 +342,9 @@
 
 /* Footer & Hints */
 .disagall-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
   width: 100%;
   padding: 10px 24px;
   display: flex;

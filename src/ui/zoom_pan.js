@@ -1,5 +1,6 @@
 // Zoom and Pan Engine for Disagall Viewer
 import { state } from '../state.js';
+import { applyFittingAndPadding } from './overlay.js';
 
 export function onWindowMouseMove(e) {
   if (!state.zoom.isDragging) return;
@@ -55,6 +56,7 @@ export function resetZoom() {
     window.removeEventListener('mouseup', onWindowMouseUp);
   }
   updateImgTransform();
+  applyFittingAndPadding();
 }
 
 export function setupZoomEvents(mainImgEl) {
@@ -75,6 +77,10 @@ export function setupZoomEvents(mainImgEl) {
     }
 
     updateImgTransform();
+    if (oldScale > 1.001 && state.zoom.scale <= 1.001) {
+      state.zoom.scale = 1.0;
+      applyFittingAndPadding();
+    }
   }, { passive: false });
 
   mainImgEl.addEventListener('mousedown', (e) => {

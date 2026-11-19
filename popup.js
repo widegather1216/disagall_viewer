@@ -3,11 +3,13 @@
 const STORAGE_KEYS = {
   PADDING: 'defaultPadding',
   AUTO_HIDE_UI: 'autoHideUi',
+  AUTO_FULLSCREEN: 'autoFullscreen',
 };
 
 const DEFAULT_SETTINGS = {
   [STORAGE_KEYS.PADDING]: 24,
   [STORAGE_KEYS.AUTO_HIDE_UI]: true,
+  [STORAGE_KEYS.AUTO_FULLSCREEN]: false,
 };
 
 const PADDING_SAVE_DEBOUNCE_MS = 250;
@@ -53,7 +55,17 @@ function loadSettings(storage, callbacks = {}) {
     if (typeof callbacks.onAutoHideLoaded === 'function' && typeof autoHide === 'boolean') {
       callbacks.onAutoHideLoaded(autoHide);
     }
+
+    const autoFullscreen = result[STORAGE_KEYS.AUTO_FULLSCREEN];
+    if (typeof callbacks.onAutoFullscreenLoaded === 'function' && typeof autoFullscreen === 'boolean') {
+      callbacks.onAutoFullscreenLoaded(autoFullscreen);
+    }
   });
+}
+
+function saveBooleanSetting(storage, key, enabled, callback) {
+  if (!storage || typeof storage.set !== 'function') return;
+  storage.set({ [key]: Boolean(enabled) }, callback);
 }
 
 /**
@@ -63,8 +75,17 @@ function loadSettings(storage, callbacks = {}) {
  * @param {function} [callback] - Optional completion callback
  */
 function saveAutoHideUi(storage, enabled, callback) {
-  if (!storage || typeof storage.set !== 'function') return;
-  storage.set({ [STORAGE_KEYS.AUTO_HIDE_UI]: Boolean(enabled) }, callback);
+  saveBooleanSetting(storage, STORAGE_KEYS.AUTO_HIDE_UI, enabled, callback);
+}
+
+/**
+ * Save Auto-Fullscreen setting to Chrome sync storage.
+ * @param {object} storage - chrome.storage.sync API instance
+ * @param {boolean} enabled - Whether auto-fullscreen on open is enabled
+ * @param {function} [callback] - Optional completion callback
+ */
+function saveAutoFullscreen(storage, enabled, callback) {
+  saveBooleanSetting(storage, STORAGE_KEYS.AUTO_FULLSCREEN, enabled, callback);
 }
 
 /**
@@ -85,13 +106,16 @@ function savePadding(storage, padding, callback) {
  * @param {object|null} storageRef - chrome.storage.sync reference
  * @param {object} elements - { slider, valDisplay, autoHideToggle }
  */
-function applyInitialSettings(storageRef, { slider, valDisplay, autoHideToggle }) {
+function applyInitialSettings(storageRef, { slider, valDisplay, autoHideToggle, autoFullscreenToggle }) {
   if (!storageRef) return;
 
   loadSettings(storageRef, {
     onPaddingLoaded: (padding) => applyPaddingUi(slider, valDisplay, padding),
     onAutoHideLoaded: (autoHide) => {
       if (autoHideToggle) autoHideToggle.checked = autoHide;
+    },
+    onAutoFullscreenLoaded: (autoFullscreen) => {
+      if (autoFullscreenToggle) autoFullscreenToggle.checked = autoFullscreen;
     },
   });
 }
@@ -151,12 +175,12 @@ function bindPopupSlider(slider, valDisplay, storageRef, debounceMs = PADDING_SA
  * @param {object|null} autoHideToggle - Checkbox input element
  * @param {object|null} storageRef - chrome.storage.sync reference
  */
-function bindPopupToggle(autoHideToggle, storageRef) {
-  if (!autoHideToggle) return;
+function bindPopupToggle(toggleEl, storageRef, saveFn = saveAutoHideUi) {
+  if (!toggleEl) return;
 
-  autoHideToggle.addEventListener('change', (e) => {
-    const checked = e && e.target ? e.target.checked : autoHideToggle.checked;
-    saveAutoHideUi(storageRef, Boolean(checked));
+  toggleEl.addEventListener('change', (e) => {
+    const checked = e && e.target ? e.target.checked : toggleEl.checked;
+    saveFn(storageRef, Boolean(checked));
   });
 }
 
@@ -164,15 +188,20 @@ function bindPopupToggle(autoHideToggle, storageRef) {
  * Apply validated chrome.storage.onChanged updates to popup DOM elements.
  * @param {object} changes - Storage change map
  * @param {string} areaName - Storage area name
- * @param {object} elements - { slider, valDisplay, autoHideToggle }
+ * @param {object} elements - { slider, valDisplay, autoHideToggle, autoFullscreenToggle }
  */
 function handleStorageChange(changes, areaName, elements) {
   if (areaName !== 'sync' || !changes || !elements) return;
 
-  const { slider, valDisplay, autoHideToggle } = elements;
+  const { slider, valDisplay, autoHideToggle, autoFullscreenToggle } = elements;
   const autoHideChange = changes[STORAGE_KEYS.AUTO_HIDE_UI];
   if (autoHideChange && autoHideToggle && typeof autoHideChange.newValue === 'boolean') {
     autoHideToggle.checked = autoHideChange.newValue;
+  }
+
+  const autoFullscreenChange = changes[STORAGE_KEYS.AUTO_FULLSCREEN];
+  if (autoFullscreenChange && autoFullscreenToggle && typeof autoFullscreenChange.newValue === 'boolean') {
+    autoFullscreenToggle.checked = autoFullscreenChange.newValue;
   }
 
   const paddingChange = changes[STORAGE_KEYS.PADDING];
@@ -209,11 +238,13 @@ function initPopup(documentRef = (typeof document !== 'undefined' ? document : n
     slider: documentRef.getElementById('padding-slider'),
     valDisplay: documentRef.getElementById('padding-val'),
     autoHideToggle: documentRef.getElementById('auto-hide-ui-toggle'),
+    autoFullscreenToggle: documentRef.getElementById('auto-fullscreen-toggle'),
   };
 
   applyInitialSettings(storageRef, elements);
   bindPopupSlider(elements.slider, elements.valDisplay, storageRef);
-  bindPopupToggle(elements.autoHideToggle, storageRef);
+  bindPopupToggle(elements.autoHideToggle, storageRef, saveAutoHideUi);
+  bindPopupToggle(elements.autoFullscreenToggle, storageRef, saveAutoFullscreen);
   bindStorageSync(elements);
 
   return elements;
@@ -235,6 +266,7 @@ if (typeof module !== 'undefined' && module.exports) {
     PADDING_SAVE_DEBOUNCE_MS,
     loadSettings,
     saveAutoHideUi,
+    saveAutoFullscreen,
     savePadding,
     bindPopupSlider,
     bindPopupToggle,

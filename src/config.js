@@ -14,5 +14,6 @@ export const CONFIG = {
 
   // Immersion & UI Auto-Hide
   UI_IDLE_TIMEOUT: 2500,
-  STORAGE_KEY_AUTO_HIDE_UI: 'autoHideUi'
+  STORAGE_KEY_AUTO_HIDE_UI: 'autoHideUi',
+  STORAGE_KEY_AUTO_FULLSCREEN: 'autoFullscreen'
 };

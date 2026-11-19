@@ -28,7 +28,10 @@ import {
   getFullscreenElement,
   exitFullscreenSafely,
   toggleFullscreen,
+  enterAutoFullscreenOnOpen,
+  resetFullscreenState,
   applyAutoHideUiSetting,
+  applyAutoFullscreenSetting,
   initImmersionSettings,
   bindImmersionEvents
 } from './immersion_controller.js';
@@ -41,7 +44,10 @@ export {
   toggleUiManual,
   exitFullscreenSafely,
   toggleFullscreen,
+  enterAutoFullscreenOnOpen,
+  resetFullscreenState,
   applyAutoHideUiSetting,
+  applyAutoFullscreenSetting,
   initImmersionSettings
 };
 
@@ -186,10 +192,37 @@ export const KEY_ACTIONS = {
   'F': () => toggleFullscreen()
 };
 
+export const CODE_ACTIONS = {
+  'KeyA': () => navigate(-1),
+  'KeyD': () => navigate(1),
+  'KeyW': () => navigatePost('up'),
+  'KeyS': () => navigatePost('down'),
+  'KeyR': () => triggerPostRecommend(),
+  'KeyC': () => triggerPostRecommend(),
+  'KeyH': () => toggleUiManual(),
+  'KeyF': () => toggleFullscreen()
+};
+
+const NON_TEXT_INPUT_TYPES = new Set([
+  'range',
+  'checkbox',
+  'radio',
+  'button',
+  'submit',
+  'reset',
+  'color',
+  'file',
+  'hidden',
+]);
+
 function isEditableTarget(target) {
   if (!target) return false;
   const tag = typeof target.tagName === 'string' ? target.tagName.toUpperCase() : '';
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || Boolean(target.isContentEditable);
+  if (tag === 'INPUT') {
+    const inputType = typeof target.type === 'string' ? target.type.toLowerCase() : 'text';
+    return !NON_TEXT_INPUT_TYPES.has(inputType);
+  }
+  return tag === 'TEXTAREA' || tag === 'SELECT' || Boolean(target.isContentEditable);
 }
 
 function isExternalModalOpen() {
@@ -216,7 +249,7 @@ export function handleKeyDown(e) {
 
   if (isExternalModalOpen()) return;
 
-  const action = KEY_ACTIONS[e.key];
+  const action = KEY_ACTIONS[e.key] || (e.code ? CODE_ACTIONS[e.code] : null);
   if (action) {
     if (typeof e.preventDefault === 'function') e.preventDefault();
     if (typeof e.stopPropagation === 'function') e.stopPropagation();
@@ -264,12 +297,13 @@ function bindStopPropagationClick(el, handler) {
 }
 
 function bindOverlayButtons() {
-  const { prevBtnEl, nextBtnEl, recommendBtnEl } = state.elements;
+  const { prevBtnEl, nextBtnEl, recommendBtnEl, fullscreenBtnEl } = state.elements;
   const closeBtnEl = document.getElementById('disagall-close-btn');
   if (closeBtnEl) {
     closeBtnEl.addEventListener('click', closeViewer);
   }
   bindStopPropagationClick(recommendBtnEl, triggerPostRecommend);
+  bindStopPropagationClick(fullscreenBtnEl, toggleFullscreen);
   bindStopPropagationClick(prevBtnEl, () => navigate(-1));
   bindStopPropagationClick(nextBtnEl, () => navigate(1));
 }
@@ -344,6 +378,9 @@ export function openViewer(targetSrc, isAuto = false) {
 
   const targetIndex = findTargetImageIndex(targetSrc);
   const { overlayEl } = state.elements;
+  if (typeof document !== 'undefined' && isEditableTarget(document.activeElement) && typeof document.activeElement.blur === 'function') {
+    document.activeElement.blur();
+  }
   overlayEl.classList.add('active');
   state.previousBodyOverflow = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
@@ -352,12 +389,16 @@ export function openViewer(targetSrc, isAuto = false) {
   resetIdleTimer();
   updateRecommendButtonUi();
   showImage(targetIndex);
+  if (state.autoFullscreen) {
+    enterAutoFullscreenOnOpen();
+  }
 }
 
 export function closeViewer() {
   clearIdleTimer();
   flushPaddingSave();
   resetImmersionGuards();
+  resetFullscreenState();
   showUi();
   resetZoom();
 

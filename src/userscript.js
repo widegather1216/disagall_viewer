@@ -53,7 +53,7 @@ import { openViewer, initViewerBase } from './controller/viewer_controller.js';
     if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
       return;
     }
-    if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if ((e.key === 'v' || e.key === 'V' || e.code === 'KeyV') && !e.ctrlKey && !e.metaKey && !e.altKey) {
       const { overlayEl } = state.elements;
       if (!overlayEl || !overlayEl.classList.contains('active')) {
         openViewer();
