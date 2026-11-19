@@ -10,6 +10,29 @@ const DEFAULT_SETTINGS = {
   [STORAGE_KEYS.AUTO_HIDE_UI]: true,
 };
 
+const PADDING_SAVE_DEBOUNCE_MS = 250;
+
+/**
+ * Parse a raw padding input string into an integer, or null if NaN.
+ * @param {string|number} rawValue - Raw input value
+ * @returns {number|null} Parsed integer or null
+ */
+function parsePaddingValue(rawValue) {
+  const parsed = parseInt(rawValue, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Update slider input value and pixel label text safely.
+ * @param {object|null} slider - Range input element
+ * @param {object|null} valDisplay - Value label element
+ * @param {number} padding - Numeric padding value
+ */
+function applyPaddingUi(slider, valDisplay, padding) {
+  if (slider) slider.value = padding;
+  if (valDisplay) valDisplay.textContent = `${padding}px`;
+}
+
 /**
  * Load settings from Chrome sync storage with fallback defaults.
  * @param {object} storage - chrome.storage.sync API instance
@@ -21,12 +44,14 @@ function loadSettings(storage, callbacks = {}) {
   storage.get(DEFAULT_SETTINGS, (result) => {
     if (!result) return;
 
-    if (typeof callbacks.onPaddingLoaded === 'function' && typeof result[STORAGE_KEYS.PADDING] === 'number') {
-      callbacks.onPaddingLoaded(result[STORAGE_KEYS.PADDING]);
+    const padding = result[STORAGE_KEYS.PADDING];
+    if (typeof callbacks.onPaddingLoaded === 'function' && typeof padding === 'number' && !Number.isNaN(padding)) {
+      callbacks.onPaddingLoaded(padding);
     }
 
-    if (typeof callbacks.onAutoHideLoaded === 'function' && typeof result[STORAGE_KEYS.AUTO_HIDE_UI] === 'boolean') {
-      callbacks.onAutoHideLoaded(result[STORAGE_KEYS.AUTO_HIDE_UI]);
+    const autoHide = result[STORAGE_KEYS.AUTO_HIDE_UI];
+    if (typeof callbacks.onAutoHideLoaded === 'function' && typeof autoHide === 'boolean') {
+      callbacks.onAutoHideLoaded(autoHide);
     }
   });
 }
@@ -50,7 +75,125 @@ function saveAutoHideUi(storage, enabled, callback) {
  */
 function savePadding(storage, padding, callback) {
   if (!storage || typeof storage.set !== 'function') return;
-  storage.set({ [STORAGE_KEYS.PADDING]: Number(padding) }, callback);
+  const numericPadding = Number(padding);
+  if (Number.isNaN(numericPadding)) return;
+  storage.set({ [STORAGE_KEYS.PADDING]: numericPadding }, callback);
+}
+
+/**
+ * Load initial storage values into popup DOM elements.
+ * @param {object|null} storageRef - chrome.storage.sync reference
+ * @param {object} elements - { slider, valDisplay, autoHideToggle }
+ */
+function applyInitialSettings(storageRef, { slider, valDisplay, autoHideToggle }) {
+  if (!storageRef) return;
+
+  loadSettings(storageRef, {
+    onPaddingLoaded: (padding) => applyPaddingUi(slider, valDisplay, padding),
+    onAutoHideLoaded: (autoHide) => {
+      if (autoHideToggle) autoHideToggle.checked = autoHide;
+    },
+  });
+}
+
+/**
+ * Read, validate, and preview padding value from a slider event.
+ * @param {Event} event - DOM input/change event
+ * @param {object} slider - Range input element
+ * @param {object|null} valDisplay - Value label element
+ * @returns {number|null} Validated integer padding or null
+ */
+function readAndPreviewPadding(event, slider, valDisplay) {
+  const rawValue = event && event.target ? event.target.value : slider.value;
+  const parsed = parsePaddingValue(rawValue);
+  if (parsed === null) return null;
+  if (valDisplay) valDisplay.textContent = `${parsed}px`;
+  return parsed;
+}
+
+/**
+ * Bind debounced input and immediate change persistence for the padding slider.
+ * @param {object|null} slider - Range input element
+ * @param {object|null} valDisplay - Value label element
+ * @param {object|null} storageRef - chrome.storage.sync reference
+ * @param {number} [debounceMs] - Debounce delay in milliseconds
+ */
+function bindPopupSlider(slider, valDisplay, storageRef, debounceMs = PADDING_SAVE_DEBOUNCE_MS) {
+  if (!slider) return;
+  let saveTimer = null;
+
+  const clearPendingSave = () => {
+    if (!saveTimer) return;
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  };
+
+  slider.addEventListener('input', (e) => {
+    const parsed = readAndPreviewPadding(e, slider, valDisplay);
+    if (parsed === null || !storageRef) return;
+    clearPendingSave();
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      savePadding(storageRef, parsed);
+    }, debounceMs);
+  });
+
+  slider.addEventListener('change', (e) => {
+    const parsed = readAndPreviewPadding(e, slider, valDisplay);
+    if (parsed === null) return;
+    clearPendingSave();
+    savePadding(storageRef, parsed);
+  });
+}
+
+/**
+ * Bind change persistence for the Auto-Hide UI toggle switch.
+ * @param {object|null} autoHideToggle - Checkbox input element
+ * @param {object|null} storageRef - chrome.storage.sync reference
+ */
+function bindPopupToggle(autoHideToggle, storageRef) {
+  if (!autoHideToggle) return;
+
+  autoHideToggle.addEventListener('change', (e) => {
+    const checked = e && e.target ? e.target.checked : autoHideToggle.checked;
+    saveAutoHideUi(storageRef, Boolean(checked));
+  });
+}
+
+/**
+ * Apply validated chrome.storage.onChanged updates to popup DOM elements.
+ * @param {object} changes - Storage change map
+ * @param {string} areaName - Storage area name
+ * @param {object} elements - { slider, valDisplay, autoHideToggle }
+ */
+function handleStorageChange(changes, areaName, elements) {
+  if (areaName !== 'sync' || !changes || !elements) return;
+
+  const { slider, valDisplay, autoHideToggle } = elements;
+  const autoHideChange = changes[STORAGE_KEYS.AUTO_HIDE_UI];
+  if (autoHideChange && autoHideToggle && typeof autoHideChange.newValue === 'boolean') {
+    autoHideToggle.checked = autoHideChange.newValue;
+  }
+
+  const paddingChange = changes[STORAGE_KEYS.PADDING];
+  if (paddingChange && typeof paddingChange.newValue === 'number' && !Number.isNaN(paddingChange.newValue)) {
+    applyPaddingUi(slider, valDisplay, paddingChange.newValue);
+  }
+}
+
+/**
+ * Subscribe to chrome.storage.onChanged for external sync updates.
+ * @param {object} elements - { slider, valDisplay, autoHideToggle }
+ * @param {object|null} [storageEvents] - Optional chrome.storage.onChanged instance
+ * @returns {function|null} Registered listener function or null
+ */
+function bindStorageSync(elements, storageEvents = null) {
+  const target = storageEvents || (typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.onChanged : null);
+  if (!target || typeof target.addListener !== 'function') return null;
+
+  const listener = (changes, areaName) => handleStorageChange(changes, areaName, elements);
+  target.addListener(listener);
+  return listener;
 }
 
 /**
@@ -62,60 +205,18 @@ function savePadding(storage, padding, callback) {
 function initPopup(documentRef = (typeof document !== 'undefined' ? document : null), storageRef = (typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.sync : null)) {
   if (!documentRef) return null;
 
-  const slider = documentRef.getElementById('padding-slider');
-  const valDisplay = documentRef.getElementById('padding-val');
-  const autoHideToggle = documentRef.getElementById('auto-hide-ui-toggle');
+  const elements = {
+    slider: documentRef.getElementById('padding-slider'),
+    valDisplay: documentRef.getElementById('padding-val'),
+    autoHideToggle: documentRef.getElementById('auto-hide-ui-toggle'),
+  };
 
-  // 1. Initial load from storage
-  if (storageRef) {
-    loadSettings(storageRef, {
-      onPaddingLoaded: (padding) => {
-        if (slider) slider.value = padding;
-        if (valDisplay) valDisplay.textContent = `${padding}px`;
-      },
-      onAutoHideLoaded: (autoHide) => {
-        if (autoHideToggle) autoHideToggle.checked = autoHide;
-      },
-    });
-  }
+  applyInitialSettings(storageRef, elements);
+  bindPopupSlider(elements.slider, elements.valDisplay, storageRef);
+  bindPopupToggle(elements.autoHideToggle, storageRef);
+  bindStorageSync(elements);
 
-  // 2. Padding slider input listener
-  if (slider && valDisplay) {
-    slider.addEventListener('input', (e) => {
-      const newVal = parseInt(e.target.value, 10);
-      valDisplay.textContent = `${newVal}px`;
-      if (storageRef) {
-        savePadding(storageRef, newVal);
-      }
-    });
-  }
-
-  // 3. Auto-hide UI toggle change listener
-  if (autoHideToggle) {
-    autoHideToggle.addEventListener('change', (e) => {
-      const enabled = Boolean(e.target.checked);
-      if (storageRef) {
-        saveAutoHideUi(storageRef, enabled);
-      }
-    });
-  }
-
-  // 4. Storage changed listener (multi-tab / external sync)
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === 'sync') {
-        if (changes[STORAGE_KEYS.AUTO_HIDE_UI] && autoHideToggle) {
-          autoHideToggle.checked = changes[STORAGE_KEYS.AUTO_HIDE_UI].newValue;
-        }
-        if (changes[STORAGE_KEYS.PADDING] && slider && valDisplay) {
-          slider.value = changes[STORAGE_KEYS.PADDING].newValue;
-          valDisplay.textContent = `${changes[STORAGE_KEYS.PADDING].newValue}px`;
-        }
-      }
-    });
-  }
-
-  return { slider, valDisplay, autoHideToggle };
+  return elements;
 }
 
 // Browser lifecycle hook
@@ -131,9 +232,14 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     STORAGE_KEYS,
     DEFAULT_SETTINGS,
+    PADDING_SAVE_DEBOUNCE_MS,
     loadSettings,
     saveAutoHideUi,
     savePadding,
+    bindPopupSlider,
+    bindPopupToggle,
+    bindStorageSync,
+    handleStorageChange,
     initPopup,
   };
 }
