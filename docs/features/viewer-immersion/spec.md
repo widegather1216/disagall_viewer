@@ -8,22 +8,37 @@
 - `CONFIG.STORAGE_KEY_AUTO_OPEN`: `'disagall_auto_open'`
 - `CONFIG.UI_IDLE_TIMEOUT`: `2500` (ms, 마우스 유휴 판단 대기 시간)
 - `CONFIG.STORAGE_KEY_AUTO_HIDE_UI`: `'autoHideUi'` (boolean, 기본값 `true`)
+- `CONFIG.STORAGE_KEY_AUTO_FULLSCREEN`: `'autoFullscreen'` (boolean, 기본값 `false`)
 - `state.idleTimer`: `NodeJS.Timeout | number | null` (마우스 유휴 타이머 ID)
 - `state.autoHideUi`: `boolean` (설정 저장소에서 로드된 자동 숨김 활성화 여부, 기본 `true`)
+- `state.autoFullscreen`: `boolean` (뷰어 열 때 자동 전체화면 설정 여부, 기본 `false`)
 - `state.isUiHidden`: `boolean` (현재 수동 UI 숨김 상태 여부 플래그, 기본 `false`)
+- `state.isFullscreenMode`: `boolean` (OS 전체화면 또는 `autoFullscreen` 폴백 꽉 채움 활성 상태, 기본 `false`)
+- `state.elements.stageEl`: `HTMLElement | null` (`#disagall-stage` 캐시 참조)
+- `state.elements.fullscreenBtnEl`: `HTMLButtonElement | null` (`#disagall-btn-fullscreen` 캐시 참조)
+- **UI 숨김 연동 동적 피팅 (`src/ui/overlay.js`, `content.css`)**:
+  - `applyFittingAndPadding()`에서 `isUiHiddenState(overlayEl)` 검사 후 UI 숨김 상태(`.disagall-idle` / `.disagall-ui-hidden` / `state.isUiHidden`)이면 `headerHeight = 0`, `footerHeight = 0`으로 확장 계산 (`state.currentPadding`은 그대로 유지)
+  - `.disagall-header` (`position: absolute; top: 0; left: 0;`) 및 `.disagall-footer` (`position: absolute; bottom: 0; left: 0;`)를 오버레이 배치하고, `.disagall-stage`에 `height: 100%; transition: padding-top 0.25s ease, padding-bottom 0.25s ease;` 및 동적 `paddingTop`/`paddingBottom` 적용
+- **줌 연동 보호 (`src/controller/immersion_controller.js`, `src/ui/zoom_pan.js`)**:
+  - `showUi()` / `hideUi()` 상태 전이 시 `state.zoom.scale <= 1.001`일 때만 `applyFittingAndPadding()` 호출 (확대 중 크기 고정)
+  - `resetZoom()` 및 휠 축소로 `1.0x` 복귀 시 `applyFittingAndPadding()` 호출하여 현재 UI 상태에 맞춰 즉시 리피팅
+- **전체화면 모드 & 자동 진입 폴백 (`popup.html`, `popup.js`, `overlay.js`, `immersion_controller.js`, `viewer_controller.js`)**:
+  - 헤더 `#disagall-btn-fullscreen` 버튼 + `F` 단축키 + `fullscreenchange`/`webkitfullscreenchange` 동기화
+  - `state.isFullscreenMode === true` 동안 `state.currentPadding` 저장값을 훼손하지 않고 임시 `effectivePadding = 0` 및 `hideUi(true)` 적용, 해제 시 원래 여백 및 UI 복구
+  - `openViewer()` 시 `state.autoFullscreen === true`이면 `requestFullscreen()` 시도 및 차단 시 `0px`+UI 숨김 폴백 적용 + 토스트 안내
 
 ### 🟡 [To-Be 신규/마이그레이션 대상]
 - 현재 예정된 추가 변경사항 없음
 
 ## 2. 저장소 및 통신 계약 (Storage & Communication Contracts)
 - **Chrome Extension Storage**:
-  - 키: `autoHideUi`
-  - 읽기: `chrome.storage.sync.get({ autoHideUi: true }, callback)`
-  - 쓰기: `chrome.storage.sync.set({ autoHideUi: value })`
+  - 키: `autoHideUi`, `autoFullscreen`
+  - 읽기: `chrome.storage.sync.get({ autoHideUi: true, autoFullscreen: false }, callback)`
+  - 쓰기: `chrome.storage.sync.set({ autoHideUi: value })`, `chrome.storage.sync.set({ autoFullscreen: value })`
 - **Tampermonkey / Userscript Storage**:
-  - 읽기: `GM_getValue('autoHideUi', true)`
+  - 읽기: `GM_getValue('autoHideUi', true)`, `GM_getValue('autoFullscreen', false)`
   - 쓰기: `GM_setValue('autoHideUi', value)`
-- **동기화 시점**: 뷰어 초기화 시 스토리지 값을 읽어 `state.autoHideUi`에 저장. 팝업에서 변경 시 즉시 스토리지 반영.
+- **동기화 시점**: 뷰어 초기화 시 스토리지 값을 읽어 `state.autoHideUi`·`state.autoFullscreen`에 저장. 팝업에서 변경 시 `onChanged`로 실시간 동기화.
 
 ## 3. 클라이언트 상태 계약 (Client State & Lifecycle)
 - **`resetIdleTimer()`**:
@@ -38,8 +53,8 @@
   - 단축키 `H` 또는 `h` 입력 시 호출
   - 현재 숨김 상태(`state.isUiHidden` 또는 `.disagall-idle`)이면 `showUi()`, 보이는 상태이면 `hideUi(true)`
 - **`toggleFullscreen()`**:
-  - 단축키 `F` 또는 `f` 입력 시 호출
-  - `document.fullscreenElement` 검사: 활성화 시 `document.exitFullscreen()`, 비활성화 시 `state.elements.overlayEl.requestFullscreen()` 안전 호출
+  - 단축키 `F`/`f`(`e.code === 'KeyF'`, 한글 IME `'ㄹ'` 포함) 또는 헤더 `#disagall-btn-fullscreen` 클릭 시 호출
+  - `document.fullscreenElement` 검사: 활성화 시 `document.exitFullscreen()`, 비활성화 시 `state.elements.overlayEl.requestFullscreen()` 안전 호출 (거부 시 `0px`+UI 숨김 창 전체 채움 폴백 토글)
 
 ## 4. UI/UX 상태 전이 및 디자인 규칙 (UI States & Design Rules)
 - **Idle 자동 숨김 및 수동 숨김 상태 (`.disagall-idle`, `.disagall-ui-hidden`)**:
@@ -58,3 +73,4 @@
 - **이미지 드래그 팬(Pan)**: 1.0배율 초과 확대 시 드래그 중(`isDragging === true`)에는 마우스 커서(`grabbing`) 유지 및 자동 숨김 방지
 - **전체화면(`F`) 상태에서 ESC 키 입력**: 브라우저 기본 동작으로 Fullscreen이 먼저 해제되며, 뷰어 자체는 열려 있는 상태를 유지
 - **토글 비활성화(`autoHideUi === false`)**: 유휴 자동 숨김은 작동하지 않으나, 단축키 `H`를 통한 수동 숨김은 언제든 사용 가능
+- **한글 IME 및 슬라이더 포커스 보호**: `KEY_ACTIONS[e.key]` 외 `CODE_ACTIONS[e.code]` 폴백을 지원하여 한글 입력기(`ㄹ`/`ㅗ`/`ㄱ` 등)에서도 단축키가 동작하며, `<input type="range">` 등 비텍스트 입력 컨트롤 포커스 시 단축키를 차단하지 않음

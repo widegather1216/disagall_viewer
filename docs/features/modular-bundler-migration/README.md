@@ -1,8 +1,8 @@
 # 📦 [modular-bundler-migration] 모듈화 및 esbuild 번들러 파이프라인 (Modular Bundler)
 
-- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
+- **현재 상태 (Lifecycle)**: `🩹 Debugging`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 1건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,12 +29,11 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-07 / `interactive-feature-planner` / `modular-bundler-migration` 5대 도메인 위키 표준화 및 문서 정비 완료
+- **직전 완료 작업**: 2026-11-19 / `deep-bug-hunter` / `DEFECT-01`(Safari 확장 번들 v1.0.0 미동기화 및 `#disagall-quick-launcher` CSS 누락) 등록
 - **생성/수정된 핵심 파일**:
   - `build.js`: `esbuild` 기반 멀티 타겟 번들링 스크립트
   - `package.json`: 빌드/테스트/패키징 스크립트 SSOT
 - **검증 완료된 테스트 실행 명령어**:
-  - `npm run build`: 100ms 내 번들 생성 확인
-  - `npm test`: 전체 3개 테스트 스위트 PASS 확인
+  - `npm run build`: `content.js`, `disagall_viewer.user.js` 생성 PASS (Safari 리소스 및 `disagall_viewer.zip` 미동기화 확인)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `content.js` 및 `disagall_viewer.user.js`는 빌드 산출물이므로 절대로 직접 수정하지 말고, 반드시 `src/`와 `content.css`를 수정한 뒤 `npm run build`를 실행할 것.
+  - `DEFECT-01` 해결 시 `content.css`에 `#disagall-quick-launcher` 스타일을 추가하고 `build.js`에서 `safari_extension/.../Resources/`도 자동 동기화하도록 개선할 것.

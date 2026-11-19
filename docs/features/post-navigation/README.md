@@ -1,8 +1,8 @@
 # 📦 [post-navigation] 위/아래 방향키 게시글 탐색 (Post Navigation)
 
-- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
+- **현재 상태 (Lifecycle)**: `🩹 Debugging`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 3건` | `🧐 REFACTOR: 1건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,13 +29,12 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-07 / `interactive-feature-planner` / `post-navigation` 도메인 위키 표준화 및 5대 문서군(`architecture.md`, `spec.md` 등) 정비 완료
+- **직전 완료 작업**: 2026-11-19 / `deep-bug-hunter` / 3-Lens 병렬 헌팅으로 3건 실증 결함 등록 (`DEFECT-02`~`04`: P0 1건, P1 2건)
 - **생성/수정된 핵심 파일**:
   - `src/parser/post_navigator.js`: 게시판 목록 파싱 및 스마트 사진글 스킵 알고리즘
   - `src/controller/viewer_controller.js`: 세션 플래그 설정 및 연속 감상 부트스트랩
-  - `tests/post_navigation.test.js`: 통합 단위 테스트 7종 검증
+  - `src/ui/overlay.js`: 사진 없는 글 안내 바(`showNoPhotoNotice`)
 - **검증 완료된 테스트 실행 명령어**:
-  - `node tests/post_navigation.test.js`: 전 케이스 PASS
+  - `node tests/post_navigation.test.js`: 기존 단위 PASS (`verify_all_bugs.mjs` 프로브로 `DEFECT-02`, `DEFECT-03` 재현 확인)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - 디시 목록에서 현재 글(`crt`)은 글 번호가 빈 문자열(`""`)일 수 있으므로 번호 대신 `crt_icon`이나 `className`으로 판별해야 함.
-  - `sessionStorage` 키는 읽은 직후 `removeItem`하여 새로고침 시 무한 뷰어 오픈 루프를 방지할 것.
+  - `DEFECT-02`(무사진 안내 `keydown` 누수/입력창 가로채기), `DEFECT-03`(하단 경계 `'bottom'` dead code·AD/공지 `innerHTML` 우회·`javascript:` URL), `DEFECT-04`(이동/폴링 타이머 충돌) 수정 및 실제 `src/parser/post_navigator.js` 기반 테스트 연동 필요.

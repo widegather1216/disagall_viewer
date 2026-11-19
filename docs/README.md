@@ -1,14 +1,14 @@
 # 🧭 Disagall Viewer Master Control Tower (Living Wiki Hub)
 
-> **최종 업데이트**: 2026-11-19 (by `atomic-commit-crafter`)
+> **최종 업데이트**: 2026-11-19 (by `deep-bug-hunter`)
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: [`viewer-immersion`](./features/viewer-immersion/README.md)
-- **현재 단계 (Stage)**: `🟢 Sign-Off` (`구현 4/4`, `QA 4/4 (100% — 8/8 Scenarios PASS)`, 감사 티켓 `0건` 완료)
-- **직전 완료 작업**: `viewer-immersion` `REFACTOR-03` 해결·원자적 커밋 완료(`bd57dbd`, `0cf815f`) 및 최종 **`🟢 Sign-Off`** 확정 (`node --check`·`npm test`·`immersion_e2e.test.js` 8/8·`npm run build` PASS)
+- **Active 도메인**: 전 도메인 (`core-viewer`, `post-navigation`, `post-recommend`, `viewer-immersion`, `modular-bundler-migration`)
+- **현재 단계 (Stage)**: `🩹 Debugging` (`신규 실증 결함 12건 OPEN` — P0 4건 / P1 8건)
+- **직전 완료 작업**: `deep-bug-hunter` 3-Lens 병렬 탐색 및 비파괴 프로브(`verify_all_bugs.mjs`)로 테스트 Mock에 가려진 치명적 런타임 결함 12건(`DEFECT` 등록) 발굴 완료
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `npm run pack`으로 배포용 ZIP 패키징 또는 신규 기능 기획(`"새 기능 기획해줘"`)
+  > `디버깅해줘` (`systematic-debugger`로 `core-viewer/DEFECT-01`, `post-navigation/DEFECT-02`, `post-recommend/DEFECT-03`, `viewer-immersion/DEFECT-01` P0 4건부터 순차 수정)
 
 ---
 
@@ -17,11 +17,11 @@
 | 도메인 (Bounded Context) | 생명주기 상태 | 구현 진척도 (Step 1~4) | QA 인수 통과율 | 미해결 티켓 (`🚨D` / `🧐R`) | 최근 작업 요약 |
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 기술 스택/동시성 제약 확립 |
-| [`core-viewer`](./features/core-viewer/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `5/5 (100%)` | `0 / 0` | 본문 이미지 파싱, 화면 맞춤 피팅, 줌앤팬 엔진 문서화 완료 |
-| [`post-navigation`](./features/post-navigation/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `5/5 (100%)` | `0 / 0` | 위/아래 방향키 게시글 탐색 및 연속 감상 모드 문서화 완료 |
-| [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `4/4 (100%)` | `0 / 0` | 뷰어 내 개념글 추천(개추) 연동 및 실시간 카운트 업 문서화 완료 |
-| [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 0` | esbuild 기반 멀티 플랫폼 번들러 파이프라인 문서화 완료 |
-| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `4/4 (100%)` | `0 / 0` | 전체 QA `8/8 PASS`, `REFACTOR-01~03` 전량 해결 및 최종 Sign-Off 완료 |
+| [`core-viewer`](./features/core-viewer/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `2/5 (40%)` | `4 / 0` | `DEFECT-01~04` 등록 (Userscript 재진입, 이미지 레이스, 드래그 닫힘, 지연 로딩 우클릭) |
+| [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `-` | `3 / 1` | `DEFECT-02~04` 등록 (무사진 키누수, `'bottom'` dead code, 이동/폴링 타이머 충돌) |
+| [`post-recommend`](./features/post-recommend/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `3/4 (75%)` | `1 / 0` | `DEFECT-03` 등록 (셀렉터 자가 매칭·오클릭 및 `dispatchRecommendClick` 실패 은폐) |
+| [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `1/3 (33%)` | `1 / 0` | `DEFECT-01` 등록 (Safari v1.0.0 번들 미동기화 및 `#disagall-quick-launcher` CSS 누락) |
+| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🩹 Debugging | `[■■■■■■■■] 8/8` | `4/6 (67%)` | `3 / 0` | `DEFECT-01~03` 등록 (전체화면 Promise 레이스, `mouseleave` 숨김 취소, `defaultPadding` sync) |
 
 *(※ 상태 범례: `📐 Planning` | `🛠️ Implementing` | `🧐 Auditing` | `🧪 QA Testing` | `🩹 Debugging` | `🟢 Sign-Off`)*
 *(※ 미해결 티켓: `🚨D` = Open `DEFECT-xx` 개수, `🧐R` = Open `REFACTOR-xx` 개수)*
@@ -29,6 +29,12 @@
 ---
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
+
+- **`[2026-11-19]` `[atomic-commit-crafter]` [전 도메인]**: `36851e1` (`feat(immersion)` ADR-05/06), `a7bc857` (`test(immersion)` 26개 단위/14개 E2E), 위키·결함 티켓 문서 원자적 커밋 및 핸드오프 동기화 완료.
+- **`[2026-11-19]` `[deep-bug-hunter]` [전 도메인]**: 3-Lens 병렬 적대적 결함 헌팅 및 실증 프로빙 완료 — 5개 도메인(`core-viewer`, `post-navigation`, `post-recommend`, `viewer-immersion`, `modular-bundler-migration`)에 총 12건의 실증 `DEFECT` 티켓 등록 및 관제판 `🩹 Debugging` 전환.
+- **`[2026-11-19]` [`viewer-immersion`]**: `ADR-06` 전체화면 모드 UX(`#disagall-btn-fullscreen` 헤더 버튼, `fullscreenchange` 동기화, 임시 여백 `0px`+즉시 UI 숨김, 팝업 `#auto-fullscreen-toggle` 및 User Gesture 차단 폴백) 구현, 문서 `[As-Is]` 승격 및 `npm run build`·`npm test`(25/25)·`immersion_e2e.test.js`(14/14) PASS.
+
+- **`[2026-11-19]` [`viewer-immersion`]**: `ADR-05` UI 숨김 시 사진 영역 확장(`content.css` 헤더/푸터 절대 배치 및 스테이지 패딩 트랜지션, `overlay.js` 동적 피팅, `immersion_controller.js`/`zoom_pan.js` 줌 보호·동기화) 구현, 문서 `[As-Is]` 승격 및 `npm run build`·`npm test`(22/22)·`immersion_e2e.test.js`(11/11) PASS.
 
 - **`[2026-11-19]` `[atomic-commit-crafter]` [`viewer-immersion`]**: `bd57dbd`, `0cf815f` 커밋 완료 — `REFACTOR-03` (`popup.js` 분할·디바운스·타입 가드) 반영 및 최종 **`🟢 Sign-Off`** 확정.
 - **`[2026-11-19]` `[systematic-debugger]` [`viewer-immersion`]**: `REFACTOR-03` 해결 및 최종 **`🟢 Sign-Off`** 전환 — `popup.js` 헬퍼 분할·`onChanged` 타입/키 삭제 가드·슬라이더 250ms 디바운스/`change` 저장 보강 (`node --check`·`npm test`·`immersion_e2e.test.js` 8/8·`npm run build` PASS).

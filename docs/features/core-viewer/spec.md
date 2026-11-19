@@ -36,6 +36,7 @@
 - `availableWidth = Math.max(100, window.innerWidth - (currentPadding * 2))`
 - `scale = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight)`
 - `targetWidth = Math.round(naturalWidth * scale)`, `targetHeight = Math.round(naturalHeight * scale)`
+- *(🟢 As-Is 연동: [`viewer-immersion` ADR-05](../viewer-immersion/decisions.md)에 따라 `.disagall-idle` / `.disagall-ui-hidden` 상태에서는 `headerHeight = 0`, `footerHeight = 0`으로 확장 계산)*
 
 ### 3.2 줌앤팬 제스처 및 렌더링 규격
 - **스케일 한도**: `1.0x` ~ `5.0x` (휠 1회당 `±0.15`)
