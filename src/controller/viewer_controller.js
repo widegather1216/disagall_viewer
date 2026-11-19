@@ -17,16 +17,51 @@ import {
 } from '../ui/overlay.js';
 import { resetZoom, setupZoomEvents } from '../ui/zoom_pan.js';
 import { triggerPostRecommend, updateRecommendButtonUi } from './recommend_controller.js';
+import {
+  isOverlayActive,
+  clearIdleTimer,
+  resetImmersionGuards,
+  showUi,
+  hideUi,
+  resetIdleTimer,
+  toggleUiManual,
+  getFullscreenElement,
+  exitFullscreenSafely,
+  toggleFullscreen,
+  applyAutoHideUiSetting,
+  initImmersionSettings,
+  bindImmersionEvents
+} from './immersion_controller.js';
+
+export {
+  clearIdleTimer,
+  showUi,
+  hideUi,
+  resetIdleTimer,
+  toggleUiManual,
+  exitFullscreenSafely,
+  toggleFullscreen,
+  applyAutoHideUiSetting,
+  initImmersionSettings
+};
+
+const PADDING_SAVE_DEBOUNCE_MS = 250;
+let paddingSaveTimer = null;
+
+function resolveLazyOriginalUrl(img) {
+  const attrUrl = img.getAttribute('data-original') || img.getAttribute('data-src') || img.getAttribute('data-url');
+  if (attrUrl) return attrUrl;
+  if (!img.dataset) return null;
+  return img.dataset.original || img.dataset.src || img.dataset.url || null;
+}
 
 export function forcePreloadPostImages() {
   const imgs = document.querySelectorAll(`${POST_BODY_CONTAINER_SELECTORS} img, img`);
-  imgs.forEach(img => {
+  imgs.forEach((img) => {
     if (!isPostBodyImage(img)) return;
-    const orig = img.getAttribute('data-original') ||
-                 img.getAttribute('data-src') ||
-                 img.getAttribute('data-url') ||
-                 (img.dataset ? (img.dataset.original || img.dataset.src || img.dataset.url) : null);
-    if (orig && (img.src.includes('loading') || img.src.includes('blank.gif') || img.classList.contains('lazy'))) {
+    const orig = resolveLazyOriginalUrl(img);
+    const needsPreload = img.src.includes('loading') || img.src.includes('blank.gif') || img.classList.contains('lazy');
+    if (orig && needsPreload) {
       img.src = orig;
       img.classList.remove('lazy');
     }
@@ -35,7 +70,9 @@ export function forcePreloadPostImages() {
   try {
     window.dispatchEvent(new Event('scroll'));
     window.dispatchEvent(new Event('resize'));
-  } catch (e) {}
+  } catch (e) {
+    // Non-fatal: synthetic window event dispatch may fail in restricted DOM environments
+  }
 }
 
 export function collectPostImages() {
@@ -43,26 +80,34 @@ export function collectPostImages() {
   return state.postImages;
 }
 
+function updateNavAndCounterUi() {
+  const { counterEl, prevBtnEl, nextBtnEl } = state.elements;
+  const total = state.postImages.length;
+  if (counterEl) {
+    counterEl.textContent = `${state.currentIndex + 1} / ${total}`;
+  }
+  if (prevBtnEl) prevBtnEl.classList.toggle('disabled', total <= 1);
+  if (nextBtnEl) nextBtnEl.classList.toggle('disabled', total <= 1);
+}
+
+function renderViewerImage(mainImgEl, loaderEl, src, alt) {
+  if (!mainImgEl) return;
+  mainImgEl.src = src;
+  mainImgEl.alt = alt;
+  if (loaderEl) loaderEl.style.display = 'none';
+  mainImgEl.style.opacity = '1';
+  applyFittingAndPadding();
+}
+
 export function showImage(index) {
   if (state.postImages.length === 0) return;
 
   resetZoom();
-
   state.currentIndex = (index + state.postImages.length) % state.postImages.length;
+  updateNavAndCounterUi();
+
   const imgData = state.postImages[state.currentIndex];
-  const { counterEl, prevBtnEl, nextBtnEl, loaderEl, mainImgEl } = state.elements;
-
-  if (counterEl) {
-    counterEl.textContent = `${state.currentIndex + 1} / ${state.postImages.length}`;
-  }
-
-  if (prevBtnEl) {
-    prevBtnEl.classList.toggle('disabled', state.postImages.length <= 1);
-  }
-  if (nextBtnEl) {
-    nextBtnEl.classList.toggle('disabled', state.postImages.length <= 1);
-  }
-
+  const { loaderEl, mainImgEl } = state.elements;
   if (loaderEl) loaderEl.style.display = 'flex';
   if (mainImgEl) {
     mainImgEl.style.opacity = '0';
@@ -71,28 +116,11 @@ export function showImage(index) {
 
   const tempImg = new Image();
   tempImg.referrerPolicy = 'no-referrer-when-downgrade';
-
-  tempImg.onload = () => {
-    if (mainImgEl) {
-      mainImgEl.src = tempImg.src;
-      mainImgEl.alt = imgData.alt;
-      if (loaderEl) loaderEl.style.display = 'none';
-      mainImgEl.style.opacity = '1';
-      applyFittingAndPadding();
-    }
-  };
-
+  tempImg.onload = () => renderViewerImage(mainImgEl, loaderEl, tempImg.src, imgData.alt);
   tempImg.onerror = () => {
-    if (mainImgEl) {
-      const fallbackSrc = (imgData.element && (imgData.element.currentSrc || imgData.element.src)) || imgData.url;
-      mainImgEl.src = fallbackSrc;
-      mainImgEl.alt = imgData.alt;
-      if (loaderEl) loaderEl.style.display = 'none';
-      mainImgEl.style.opacity = '1';
-      applyFittingAndPadding();
-    }
+    const fallbackSrc = (imgData.element && (imgData.element.currentSrc || imgData.element.src)) || imgData.url;
+    renderViewerImage(mainImgEl, loaderEl, fallbackSrc, imgData.alt);
   };
-
   tempImg.src = imgData.url;
 }
 
@@ -102,242 +130,30 @@ export function navigate(direction) {
 
 export function navigatePost(direction) {
   const result = getAdjacentPostUrl(direction);
-
   if (!result) {
     showViewerToast('이동할 수 있는 게시글 목록을 찾을 수 없습니다.');
     return;
   }
-
   if (result.error) {
     showViewerToast(result.message);
     return;
   }
+  if (!result.url) return;
 
-  if (result.url) {
-    const label = direction === 'up' ? '위쪽 최신 글' : '아래쪽 이전 글';
-    const photoHint = result.hasPhoto ? ' 📷' : '';
-    const titleHint = result.title ? ` (${result.title.length > 12 ? result.title.slice(0, 12) + '...' : result.title})` : '';
-    showViewerToast(`${label}로 이동 중...${photoHint}${titleHint}`);
+  const label = direction === 'up' ? '위쪽 최신 글' : '아래쪽 이전 글';
+  const photoHint = result.hasPhoto ? ' 📷' : '';
+  const titleHint = result.title ? ` (${result.title.length > 12 ? result.title.slice(0, 12) + '...' : result.title})` : '';
+  showViewerToast(`${label}로 이동 중...${photoHint}${titleHint}`);
 
-    try {
-      sessionStorage.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, '1');
-    } catch (e) {}
-
-    setTimeout(() => {
-      window.location.href = result.url;
-    }, CONFIG.POST_NAV_DELAY);
-  }
-}
-
-let isHeaderHovered = false;
-let isSliderInteracting = false;
-let hasBoundStorageSync = false;
-
-function isOverlayActive() {
-  const { overlayEl } = state.elements;
-  return Boolean(overlayEl && overlayEl.classList.contains('active'));
-}
-
-export function clearIdleTimer() {
-  if (state.idleTimer) {
-    clearTimeout(state.idleTimer);
-    state.idleTimer = null;
-  }
-}
-
-function isIdleHideDeferred() {
-  if (state.zoom.isDragging || isSliderInteracting || isHeaderHovered) {
-    return true;
-  }
-  const { overlayEl } = state.elements;
-  if (!overlayEl || typeof overlayEl.querySelector !== 'function') {
-    return false;
-  }
-  const headerEl = overlayEl.querySelector('.disagall-header');
-  if (!headerEl || typeof headerEl.matches !== 'function') {
-    return false;
-  }
   try {
-    return headerEl.matches(':hover');
-  } catch (err) {
-    // Some DOM environments or mock elements do not support :hover selector matching
-    return false;
-  }
-}
-
-export function showUi() {
-  state.isUiHidden = false;
-  const { overlayEl } = state.elements;
-  if (!overlayEl) return;
-
-  overlayEl.classList.remove('disagall-idle');
-  overlayEl.classList.remove('disagall-ui-hidden');
-}
-
-export function hideUi(isManual = false) {
-  if (!isOverlayActive()) return false;
-  const { overlayEl } = state.elements;
-
-  if (isManual) {
-    clearIdleTimer();
-    state.isUiHidden = true;
-    overlayEl.classList.remove('disagall-idle');
-    overlayEl.classList.add('disagall-ui-hidden');
-    return true;
+    sessionStorage.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, '1');
+  } catch (e) {
+    // Non-fatal: sessionStorage may be blocked under browser privacy or sandbox policies
   }
 
-  if (!state.autoHideUi || state.isUiHidden) return false;
-  if (isIdleHideDeferred()) {
-    resetIdleTimer();
-    return false;
-  }
-
-  overlayEl.classList.add('disagall-idle');
-  return true;
-}
-
-export function resetIdleTimer() {
-  clearIdleTimer();
-  if (!isOverlayActive()) return;
-
-  const { overlayEl } = state.elements;
-  if (
-    state.isUiHidden ||
-    overlayEl.classList.contains('disagall-idle') ||
-    overlayEl.classList.contains('disagall-ui-hidden')
-  ) {
-    showUi();
-  }
-
-  if (!state.autoHideUi) return;
-
-  state.idleTimer = setTimeout(() => {
-    state.idleTimer = null;
-    hideUi(false);
-  }, CONFIG.UI_IDLE_TIMEOUT);
-}
-
-export function toggleUiManual() {
-  if (!isOverlayActive()) return false;
-  const { overlayEl } = state.elements;
-
-  const isHidden =
-    state.isUiHidden ||
-    overlayEl.classList.contains('disagall-idle') ||
-    overlayEl.classList.contains('disagall-ui-hidden');
-
-  if (isHidden) {
-    showUi();
-    resetIdleTimer();
-    return false;
-  }
-
-  return hideUi(true);
-}
-
-function getFullscreenElement() {
-  if (typeof document === 'undefined') return null;
-  return document.fullscreenElement || document.webkitFullscreenElement || null;
-}
-
-function handleFullscreenPromise(result) {
-  if (result && typeof result.catch === 'function') {
-    result.catch((err) => {
-      // Browser may reject fullscreen transitions outside direct user gestures
-      return err;
-    });
-  }
-}
-
-export function exitFullscreenSafely() {
-  if (!getFullscreenElement()) return false;
-  try {
-    if (typeof document.exitFullscreen === 'function') {
-      handleFullscreenPromise(document.exitFullscreen());
-      return true;
-    }
-    if (typeof document.webkitExitFullscreen === 'function') {
-      handleFullscreenPromise(document.webkitExitFullscreen());
-      return true;
-    }
-  } catch (err) {
-    // Safely ignore unsupported or disallowed fullscreen exit errors
-    return false;
-  }
-  return false;
-}
-
-export function toggleFullscreen() {
-  if (!isOverlayActive()) return false;
-  if (getFullscreenElement()) {
-    return exitFullscreenSafely();
-  }
-
-  const { overlayEl } = state.elements;
-  try {
-    if (typeof overlayEl.requestFullscreen === 'function') {
-      handleFullscreenPromise(overlayEl.requestFullscreen());
-      return true;
-    }
-    if (typeof overlayEl.webkitRequestFullscreen === 'function') {
-      handleFullscreenPromise(overlayEl.webkitRequestFullscreen());
-      return true;
-    }
-  } catch (err) {
-    // Safely ignore unsupported or disallowed fullscreen request errors
-    return false;
-  }
-  return false;
-}
-
-export function applyAutoHideUiSetting(enabled) {
-  state.autoHideUi = Boolean(enabled);
-  if (!isOverlayActive()) return;
-
-  const { overlayEl } = state.elements;
-  if (!state.autoHideUi) {
-    clearIdleTimer();
-    if (overlayEl.classList.contains('disagall-idle') && !state.isUiHidden) {
-      showUi();
-    }
-    return;
-  }
-
-  if (!state.isUiHidden) {
-    resetIdleTimer();
-  }
-}
-
-export function initImmersionSettings() {
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.get === 'function') {
-    chrome.storage.sync.get({ [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: true }, (result) => {
-      if (result && typeof result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI] === 'boolean') {
-        applyAutoHideUiSetting(result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI]);
-      }
-    });
-  } else if (typeof GM_getValue === 'function') {
-    const savedAutoHide = GM_getValue(CONFIG.STORAGE_KEY_AUTO_HIDE_UI, true);
-    if (typeof savedAutoHide === 'boolean') {
-      applyAutoHideUiSetting(savedAutoHide);
-    }
-  }
-
-  if (
-    !hasBoundStorageSync &&
-    typeof chrome !== 'undefined' &&
-    chrome.storage &&
-    chrome.storage.onChanged &&
-    typeof chrome.storage.onChanged.addListener === 'function'
-  ) {
-    hasBoundStorageSync = true;
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== 'sync' || !changes) return;
-      const change = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
-      if (change && typeof change.newValue === 'boolean') {
-        applyAutoHideUiSetting(change.newValue);
-      }
-    });
-  }
+  setTimeout(() => {
+    window.location.href = result.url;
+  }, CONFIG.POST_NAV_DELAY);
 }
 
 export const KEY_ACTIONS = {
@@ -408,44 +224,81 @@ export function handleKeyDown(e) {
   }
 }
 
-function bindImmersionEvents(overlayEl, sliderEl) {
-  overlayEl.addEventListener('mousemove', () => {
+function persistPaddingSetting() {
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.set === 'function') {
+    chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: state.currentPadding });
+    return;
+  }
+  if (typeof GM_setValue === 'function') {
+    GM_setValue(CONFIG.STORAGE_KEY_PADDING, state.currentPadding);
+  }
+}
+
+function clearPaddingSaveTimer() {
+  if (!paddingSaveTimer) return false;
+  clearTimeout(paddingSaveTimer);
+  paddingSaveTimer = null;
+  return true;
+}
+
+function schedulePaddingSave() {
+  clearPaddingSaveTimer();
+  paddingSaveTimer = setTimeout(() => {
+    paddingSaveTimer = null;
+    persistPaddingSetting();
+  }, PADDING_SAVE_DEBOUNCE_MS);
+}
+
+function flushPaddingSave() {
+  if (clearPaddingSaveTimer()) {
+    persistPaddingSetting();
+  }
+}
+
+function bindStopPropagationClick(el, handler) {
+  if (!el) return;
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    handler();
+  });
+}
+
+function bindOverlayButtons() {
+  const { prevBtnEl, nextBtnEl, recommendBtnEl } = state.elements;
+  const closeBtnEl = document.getElementById('disagall-close-btn');
+  if (closeBtnEl) {
+    closeBtnEl.addEventListener('click', closeViewer);
+  }
+  bindStopPropagationClick(recommendBtnEl, triggerPostRecommend);
+  bindStopPropagationClick(prevBtnEl, () => navigate(-1));
+  bindStopPropagationClick(nextBtnEl, () => navigate(1));
+}
+
+function bindPaddingSlider(sliderEl, sliderValEl) {
+  if (!sliderEl) return;
+
+  sliderEl.addEventListener('input', (e) => {
+    const nextPadding = parseInt(e.target.value, 10);
+    if (Number.isNaN(nextPadding)) return;
+    state.currentPadding = nextPadding;
+    if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
+    applyFittingAndPadding();
     resetIdleTimer();
+    schedulePaddingSave();
   });
 
-  const headerEl = typeof overlayEl.querySelector === 'function'
-    ? overlayEl.querySelector('.disagall-header')
-    : null;
-  if (headerEl) {
-    headerEl.addEventListener('mouseenter', () => {
-      isHeaderHovered = true;
-    });
-    headerEl.addEventListener('mouseleave', () => {
-      isHeaderHovered = false;
-      resetIdleTimer();
-    });
-  }
+  sliderEl.addEventListener('change', () => {
+    clearPaddingSaveTimer();
+    persistPaddingSetting();
+  });
+}
 
-  if (sliderEl) {
-    const startSliderInteraction = () => {
-      isSliderInteracting = true;
-      resetIdleTimer();
-    };
-    const endSliderInteraction = () => {
-      if (!isSliderInteracting) return;
-      isSliderInteracting = false;
-      resetIdleTimer();
-    };
-
-    sliderEl.addEventListener('mousedown', startSliderInteraction);
-    sliderEl.addEventListener('touchstart', startSliderInteraction, { passive: true });
-    sliderEl.addEventListener('change', endSliderInteraction);
-    sliderEl.addEventListener('mouseup', endSliderInteraction);
-    sliderEl.addEventListener('touchend', endSliderInteraction);
-    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-      window.addEventListener('mouseup', endSliderInteraction);
+function bindOverlayBackdrop(overlayEl) {
+  overlayEl.addEventListener('click', (e) => {
+    if (e.target === overlayEl || e.target.id === 'disagall-stage' || e.target.id === 'disagall-img-wrapper') {
+      closeViewer();
     }
-  }
+  });
 }
 
 export function createOverlay() {
@@ -455,61 +308,25 @@ export function createOverlay() {
   overlay.id = 'disagall-viewer-overlay';
   overlay.innerHTML = buildOverlayHtml();
   document.body.appendChild(overlay);
-
   cacheOverlayElements();
 
-  const { overlayEl, mainImgEl, prevBtnEl, nextBtnEl, sliderEl, sliderValEl, recommendBtnEl } = state.elements;
-
-  const closeBtnEl = document.getElementById('disagall-close-btn');
-  if (closeBtnEl) {
-    closeBtnEl.addEventListener('click', closeViewer);
-  }
-
-  if (recommendBtnEl) {
-    recommendBtnEl.addEventListener('click', (e) => {
-      e.stopPropagation();
-      triggerPostRecommend();
-    });
-  }
-
-  if (prevBtnEl) {
-    prevBtnEl.addEventListener('click', (e) => {
-      e.stopPropagation();
-      navigate(-1);
-    });
-  }
-
-  if (nextBtnEl) {
-    nextBtnEl.addEventListener('click', (e) => {
-      e.stopPropagation();
-      navigate(1);
-    });
-  }
-
-  if (sliderEl) {
-    sliderEl.addEventListener('input', (e) => {
-      state.currentPadding = parseInt(e.target.value, 10);
-      if (sliderValEl) sliderValEl.textContent = state.currentPadding + 'px';
-      applyFittingAndPadding();
-      resetIdleTimer();
-
-      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-        chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: state.currentPadding });
-      } else if (typeof GM_setValue !== 'undefined') {
-        GM_setValue(CONFIG.STORAGE_KEY_PADDING, state.currentPadding);
-      }
-    });
-  }
-
-  overlayEl.addEventListener('click', (e) => {
-    if (e.target === overlayEl || e.target.id === 'disagall-stage' || e.target.id === 'disagall-img-wrapper') {
-      closeViewer();
-    }
-  });
-
+  const { overlayEl, mainImgEl, sliderEl, sliderValEl } = state.elements;
+  bindOverlayButtons();
+  bindPaddingSlider(sliderEl, sliderValEl);
+  bindOverlayBackdrop(overlayEl);
   bindImmersionEvents(overlayEl, sliderEl);
   setupZoomEvents(mainImgEl);
   window.addEventListener('keydown', handleKeyDown, true);
+}
+
+function findTargetImageIndex(targetSrc) {
+  const searchUrl = targetSrc ? getCleanOriginalUrl(targetSrc) : state.lastRightClickedImgSrc;
+  if (!searchUrl) return 0;
+
+  const foundIdx = state.postImages.findIndex(
+    (item) => item.url === searchUrl || searchUrl.includes(item.url) || item.url.includes(searchUrl)
+  );
+  return foundIdx !== -1 ? foundIdx : 0;
 }
 
 export function openViewer(targetSrc, isAuto = false) {
@@ -518,23 +335,14 @@ export function openViewer(targetSrc, isAuto = false) {
 
   if (state.postImages.length === 0) {
     if (!isAuto) {
-      alert("디시 사진 뷰어: 게시글 본문에서 감상 가능한 이미지를 찾지 못했습니다.");
+      alert('디시 사진 뷰어: 게시글 본문에서 감상 가능한 이미지를 찾지 못했습니다.');
     }
     return;
   }
 
   createOverlay();
 
-  let targetIndex = 0;
-  const searchUrl = targetSrc ? getCleanOriginalUrl(targetSrc) : state.lastRightClickedImgSrc;
-
-  if (searchUrl) {
-    const foundIdx = state.postImages.findIndex(item => item.url === searchUrl || searchUrl.includes(item.url) || item.url.includes(searchUrl));
-    if (foundIdx !== -1) {
-      targetIndex = foundIdx;
-    }
-  }
-
+  const targetIndex = findTargetImageIndex(targetSrc);
   const { overlayEl } = state.elements;
   overlayEl.classList.add('active');
   state.previousBodyOverflow = document.body.style.overflow;
@@ -548,8 +356,8 @@ export function openViewer(targetSrc, isAuto = false) {
 
 export function closeViewer() {
   clearIdleTimer();
-  isHeaderHovered = false;
-  isSliderInteracting = false;
+  flushPaddingSave();
+  resetImmersionGuards();
   showUi();
   resetZoom();
 
@@ -562,69 +370,82 @@ export function closeViewer() {
   exitFullscreenSafely();
 }
 
+function startAutoOpenPolling() {
+  let attempts = 0;
+  const maxAttempts = CONFIG.AUTO_OPEN_MAX_ATTEMPTS;
+  const pollTimer = setInterval(() => {
+    attempts++;
+    forcePreloadPostImages();
+    collectPostImages();
+
+    if (state.postImages.length > 0) {
+      clearInterval(pollTimer);
+      openViewer(null, true);
+      return;
+    }
+    if (attempts >= maxAttempts) {
+      clearInterval(pollTimer);
+      showNoPhotoNotice((dir) => navigatePost(dir));
+    }
+  }, CONFIG.AUTO_OPEN_POLL_INTERVAL);
+}
+
 export function checkAutoOpen() {
   try {
     const autoOpen = sessionStorage.getItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
-    if (autoOpen === '1') {
-      sessionStorage.removeItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
-
-      let attempts = 0;
-      const maxAttempts = CONFIG.AUTO_OPEN_MAX_ATTEMPTS;
-      const pollTimer = setInterval(() => {
-        attempts++;
-        forcePreloadPostImages();
-        collectPostImages();
-
-        if (state.postImages.length > 0) {
-          clearInterval(pollTimer);
-          openViewer(null, true);
-        } else if (attempts >= maxAttempts) {
-          clearInterval(pollTimer);
-          showNoPhotoNotice((dir) => navigatePost(dir));
-        }
-      }, CONFIG.AUTO_OPEN_POLL_INTERVAL);
-    }
-  } catch (e) {}
+    if (autoOpen !== '1') return;
+    sessionStorage.removeItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
+    startAutoOpenPolling();
+  } catch (e) {
+    // Non-fatal: sessionStorage access may be blocked under strict privacy/sandbox policies
+  }
 }
 
-export function initViewerBase() {
-  initImmersionSettings();
-
-  // Contextmenu listener for right clicked images
+function bindContextMenuTracker() {
   document.addEventListener('contextmenu', (e) => {
     const target = e.target;
     if (target && target.tagName === 'IMG' && isPostBodyImage(target)) {
       state.lastRightClickedImgSrc = getCleanOriginalUrl(target.src);
-    } else {
-      state.lastRightClickedImgSrc = null;
+      return;
     }
+    state.lastRightClickedImgSrc = null;
   }, true);
+}
 
-  // Window resize listener
+function bindResizeHandler() {
   let resizeRafId = null;
   window.addEventListener('resize', () => {
     const { overlayEl } = state.elements;
-    if (overlayEl && overlayEl.classList.contains('active')) {
-      if (resizeRafId) cancelAnimationFrame(resizeRafId);
-      resizeRafId = requestAnimationFrame(() => {
-        applyFittingAndPadding();
-        resizeRafId = null;
-      });
-    }
+    if (!overlayEl || !overlayEl.classList.contains('active')) return;
+    if (resizeRafId) cancelAnimationFrame(resizeRafId);
+    resizeRafId = requestAnimationFrame(() => {
+      applyFittingAndPadding();
+      resizeRafId = null;
+    });
   });
+}
 
-  // Test open listener
+function bindTestOpenListener() {
   window.addEventListener('message', (event) => {
     if (event.origin && event.origin !== window.location.origin && window.location.origin !== 'null') return;
     if (event.data && event.data.action === 'disagall_test_open') {
       openViewer();
     }
   });
+}
 
-  // Auto open trigger
+function bindAutoOpenTrigger() {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', checkAutoOpen);
-  } else {
-    checkAutoOpen();
+    return;
   }
+  checkAutoOpen();
+}
+
+export function initViewerBase() {
+  initImmersionSettings();
+  bindContextMenuTracker();
+  bindResizeHandler();
+  bindTestOpenListener();
+  bindAutoOpenTrigger();
 }

@@ -755,97 +755,7 @@
     }
   }
 
-  // src/controller/viewer_controller.js
-  function forcePreloadPostImages() {
-    const imgs = document.querySelectorAll(`${POST_BODY_CONTAINER_SELECTORS} img, img`);
-    imgs.forEach((img) => {
-      if (!isPostBodyImage(img)) return;
-      const orig = img.getAttribute("data-original") || img.getAttribute("data-src") || img.getAttribute("data-url") || (img.dataset ? img.dataset.original || img.dataset.src || img.dataset.url : null);
-      if (orig && (img.src.includes("loading") || img.src.includes("blank.gif") || img.classList.contains("lazy"))) {
-        img.src = orig;
-        img.classList.remove("lazy");
-      }
-    });
-    try {
-      window.dispatchEvent(new Event("scroll"));
-      window.dispatchEvent(new Event("resize"));
-    } catch (e) {
-    }
-  }
-  function collectPostImages() {
-    state.postImages = extractPostImages(document);
-    return state.postImages;
-  }
-  function showImage(index) {
-    if (state.postImages.length === 0) return;
-    resetZoom();
-    state.currentIndex = (index + state.postImages.length) % state.postImages.length;
-    const imgData = state.postImages[state.currentIndex];
-    const { counterEl, prevBtnEl, nextBtnEl, loaderEl, mainImgEl } = state.elements;
-    if (counterEl) {
-      counterEl.textContent = `${state.currentIndex + 1} / ${state.postImages.length}`;
-    }
-    if (prevBtnEl) {
-      prevBtnEl.classList.toggle("disabled", state.postImages.length <= 1);
-    }
-    if (nextBtnEl) {
-      nextBtnEl.classList.toggle("disabled", state.postImages.length <= 1);
-    }
-    if (loaderEl) loaderEl.style.display = "flex";
-    if (mainImgEl) {
-      mainImgEl.style.opacity = "0";
-      mainImgEl.referrerPolicy = "no-referrer-when-downgrade";
-    }
-    const tempImg = new Image();
-    tempImg.referrerPolicy = "no-referrer-when-downgrade";
-    tempImg.onload = () => {
-      if (mainImgEl) {
-        mainImgEl.src = tempImg.src;
-        mainImgEl.alt = imgData.alt;
-        if (loaderEl) loaderEl.style.display = "none";
-        mainImgEl.style.opacity = "1";
-        applyFittingAndPadding();
-      }
-    };
-    tempImg.onerror = () => {
-      if (mainImgEl) {
-        const fallbackSrc = imgData.element && (imgData.element.currentSrc || imgData.element.src) || imgData.url;
-        mainImgEl.src = fallbackSrc;
-        mainImgEl.alt = imgData.alt;
-        if (loaderEl) loaderEl.style.display = "none";
-        mainImgEl.style.opacity = "1";
-        applyFittingAndPadding();
-      }
-    };
-    tempImg.src = imgData.url;
-  }
-  function navigate(direction) {
-    showImage(state.currentIndex + direction);
-  }
-  function navigatePost(direction) {
-    const result = getAdjacentPostUrl(direction);
-    if (!result) {
-      showViewerToast("\uC774\uB3D9\uD560 \uC218 \uC788\uB294 \uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
-      return;
-    }
-    if (result.error) {
-      showViewerToast(result.message);
-      return;
-    }
-    if (result.url) {
-      const label = direction === "up" ? "\uC704\uCABD \uCD5C\uC2E0 \uAE00" : "\uC544\uB798\uCABD \uC774\uC804 \uAE00";
-      const photoHint = result.hasPhoto ? " \u{1F4F7}" : "";
-      const titleHint = result.title ? ` (${result.title.length > 12 ? result.title.slice(0, 12) + "..." : result.title})` : "";
-      showViewerToast(`${label}\uB85C \uC774\uB3D9 \uC911...${photoHint}${titleHint}`);
-      try {
-        sessionStorage.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, "1");
-      } catch (e) {
-      }
-      setTimeout(() => {
-        window.location.href = result.url;
-      }, CONFIG.POST_NAV_DELAY);
-    }
-  }
+  // src/controller/immersion_controller.js
   var isHeaderHovered = false;
   var isSliderInteracting = false;
   var hasBoundStorageSync = false;
@@ -854,28 +764,33 @@
     return Boolean(overlayEl && overlayEl.classList.contains("active"));
   }
   function clearIdleTimer() {
-    if (state.idleTimer) {
-      clearTimeout(state.idleTimer);
-      state.idleTimer = null;
+    if (!state.idleTimer) return;
+    clearTimeout(state.idleTimer);
+    state.idleTimer = null;
+  }
+  function resetImmersionGuards() {
+    isHeaderHovered = false;
+    isSliderInteracting = false;
+  }
+  function isHeaderCursorHovering() {
+    const { overlayEl } = state.elements;
+    if (!overlayEl || typeof overlayEl.querySelector !== "function") return false;
+    const headerEl = overlayEl.querySelector(".disagall-header");
+    if (!headerEl || typeof headerEl.matches !== "function") return false;
+    try {
+      return headerEl.matches(":hover");
+    } catch (err) {
+      return false;
     }
   }
   function isIdleHideDeferred() {
     if (state.zoom.isDragging || isSliderInteracting || isHeaderHovered) {
       return true;
     }
-    const { overlayEl } = state.elements;
-    if (!overlayEl || typeof overlayEl.querySelector !== "function") {
-      return false;
-    }
-    const headerEl = overlayEl.querySelector(".disagall-header");
-    if (!headerEl || typeof headerEl.matches !== "function") {
-      return false;
-    }
-    try {
-      return headerEl.matches(":hover");
-    } catch (err) {
-      return false;
-    }
+    return isHeaderCursorHovering();
+  }
+  function isAnyUiHiddenClass(overlayEl) {
+    return state.isUiHidden || overlayEl.classList.contains("disagall-idle") || overlayEl.classList.contains("disagall-ui-hidden");
   }
   function showUi() {
     state.isUiHidden = false;
@@ -906,7 +821,7 @@
     clearIdleTimer();
     if (!isOverlayActive()) return;
     const { overlayEl } = state.elements;
-    if (state.isUiHidden || overlayEl.classList.contains("disagall-idle") || overlayEl.classList.contains("disagall-ui-hidden")) {
+    if (isAnyUiHiddenClass(overlayEl)) {
       showUi();
     }
     if (!state.autoHideUi) return;
@@ -918,8 +833,7 @@
   function toggleUiManual() {
     if (!isOverlayActive()) return false;
     const { overlayEl } = state.elements;
-    const isHidden = state.isUiHidden || overlayEl.classList.contains("disagall-idle") || overlayEl.classList.contains("disagall-ui-hidden");
-    if (isHidden) {
+    if (isAnyUiHiddenClass(overlayEl)) {
       showUi();
       resetIdleTimer();
       return false;
@@ -931,11 +845,10 @@
     return document.fullscreenElement || document.webkitFullscreenElement || null;
   }
   function handleFullscreenPromise(result) {
-    if (result && typeof result.catch === "function") {
-      result.catch((err) => {
-        return err;
-      });
-    }
+    if (!result || typeof result.catch !== "function") return;
+    result.catch((err) => {
+      return err;
+    });
   }
   function exitFullscreenSafely() {
     if (!getFullscreenElement()) return false;
@@ -988,29 +901,172 @@
       resetIdleTimer();
     }
   }
-  function initImmersionSettings() {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.get === "function") {
+  function loadInitialAutoHideSetting() {
+    const hasChromeSync = typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.get === "function";
+    if (hasChromeSync) {
       chrome.storage.sync.get({ [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: true }, (result) => {
         if (result && typeof result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI] === "boolean") {
           applyAutoHideUiSetting(result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI]);
         }
       });
-    } else if (typeof GM_getValue === "function") {
+      return;
+    }
+    if (typeof GM_getValue === "function") {
       const savedAutoHide = GM_getValue(CONFIG.STORAGE_KEY_AUTO_HIDE_UI, true);
       if (typeof savedAutoHide === "boolean") {
         applyAutoHideUiSetting(savedAutoHide);
       }
     }
-    if (!hasBoundStorageSync && typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.addListener === "function") {
-      hasBoundStorageSync = true;
-      chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName !== "sync" || !changes) return;
-        const change = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
-        if (change && typeof change.newValue === "boolean") {
-          applyAutoHideUiSetting(change.newValue);
-        }
-      });
+  }
+  function bindAutoHideStorageListener() {
+    const canBindListener = !hasBoundStorageSync && typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.addListener === "function";
+    if (!canBindListener) return;
+    hasBoundStorageSync = true;
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "sync" || !changes) return;
+      const change = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
+      if (change && typeof change.newValue === "boolean") {
+        applyAutoHideUiSetting(change.newValue);
+      }
+    });
+  }
+  function initImmersionSettings() {
+    loadInitialAutoHideSetting();
+    bindAutoHideStorageListener();
+  }
+  function bindHeaderHoverEvents(overlayEl) {
+    if (typeof overlayEl.querySelector !== "function") return;
+    const headerEl = overlayEl.querySelector(".disagall-header");
+    if (!headerEl) return;
+    headerEl.addEventListener("mouseenter", () => {
+      isHeaderHovered = true;
+    });
+    headerEl.addEventListener("mouseleave", () => {
+      isHeaderHovered = false;
+      resetIdleTimer();
+    });
+  }
+  function bindSliderInteractionEvents(sliderEl) {
+    if (!sliderEl) return;
+    const startSliderInteraction = () => {
+      isSliderInteracting = true;
+      resetIdleTimer();
+    };
+    const endSliderInteraction = () => {
+      if (!isSliderInteracting) return;
+      isSliderInteracting = false;
+      resetIdleTimer();
+    };
+    sliderEl.addEventListener("mousedown", startSliderInteraction);
+    sliderEl.addEventListener("touchstart", startSliderInteraction, { passive: true });
+    sliderEl.addEventListener("change", endSliderInteraction);
+    sliderEl.addEventListener("mouseup", endSliderInteraction);
+    sliderEl.addEventListener("touchend", endSliderInteraction);
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+      window.addEventListener("mouseup", endSliderInteraction);
     }
+  }
+  function bindImmersionEvents(overlayEl, sliderEl) {
+    overlayEl.addEventListener("mousemove", () => {
+      resetIdleTimer();
+    });
+    bindHeaderHoverEvents(overlayEl);
+    bindSliderInteractionEvents(sliderEl);
+  }
+
+  // src/controller/viewer_controller.js
+  var PADDING_SAVE_DEBOUNCE_MS = 250;
+  var paddingSaveTimer = null;
+  function resolveLazyOriginalUrl(img) {
+    const attrUrl = img.getAttribute("data-original") || img.getAttribute("data-src") || img.getAttribute("data-url");
+    if (attrUrl) return attrUrl;
+    if (!img.dataset) return null;
+    return img.dataset.original || img.dataset.src || img.dataset.url || null;
+  }
+  function forcePreloadPostImages() {
+    const imgs = document.querySelectorAll(`${POST_BODY_CONTAINER_SELECTORS} img, img`);
+    imgs.forEach((img) => {
+      if (!isPostBodyImage(img)) return;
+      const orig = resolveLazyOriginalUrl(img);
+      const needsPreload = img.src.includes("loading") || img.src.includes("blank.gif") || img.classList.contains("lazy");
+      if (orig && needsPreload) {
+        img.src = orig;
+        img.classList.remove("lazy");
+      }
+    });
+    try {
+      window.dispatchEvent(new Event("scroll"));
+      window.dispatchEvent(new Event("resize"));
+    } catch (e) {
+    }
+  }
+  function collectPostImages() {
+    state.postImages = extractPostImages(document);
+    return state.postImages;
+  }
+  function updateNavAndCounterUi() {
+    const { counterEl, prevBtnEl, nextBtnEl } = state.elements;
+    const total = state.postImages.length;
+    if (counterEl) {
+      counterEl.textContent = `${state.currentIndex + 1} / ${total}`;
+    }
+    if (prevBtnEl) prevBtnEl.classList.toggle("disabled", total <= 1);
+    if (nextBtnEl) nextBtnEl.classList.toggle("disabled", total <= 1);
+  }
+  function renderViewerImage(mainImgEl, loaderEl, src, alt) {
+    if (!mainImgEl) return;
+    mainImgEl.src = src;
+    mainImgEl.alt = alt;
+    if (loaderEl) loaderEl.style.display = "none";
+    mainImgEl.style.opacity = "1";
+    applyFittingAndPadding();
+  }
+  function showImage(index) {
+    if (state.postImages.length === 0) return;
+    resetZoom();
+    state.currentIndex = (index + state.postImages.length) % state.postImages.length;
+    updateNavAndCounterUi();
+    const imgData = state.postImages[state.currentIndex];
+    const { loaderEl, mainImgEl } = state.elements;
+    if (loaderEl) loaderEl.style.display = "flex";
+    if (mainImgEl) {
+      mainImgEl.style.opacity = "0";
+      mainImgEl.referrerPolicy = "no-referrer-when-downgrade";
+    }
+    const tempImg = new Image();
+    tempImg.referrerPolicy = "no-referrer-when-downgrade";
+    tempImg.onload = () => renderViewerImage(mainImgEl, loaderEl, tempImg.src, imgData.alt);
+    tempImg.onerror = () => {
+      const fallbackSrc = imgData.element && (imgData.element.currentSrc || imgData.element.src) || imgData.url;
+      renderViewerImage(mainImgEl, loaderEl, fallbackSrc, imgData.alt);
+    };
+    tempImg.src = imgData.url;
+  }
+  function navigate(direction) {
+    showImage(state.currentIndex + direction);
+  }
+  function navigatePost(direction) {
+    const result = getAdjacentPostUrl(direction);
+    if (!result) {
+      showViewerToast("\uC774\uB3D9\uD560 \uC218 \uC788\uB294 \uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+      return;
+    }
+    if (result.error) {
+      showViewerToast(result.message);
+      return;
+    }
+    if (!result.url) return;
+    const label = direction === "up" ? "\uC704\uCABD \uCD5C\uC2E0 \uAE00" : "\uC544\uB798\uCABD \uC774\uC804 \uAE00";
+    const photoHint = result.hasPhoto ? " \u{1F4F7}" : "";
+    const titleHint = result.title ? ` (${result.title.length > 12 ? result.title.slice(0, 12) + "..." : result.title})` : "";
+    showViewerToast(`${label}\uB85C \uC774\uB3D9 \uC911...${photoHint}${titleHint}`);
+    try {
+      sessionStorage.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, "1");
+    } catch (e) {
+    }
+    setTimeout(() => {
+      window.location.href = result.url;
+    }, CONFIG.POST_NAV_DELAY);
   }
   var KEY_ACTIONS = {
     "Escape": () => {
@@ -1073,39 +1129,72 @@
       action();
     }
   }
-  function bindImmersionEvents(overlayEl, sliderEl) {
-    overlayEl.addEventListener("mousemove", () => {
-      resetIdleTimer();
+  function persistPaddingSetting() {
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.set === "function") {
+      chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: state.currentPadding });
+      return;
+    }
+    if (typeof GM_setValue === "function") {
+      GM_setValue(CONFIG.STORAGE_KEY_PADDING, state.currentPadding);
+    }
+  }
+  function clearPaddingSaveTimer() {
+    if (!paddingSaveTimer) return false;
+    clearTimeout(paddingSaveTimer);
+    paddingSaveTimer = null;
+    return true;
+  }
+  function schedulePaddingSave() {
+    clearPaddingSaveTimer();
+    paddingSaveTimer = setTimeout(() => {
+      paddingSaveTimer = null;
+      persistPaddingSetting();
+    }, PADDING_SAVE_DEBOUNCE_MS);
+  }
+  function flushPaddingSave() {
+    if (clearPaddingSaveTimer()) {
+      persistPaddingSetting();
+    }
+  }
+  function bindStopPropagationClick(el, handler) {
+    if (!el) return;
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handler();
     });
-    const headerEl = typeof overlayEl.querySelector === "function" ? overlayEl.querySelector(".disagall-header") : null;
-    if (headerEl) {
-      headerEl.addEventListener("mouseenter", () => {
-        isHeaderHovered = true;
-      });
-      headerEl.addEventListener("mouseleave", () => {
-        isHeaderHovered = false;
-        resetIdleTimer();
-      });
+  }
+  function bindOverlayButtons() {
+    const { prevBtnEl, nextBtnEl, recommendBtnEl } = state.elements;
+    const closeBtnEl = document.getElementById("disagall-close-btn");
+    if (closeBtnEl) {
+      closeBtnEl.addEventListener("click", closeViewer);
     }
-    if (sliderEl) {
-      const startSliderInteraction = () => {
-        isSliderInteracting = true;
-        resetIdleTimer();
-      };
-      const endSliderInteraction = () => {
-        if (!isSliderInteracting) return;
-        isSliderInteracting = false;
-        resetIdleTimer();
-      };
-      sliderEl.addEventListener("mousedown", startSliderInteraction);
-      sliderEl.addEventListener("touchstart", startSliderInteraction, { passive: true });
-      sliderEl.addEventListener("change", endSliderInteraction);
-      sliderEl.addEventListener("mouseup", endSliderInteraction);
-      sliderEl.addEventListener("touchend", endSliderInteraction);
-      if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
-        window.addEventListener("mouseup", endSliderInteraction);
+    bindStopPropagationClick(recommendBtnEl, triggerPostRecommend);
+    bindStopPropagationClick(prevBtnEl, () => navigate(-1));
+    bindStopPropagationClick(nextBtnEl, () => navigate(1));
+  }
+  function bindPaddingSlider(sliderEl, sliderValEl) {
+    if (!sliderEl) return;
+    sliderEl.addEventListener("input", (e) => {
+      const nextPadding = parseInt(e.target.value, 10);
+      if (Number.isNaN(nextPadding)) return;
+      state.currentPadding = nextPadding;
+      if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
+      applyFittingAndPadding();
+      resetIdleTimer();
+      schedulePaddingSave();
+    });
+    sliderEl.addEventListener("change", () => {
+      clearPaddingSaveTimer();
+      persistPaddingSetting();
+    });
+  }
+  function bindOverlayBackdrop(overlayEl) {
+    overlayEl.addEventListener("click", (e) => {
+      if (e.target === overlayEl || e.target.id === "disagall-stage" || e.target.id === "disagall-img-wrapper") {
+        closeViewer();
       }
-    }
+    });
   }
   function createOverlay() {
     if (state.elements.overlayEl) return;
@@ -1114,50 +1203,21 @@
     overlay.innerHTML = buildOverlayHtml();
     document.body.appendChild(overlay);
     cacheOverlayElements();
-    const { overlayEl, mainImgEl, prevBtnEl, nextBtnEl, sliderEl, sliderValEl, recommendBtnEl } = state.elements;
-    const closeBtnEl = document.getElementById("disagall-close-btn");
-    if (closeBtnEl) {
-      closeBtnEl.addEventListener("click", closeViewer);
-    }
-    if (recommendBtnEl) {
-      recommendBtnEl.addEventListener("click", (e) => {
-        e.stopPropagation();
-        triggerPostRecommend();
-      });
-    }
-    if (prevBtnEl) {
-      prevBtnEl.addEventListener("click", (e) => {
-        e.stopPropagation();
-        navigate(-1);
-      });
-    }
-    if (nextBtnEl) {
-      nextBtnEl.addEventListener("click", (e) => {
-        e.stopPropagation();
-        navigate(1);
-      });
-    }
-    if (sliderEl) {
-      sliderEl.addEventListener("input", (e) => {
-        state.currentPadding = parseInt(e.target.value, 10);
-        if (sliderValEl) sliderValEl.textContent = state.currentPadding + "px";
-        applyFittingAndPadding();
-        resetIdleTimer();
-        if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync) {
-          chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: state.currentPadding });
-        } else if (typeof GM_setValue !== "undefined") {
-          GM_setValue(CONFIG.STORAGE_KEY_PADDING, state.currentPadding);
-        }
-      });
-    }
-    overlayEl.addEventListener("click", (e) => {
-      if (e.target === overlayEl || e.target.id === "disagall-stage" || e.target.id === "disagall-img-wrapper") {
-        closeViewer();
-      }
-    });
+    const { overlayEl, mainImgEl, sliderEl, sliderValEl } = state.elements;
+    bindOverlayButtons();
+    bindPaddingSlider(sliderEl, sliderValEl);
+    bindOverlayBackdrop(overlayEl);
     bindImmersionEvents(overlayEl, sliderEl);
     setupZoomEvents(mainImgEl);
     window.addEventListener("keydown", handleKeyDown, true);
+  }
+  function findTargetImageIndex(targetSrc) {
+    const searchUrl = targetSrc ? getCleanOriginalUrl(targetSrc) : state.lastRightClickedImgSrc;
+    if (!searchUrl) return 0;
+    const foundIdx = state.postImages.findIndex(
+      (item) => item.url === searchUrl || searchUrl.includes(item.url) || item.url.includes(searchUrl)
+    );
+    return foundIdx !== -1 ? foundIdx : 0;
   }
   function openViewer(targetSrc, isAuto = false) {
     forcePreloadPostImages();
@@ -1169,14 +1229,7 @@
       return;
     }
     createOverlay();
-    let targetIndex = 0;
-    const searchUrl = targetSrc ? getCleanOriginalUrl(targetSrc) : state.lastRightClickedImgSrc;
-    if (searchUrl) {
-      const foundIdx = state.postImages.findIndex((item) => item.url === searchUrl || searchUrl.includes(item.url) || item.url.includes(searchUrl));
-      if (foundIdx !== -1) {
-        targetIndex = foundIdx;
-      }
-    }
+    const targetIndex = findTargetImageIndex(targetSrc);
     const { overlayEl } = state.elements;
     overlayEl.classList.add("active");
     state.previousBodyOverflow = document.body.style.overflow;
@@ -1188,8 +1241,8 @@
   }
   function closeViewer() {
     clearIdleTimer();
-    isHeaderHovered = false;
-    isSliderInteracting = false;
+    flushPaddingSave();
+    resetImmersionGuards();
     showUi();
     resetZoom();
     const { overlayEl } = state.elements;
@@ -1199,61 +1252,76 @@
     }
     exitFullscreenSafely();
   }
+  function startAutoOpenPolling() {
+    let attempts = 0;
+    const maxAttempts = CONFIG.AUTO_OPEN_MAX_ATTEMPTS;
+    const pollTimer = setInterval(() => {
+      attempts++;
+      forcePreloadPostImages();
+      collectPostImages();
+      if (state.postImages.length > 0) {
+        clearInterval(pollTimer);
+        openViewer(null, true);
+        return;
+      }
+      if (attempts >= maxAttempts) {
+        clearInterval(pollTimer);
+        showNoPhotoNotice((dir) => navigatePost(dir));
+      }
+    }, CONFIG.AUTO_OPEN_POLL_INTERVAL);
+  }
   function checkAutoOpen() {
     try {
       const autoOpen = sessionStorage.getItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
-      if (autoOpen === "1") {
-        sessionStorage.removeItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
-        let attempts = 0;
-        const maxAttempts = CONFIG.AUTO_OPEN_MAX_ATTEMPTS;
-        const pollTimer = setInterval(() => {
-          attempts++;
-          forcePreloadPostImages();
-          collectPostImages();
-          if (state.postImages.length > 0) {
-            clearInterval(pollTimer);
-            openViewer(null, true);
-          } else if (attempts >= maxAttempts) {
-            clearInterval(pollTimer);
-            showNoPhotoNotice((dir) => navigatePost(dir));
-          }
-        }, CONFIG.AUTO_OPEN_POLL_INTERVAL);
-      }
+      if (autoOpen !== "1") return;
+      sessionStorage.removeItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
+      startAutoOpenPolling();
     } catch (e) {
     }
   }
-  function initViewerBase() {
-    initImmersionSettings();
+  function bindContextMenuTracker() {
     document.addEventListener("contextmenu", (e) => {
       const target = e.target;
       if (target && target.tagName === "IMG" && isPostBodyImage(target)) {
         state.lastRightClickedImgSrc = getCleanOriginalUrl(target.src);
-      } else {
-        state.lastRightClickedImgSrc = null;
+        return;
       }
+      state.lastRightClickedImgSrc = null;
     }, true);
+  }
+  function bindResizeHandler() {
     let resizeRafId = null;
     window.addEventListener("resize", () => {
       const { overlayEl } = state.elements;
-      if (overlayEl && overlayEl.classList.contains("active")) {
-        if (resizeRafId) cancelAnimationFrame(resizeRafId);
-        resizeRafId = requestAnimationFrame(() => {
-          applyFittingAndPadding();
-          resizeRafId = null;
-        });
-      }
+      if (!overlayEl || !overlayEl.classList.contains("active")) return;
+      if (resizeRafId) cancelAnimationFrame(resizeRafId);
+      resizeRafId = requestAnimationFrame(() => {
+        applyFittingAndPadding();
+        resizeRafId = null;
+      });
     });
+  }
+  function bindTestOpenListener() {
     window.addEventListener("message", (event) => {
       if (event.origin && event.origin !== window.location.origin && window.location.origin !== "null") return;
       if (event.data && event.data.action === "disagall_test_open") {
         openViewer();
       }
     });
+  }
+  function bindAutoOpenTrigger() {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", checkAutoOpen);
-    } else {
-      checkAutoOpen();
+      return;
     }
+    checkAutoOpen();
+  }
+  function initViewerBase() {
+    initImmersionSettings();
+    bindContextMenuTracker();
+    bindResizeHandler();
+    bindTestOpenListener();
+    bindAutoOpenTrigger();
   }
 
   // src/extension.js
