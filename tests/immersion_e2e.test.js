@@ -242,6 +242,12 @@ function createDomEnvironment(initialSyncData = { autoHideUi: true, defaultPaddi
       if (!documentListeners[ev]) documentListeners[ev] = [];
       documentListeners[ev].push(fn);
     },
+    dispatchEvent: (evObj) => {
+      const type = typeof evObj === 'string' ? evObj : evObj.type;
+      const payload = typeof evObj === 'string' ? { type } : evObj;
+      const event = { target: doc, preventDefault() {}, stopPropagation() {}, ...payload };
+      (documentListeners[type] || []).forEach((fn) => fn(event));
+    },
     exitFullscreen: () => {
       doc.fullscreenElement = null;
       return Promise.resolve();
@@ -263,12 +269,18 @@ function createDomEnvironment(initialSyncData = { autoHideUi: true, defaultPaddi
           const slider = createElement('input', 'disagall-slider', 'disagall-slider');
           const sliderVal = createElement('span', 'disagall-slider-val', 'disagall-padding-val');
           const recBtn = createElement('button', 'disagall-btn-recommend', 'disagall-btn disagall-btn-recommend');
+          const fullscreenBtn = createElement('button', 'disagall-btn-fullscreen', 'disagall-btn disagall-btn-fullscreen');
+          const fullscreenLabel = createElement('span', '', 'disagall-fullscreen-label');
+          fullscreenLabel.textContent = '전체화면';
+          fullscreenBtn.appendChild(fullscreenLabel);
+          fullscreenBtn.querySelector = (sel) => (sel === 'span' ? fullscreenLabel : null);
           const closeBtn = createElement('button', 'disagall-close-btn', 'disagall-btn disagall-btn-close');
           header.appendChild(counter);
           header.appendChild(infoBadge);
           header.appendChild(slider);
           header.appendChild(sliderVal);
           header.appendChild(recBtn);
+          header.appendChild(fullscreenBtn);
           header.appendChild(closeBtn);
 
           const stage = createElement('div', 'disagall-stage', 'disagall-stage');
@@ -734,6 +746,279 @@ async function run() {
     assert.strictEqual(overlay.classList.contains('disagall-idle'), false, 'TC-NG-02: No ghost .disagall-idle after backdrop close');
 
     console.log('✅ TC-NG-02 PASS: closeViewer (closeBtn/Escape/backdrop/fullscreen) timer cleanup & ghost-callback defense verified');
+  }
+
+  // --- TC-HP-05: UI idle/manual hide expands portrait fitting & stage padding, arrow navigation keeps expanded fit ---
+  {
+    const timers = createFakeTimerEnv();
+    const env = createDomEnvironment({ autoHideUi: true, defaultPadding: 24 });
+    loadContentBundle(env, timers);
+
+    env.win.postMessage({ action: 'disagall_test_open' }, '*');
+    const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const header = overlay.querySelector('.disagall-header');
+    const footer = overlay.querySelector('.disagall-footer');
+    const stage = env.doc.getElementById('disagall-stage');
+    const mainImg = env.doc.getElementById('disagall-main-img');
+
+    header.offsetHeight = 52;
+    footer.offsetHeight = 38;
+    mainImg.naturalWidth = 1000;
+    mainImg.naturalHeight = 2000;
+    env.win.dispatchEvent({ type: 'resize' });
+    timers.advanceBy(20);
+
+    assert.strictEqual(mainImg.style.maxHeight, '662px', 'TC-HP-05: Visible UI must reserve header(52)+footer(38)+padding(48)');
+    assert.strictEqual(stage.style.paddingTop, '52px');
+    assert.strictEqual(stage.style.paddingBottom, '38px');
+
+    // Idle hide -> expands image and clears stage padding while preserving 24px user padding
+    timers.advanceBy(2500);
+    assert.strictEqual(overlay.classList.contains('disagall-idle'), true);
+    assert.strictEqual(mainImg.style.maxHeight, '752px', 'TC-HP-05: Idle hide must expand portrait maxHeight to 752px');
+    assert.strictEqual(mainImg.style.maxWidth, '376px');
+    assert.strictEqual(stage.style.paddingTop, '0px');
+    assert.strictEqual(stage.style.paddingBottom, '0px');
+
+    // ADR-04: ArrowRight while hidden keeps expanded fit for next photo
+    env.win.dispatchEvent({ type: 'keydown', key: 'ArrowRight' });
+    assert.strictEqual(overlay.classList.contains('disagall-idle'), true);
+    assert.strictEqual(mainImg.style.maxHeight, '752px', 'TC-HP-05: Next photo while hidden must keep expanded fit');
+
+    // Mousemove -> restores UI and shrinks back to visible bounds
+    overlay.dispatchEvent({ type: 'mousemove' });
+    assert.strictEqual(overlay.classList.contains('disagall-idle'), false);
+    assert.strictEqual(mainImg.style.maxHeight, '662px');
+    assert.strictEqual(stage.style.paddingTop, '52px');
+    assert.strictEqual(stage.style.paddingBottom, '38px');
+    console.log('✅ TC-HP-05 PASS: Built content.js UI-hidden expansion, ADR-04 persistence & restore verified');
+  }
+
+  // --- TC-BD-03: 0px user padding avoids overlap when UI visible and fills full 800px when UI hidden ---
+  {
+    const timers = createFakeTimerEnv();
+    const env = createDomEnvironment({ autoHideUi: false, defaultPadding: 0 });
+    loadContentBundle(env, timers);
+
+    env.win.postMessage({ action: 'disagall_test_open' }, '*');
+    const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const header = overlay.querySelector('.disagall-header');
+    const footer = overlay.querySelector('.disagall-footer');
+    const stage = env.doc.getElementById('disagall-stage');
+    const mainImg = env.doc.getElementById('disagall-main-img');
+
+    header.offsetHeight = 52;
+    footer.offsetHeight = 38;
+    mainImg.naturalWidth = 1000;
+    mainImg.naturalHeight = 2000;
+    env.win.dispatchEvent({ type: 'resize' });
+    timers.advanceBy(20);
+
+    assert.strictEqual(mainImg.style.maxHeight, '710px', 'TC-BD-03: 0px padding visible UI must fit 800-52-38=710px');
+    assert.strictEqual(stage.style.paddingTop, '52px');
+    assert.strictEqual(stage.style.paddingBottom, '38px');
+
+    env.win.dispatchEvent({ type: 'keydown', key: 'h' });
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true);
+    assert.strictEqual(mainImg.style.maxHeight, '800px', 'TC-BD-03: 0px padding hidden UI must fill full 800px');
+    assert.strictEqual(mainImg.style.maxWidth, '400px');
+    assert.strictEqual(stage.style.paddingTop, '0px');
+    assert.strictEqual(stage.style.paddingBottom, '0px');
+    console.log('✅ TC-BD-03 PASS: Built content.js 0px padding non-overlap & full-bleed expansion verified');
+  }
+
+  // --- TC-BD-04: Zoom > 1.0 locks base size during UI toggle and refits upon reset to 1.0x ---
+  {
+    const timers = createFakeTimerEnv();
+    const env = createDomEnvironment({ autoHideUi: true, defaultPadding: 24 });
+    loadContentBundle(env, timers);
+
+    env.win.postMessage({ action: 'disagall_test_open' }, '*');
+    const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const header = overlay.querySelector('.disagall-header');
+    const footer = overlay.querySelector('.disagall-footer');
+    const stage = env.doc.getElementById('disagall-stage');
+    const mainImg = env.doc.getElementById('disagall-main-img');
+
+    header.offsetHeight = 52;
+    footer.offsetHeight = 38;
+    mainImg.naturalWidth = 1000;
+    mainImg.naturalHeight = 2000;
+    env.win.dispatchEvent({ type: 'resize' });
+    timers.advanceBy(20);
+    assert.strictEqual(mainImg.style.maxHeight, '662px');
+
+    // Double-click to zoom 2.0x -> manual hide (H) must lock 662px base size
+    mainImg.dispatchEvent({ type: 'dblclick' });
+    timers.advanceBy(20);
+    env.win.dispatchEvent({ type: 'keydown', key: 'h' });
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true);
+    assert.strictEqual(mainImg.style.maxHeight, '662px', 'TC-BD-04: Zoomed image must not resize on H hide');
+    assert.strictEqual(stage.style.paddingTop, '52px');
+
+    // Double-click to reset zoom 1.0x while UI still hidden -> immediately syncs to expanded 752px
+    mainImg.dispatchEvent({ type: 'dblclick' });
+    timers.advanceBy(20);
+    assert.strictEqual(mainImg.style.maxHeight, '752px', 'TC-BD-04: Resetting zoom to 1.0x while hidden must sync expanded 752px');
+    assert.strictEqual(stage.style.paddingTop, '0px');
+    assert.strictEqual(stage.style.paddingBottom, '0px');
+    console.log('✅ TC-BD-04 PASS: Built content.js zoom size-lock & 1.0x refit sync verified');
+  }
+
+  // --- TC-HP-06: Header fullscreen button, 0px temp padding, immediate UI hide & fullscreenchange restore ---
+  {
+    const timers = createFakeTimerEnv();
+    const env = createDomEnvironment({ autoHideUi: true, autoFullscreen: false, defaultPadding: 36 });
+    loadContentBundle(env, timers);
+
+    env.win.postMessage({ action: 'disagall_test_open' }, '*');
+    const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const header = overlay.querySelector('.disagall-header');
+    const footer = overlay.querySelector('.disagall-footer');
+    const stage = env.doc.getElementById('disagall-stage');
+    const mainImg = env.doc.getElementById('disagall-main-img');
+    const fullscreenBtn = env.doc.getElementById('disagall-btn-fullscreen');
+
+    header.offsetHeight = 52;
+    footer.offsetHeight = 38;
+    mainImg.naturalWidth = 1000;
+    mainImg.naturalHeight = 2000;
+    env.win.dispatchEvent({ type: 'resize' });
+    timers.advanceBy(20);
+    assert.strictEqual(mainImg.style.maxHeight, '638px');
+
+    // Click header fullscreen button -> enters OS fullscreen, sets 0px temp padding & hides UI
+    fullscreenBtn.dispatchEvent('click');
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(env.doc.fullscreenElement, overlay, 'TC-HP-06: Fullscreen button click must enter OS fullscreen');
+    assert.strictEqual(overlay.classList.contains('disagall-fullscreen'), true);
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true);
+    assert.strictEqual(fullscreenBtn.classList.contains('active'), true);
+    assert.strictEqual(mainImg.style.maxHeight, '800px', 'TC-HP-06: Fullscreen must temporarily apply 0px padding');
+    assert.strictEqual(stage.style.paddingTop, '0px');
+
+    // OS ESC exit fires fullscreenchange -> restores 36px padding & UI
+    env.doc.fullscreenElement = null;
+    env.doc.dispatchEvent('fullscreenchange');
+    assert.strictEqual(overlay.classList.contains('disagall-fullscreen'), false);
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), false);
+    assert.strictEqual(fullscreenBtn.classList.contains('active'), false);
+    assert.strictEqual(mainImg.style.maxHeight, '638px', 'TC-HP-06: fullscreenchange exit must restore 36px padding');
+    assert.strictEqual(stage.style.paddingTop, '52px');
+    console.log('✅ TC-HP-06 PASS: Built content.js header fullscreen button, 0px temp padding & fullscreenchange restore verified');
+  }
+
+  // --- TC-BD-05: Popup autoFullscreen toggle -> openViewer OS fullscreen & blocked-gesture fallback ---
+  {
+    const timers = createFakeTimerEnv();
+    const env = createDomEnvironment({ autoHideUi: true, autoFullscreen: false, defaultPadding: 24 });
+    loadContentBundle(env, timers);
+
+    // Enable autoFullscreen via popup
+    const popup = require('../popup.js');
+    let autoFsChecked = false;
+    const autoFsListeners = [];
+    const mockPopupDoc = {
+      getElementById(id) {
+        if (id === 'auto-fullscreen-toggle') {
+          return {
+            checked: autoFsChecked,
+            addEventListener: (ev, fn) => { if (ev === 'change') autoFsListeners.push(fn); },
+          };
+        }
+        return null;
+      },
+    };
+    popup.initPopup(mockPopupDoc, env.chrome.storage.sync);
+    autoFsChecked = true;
+    autoFsListeners.forEach((fn) => fn({ target: { checked: true } }));
+    assert.strictEqual(env.syncStore.autoFullscreen, true, 'TC-BD-05: Popup must persist autoFullscreen=true');
+
+    // Simulate blocked requestFullscreen (no user gesture in Chrome context menu) -> fallback engages
+    const origCreateEl = env.doc.createElement;
+    env.doc.createElement = (tag) => {
+      const node = origCreateEl(tag);
+      node.requestFullscreen = () => Promise.reject(new Error('Permissions check failed'));
+      return node;
+    };
+
+    env.win.postMessage({ action: 'disagall_test_open' }, '*');
+    const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const mainImg = env.doc.getElementById('disagall-main-img');
+    const toast = env.doc.getElementById('disagall-toast');
+    mainImg.naturalWidth = 1000;
+    mainImg.naturalHeight = 2000;
+
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(env.doc.fullscreenElement, null, 'TC-BD-05: Blocked requestFullscreen leaves fullscreenElement null');
+    assert.strictEqual(overlay.classList.contains('disagall-fullscreen'), true, 'TC-BD-05: Fallback must activate .disagall-fullscreen');
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true, 'TC-BD-05: Fallback must hide UI');
+    assert.strictEqual(mainImg.style.maxHeight, '800px', 'TC-BD-05: Fallback must apply 0px padding full-bleed');
+    assert(toast.textContent.includes('전체화면'), 'TC-BD-05: Fallback must display guidance toast');
+    console.log('✅ TC-BD-05 PASS: Popup autoFullscreen sync & blocked-gesture viewport-fill fallback verified');
+  }
+
+  // --- TC-NG-03: Fullscreen enter/exit & closeViewer must never overwrite saved user padding ---
+  {
+    const timers = createFakeTimerEnv();
+    const env = createDomEnvironment({ autoHideUi: true, autoFullscreen: true, defaultPadding: 44 });
+    loadContentBundle(env, timers);
+
+    env.win.postMessage({ action: 'disagall_test_open' }, '*');
+    const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const header = overlay.querySelector('.disagall-header');
+    const footer = overlay.querySelector('.disagall-footer');
+    const mainImg = env.doc.getElementById('disagall-main-img');
+    header.offsetHeight = 52;
+    footer.offsetHeight = 38;
+    mainImg.naturalWidth = 1000;
+    mainImg.naturalHeight = 2000;
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.strictEqual(mainImg.style.maxHeight, '800px');
+    assert.strictEqual(env.syncStore.defaultPadding, 44, 'TC-NG-03: Sync store defaultPadding must remain 44');
+
+    // Exit fullscreen via F -> must restore original 44px padding (800 - 52 - 38 - 88 = 622px)
+    env.win.dispatchEvent({ type: 'keydown', key: 'F' });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(mainImg.style.maxHeight, '622px', 'TC-NG-03: Exiting fullscreen must restore 44px padding fitting');
+
+    // Re-enter fullscreen then closeViewer -> must clean up and preserve saved 44px padding
+    env.win.dispatchEvent({ type: 'keydown', key: 'F' });
+    await Promise.resolve();
+    await Promise.resolve();
+    env.doc.getElementById('disagall-close-btn').dispatchEvent('click');
+    assert.strictEqual(overlay.classList.contains('disagall-fullscreen'), false);
+    assert.strictEqual(env.syncStore.defaultPadding, 44, 'TC-NG-03: closeViewer must preserve saved defaultPadding 44');
+    console.log('✅ TC-NG-03 PASS: Fullscreen enter/exit & closeViewer preserves saved user padding verified');
+  }
+
+  // --- TC-BD-06: Korean IME KeyF/KeyH & range slider focus pass-through on built content.js ---
+  {
+    const timers = createFakeTimerEnv();
+    const env = createDomEnvironment({ autoHideUi: true, autoFullscreen: false, defaultPadding: 24 });
+    loadContentBundle(env, timers);
+
+    env.win.postMessage({ action: 'disagall_test_open' }, '*');
+    const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const slider = env.doc.getElementById('disagall-slider');
+    slider.type = 'range';
+
+    // Korean IME 'ㄹ' + code 'KeyF' while range slider is focused -> enters fullscreen
+    env.win.dispatchEvent({ type: 'keydown', key: 'ㄹ', code: 'KeyF', target: slider });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(env.doc.fullscreenElement, overlay, 'TC-BD-06: Korean IME KeyF with focused range slider must enter fullscreen');
+
+    env.win.dispatchEvent({ type: 'keydown', key: 'ㄹ', code: 'KeyF', target: slider });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(env.doc.fullscreenElement, null, 'TC-BD-06: Korean IME KeyF must exit fullscreen');
+    console.log('✅ TC-BD-06 PASS: Built content.js Korean IME KeyF & range slider pass-through verified');
   }
 
   console.log('\n🎉 ALL VIEWER IMMERSION E2E TESTS (HAPPY PATH + BOUNDARY & NEGATIVE) PASSED! 🎉');

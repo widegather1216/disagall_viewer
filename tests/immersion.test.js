@@ -335,6 +335,7 @@ async function run() {
   function createMockDomNode(id = '') {
     const classes = new Set();
     const listeners = {};
+    const attrs = {};
     const node = {
       id,
       style: {},
@@ -342,6 +343,8 @@ async function run() {
       textContent: '',
       innerHTML: '',
       children: [],
+      setAttribute: (k, v) => { attrs[k] = String(v); },
+      getAttribute: (k) => (k in attrs ? attrs[k] : null),
       classList: {
         add: (...names) => names.forEach((n) => classes.add(n)),
         remove: (...names) => names.forEach((n) => classes.delete(n)),
@@ -393,12 +396,21 @@ async function run() {
 
     const overlayNode = createMockDomNode('disagall-viewer-overlay');
     const headerNode = createMockDomNode('disagall-header');
+    headerNode.offsetHeight = 52;
+    const footerNode = createMockDomNode('disagall-footer');
+    footerNode.offsetHeight = 38;
+    const stageNode = createMockDomNode('disagall-stage');
     const sliderNode = createMockDomNode('disagall-slider');
     const sliderValNode = createMockDomNode('disagall-slider-val');
     const mainImgNode = createMockDomNode('disagall-main-img');
+    const fullscreenBtnNode = createMockDomNode('disagall-btn-fullscreen');
+    const fullscreenLabelNode = createMockDomNode('disagall-fullscreen-label');
+    fullscreenBtnNode.querySelector = (sel) => (sel === 'span' ? fullscreenLabelNode : null);
+    const toastNode = createMockDomNode('disagall-toast');
     const closeBtnNode = createMockDomNode('disagall-close-btn');
     const bodyNode = createMockDomNode('body');
     const windowListeners = {};
+    const documentListeners = {};
 
     let fullscreenCalls = 0;
     let exitFullscreenCalls = 0;
@@ -407,6 +419,8 @@ async function run() {
 
     overlayNode.querySelector = (selector) => {
       if (selector === '.disagall-header') return headerNode;
+      if (selector === '.disagall-footer') return footerNode;
+      if (selector === '#disagall-stage' || selector === '.disagall-stage') return stageNode;
       return null;
     };
     overlayNode.requestFullscreen = () => {
@@ -420,9 +434,12 @@ async function run() {
 
     const elementMap = {
       'disagall-viewer-overlay': overlayNode,
+      'disagall-stage': stageNode,
       'disagall-main-img': mainImgNode,
       'disagall-slider': sliderNode,
       'disagall-slider-val': sliderValNode,
+      'disagall-btn-fullscreen': fullscreenBtnNode,
+      'disagall-toast': toastNode,
       'disagall-close-btn': closeBtnNode,
     };
 
@@ -436,7 +453,18 @@ async function run() {
         if (selector.includes('dialog[open]')) return openModalNode;
         return null;
       },
-      addEventListener: () => {},
+      addEventListener: (event, fn) => {
+        if (!documentListeners[event]) documentListeners[event] = [];
+        documentListeners[event].push(fn);
+      },
+      removeEventListener: (event, fn) => {
+        if (!documentListeners[event]) return;
+        documentListeners[event] = documentListeners[event].filter((h) => h !== fn);
+      },
+      dispatchEvent: (event, payload = {}) => {
+        const handlers = documentListeners[event] || [];
+        handlers.forEach((fn) => fn({ target: mockDocument, preventDefault() {}, stopPropagation() {}, ...payload }));
+      },
       exitFullscreen: () => {
         exitFullscreenCalls++;
         if (rejectFullscreen) {
@@ -473,13 +501,18 @@ async function run() {
     // Reset state before running scenario
     state.idleTimer = null;
     state.autoHideUi = true;
+    state.autoFullscreen = false;
     state.isUiHidden = false;
+    state.isFullscreenMode = false;
     state.zoom.isDragging = false;
     state.zoom.scale = 1.0;
     state.elements.overlayEl = null;
+    state.elements.stageEl = null;
     state.elements.mainImgEl = null;
     state.elements.sliderEl = null;
     state.elements.sliderValEl = null;
+    state.elements.fullscreenBtnEl = null;
+    state.elements.toastEl = null;
 
     const controller = await import('../src/controller/viewer_controller.js');
 
@@ -488,6 +521,12 @@ async function run() {
         controller,
         overlayNode,
         headerNode,
+        footerNode,
+        stageNode,
+        mainImgNode,
+        fullscreenBtnNode,
+        fullscreenLabelNode,
+        toastNode,
         sliderNode,
         sliderValNode,
         mockDocument,
@@ -500,8 +539,13 @@ async function run() {
     } finally {
       controller.clearIdleTimer();
       state.elements.overlayEl = null;
+      state.elements.stageEl = null;
+      state.elements.fullscreenBtnEl = null;
+      state.elements.toastEl = null;
       state.autoHideUi = true;
+      state.autoFullscreen = false;
       state.isUiHidden = false;
+      state.isFullscreenMode = false;
       state.currentPadding = CONFIG.DEFAULT_PADDING;
       state.zoom.isDragging = false;
       global.document = origDocument;
@@ -926,6 +970,378 @@ async function run() {
     });
   });
   console.log('✅ Test 19: Padding slider debounce, change commit, closeViewer flush, and NaN/GM guard verified');
+
+  // 20. Verify UI-hidden stage expansion (idle & manual) while preserving user padding, plus 0px full-bleed
+  await withFakeTimers(async (timers) => {
+    await withControllerHarness(async ({ controller, overlayNode, stageNode, mainImgNode }) => {
+      const { applyFittingAndPadding } = await import('../src/ui/overlay.js');
+      controller.createOverlay();
+      overlayNode.classList.add('active');
+
+      // Portrait image (1000x2000) in 1280x800 viewport with header=52, footer=38, padding=24
+      mainImgNode.naturalWidth = 1000;
+      mainImgNode.naturalHeight = 2000;
+      state.currentPadding = 24;
+      state.autoHideUi = true;
+
+      applyFittingAndPadding();
+      assert.strictEqual(mainImgNode.style.maxHeight, '662px', 'Visible UI must reserve header(52)+footer(38)+padding(48)');
+      assert.strictEqual(mainImgNode.style.maxWidth, '331px', 'Visible UI portrait width must match aspect ratio');
+      assert.strictEqual(stageNode.style.paddingTop, '52px', 'Visible UI stage must reserve headerHeight top padding');
+      assert.strictEqual(stageNode.style.paddingBottom, '38px', 'Visible UI stage must reserve footerHeight bottom padding');
+
+      // Idle auto-hide -> reclaims header+footer height while keeping 24px user padding
+      controller.resetIdleTimer();
+      timers.runNext();
+      assert.strictEqual(overlayNode.classList.contains('disagall-idle'), true);
+      assert.strictEqual(mainImgNode.style.maxHeight, '752px', 'Idle-hidden UI must expand portrait height to 800-48=752px');
+      assert.strictEqual(mainImgNode.style.maxWidth, '376px', 'Idle-hidden UI portrait width must expand proportionally');
+      assert.strictEqual(stageNode.style.paddingTop, '0px', 'Idle-hidden stage must clear top padding');
+      assert.strictEqual(stageNode.style.paddingBottom, '0px', 'Idle-hidden stage must clear bottom padding');
+
+      // Mousemove -> restores UI and shrinks image back to header/footer bounds
+      overlayNode.dispatchEvent('mousemove');
+      assert.strictEqual(overlayNode.classList.contains('disagall-idle'), false);
+      assert.strictEqual(mainImgNode.style.maxHeight, '662px', 'Restoring UI must re-apply header+footer height reservation');
+      assert.strictEqual(stageNode.style.paddingTop, '52px');
+      assert.strictEqual(stageNode.style.paddingBottom, '38px');
+
+      // 0px user padding -> UI visible avoids overlap, manual hide (H) expands full-bleed 800px
+      state.currentPadding = 0;
+      applyFittingAndPadding();
+      assert.strictEqual(mainImgNode.style.maxHeight, '710px', '0px padding with visible UI must fit 800-52-38=710px');
+      assert.strictEqual(stageNode.style.paddingTop, '52px');
+      assert.strictEqual(stageNode.style.paddingBottom, '38px');
+
+      controller.handleKeyDown({ key: 'h', preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true);
+      assert.strictEqual(mainImgNode.style.maxHeight, '800px', '0px padding with hidden UI must fill full 800px height');
+      assert.strictEqual(mainImgNode.style.maxWidth, '400px');
+      assert.strictEqual(stageNode.style.paddingTop, '0px');
+      assert.strictEqual(stageNode.style.paddingBottom, '0px');
+
+      controller.handleKeyDown({ key: 'H', preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(mainImgNode.style.maxHeight, '710px', 'H restore must re-reserve header+footer height');
+    });
+  });
+  console.log('✅ Test 20: UI-hidden stage expansion (idle & manual), padding preservation, and 0px full-bleed verified');
+
+  // 21. Verify zoom > 1.0 size lock during UI toggle and immediate refit upon returning to 1.0x
+  await withFakeTimers(async () => {
+    await withControllerHarness(async ({ controller, overlayNode, stageNode, mainImgNode }) => {
+      const { applyFittingAndPadding } = await import('../src/ui/overlay.js');
+      const { resetZoom } = await import('../src/ui/zoom_pan.js');
+
+      global.requestAnimationFrame = (cb) => {
+        cb();
+        return 1;
+      };
+
+      controller.createOverlay();
+      overlayNode.classList.add('active');
+      mainImgNode.naturalWidth = 1000;
+      mainImgNode.naturalHeight = 2000;
+      state.currentPadding = 24;
+      applyFittingAndPadding();
+      assert.strictEqual(mainImgNode.style.maxHeight, '662px');
+
+      // Zoom in to 2.0x and hide UI manually -> must NOT resize image or shift stage padding while zoomed
+      state.zoom.scale = 2.0;
+      state.zoom.panX = 120;
+      state.zoom.panY = -80;
+      controller.handleKeyDown({ key: 'h', preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true);
+      assert.strictEqual(mainImgNode.style.maxHeight, '662px', 'Zoomed image must keep base maxHeight while UI hides');
+      assert.strictEqual(stageNode.style.paddingTop, '52px', 'Zoomed stage must keep paddingTop while UI hides');
+
+      // Reset zoom back to 1.0x while UI is still hidden -> immediately syncs to expanded 752px
+      resetZoom();
+      assert.strictEqual(state.zoom.scale, 1.0);
+      assert.strictEqual(mainImgNode.style.maxHeight, '752px', 'Returning to 1.0x while UI hidden must sync expanded size');
+      assert.strictEqual(stageNode.style.paddingTop, '0px');
+      assert.strictEqual(stageNode.style.paddingBottom, '0px');
+
+      // Zoom in via double-click while hidden, restore UI via mousemove -> must keep 752px while zoomed
+      mainImgNode.dispatchEvent('dblclick');
+      assert.strictEqual(state.zoom.scale, 2.0);
+      overlayNode.dispatchEvent('mousemove');
+      assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), false);
+      assert.strictEqual(mainImgNode.style.maxHeight, '752px', 'Zoomed image must keep base maxHeight while UI restores');
+
+      // Wheel zoom out back to 1.0x -> immediately syncs to visible-UI 662px
+      for (let i = 0; i < 8; i++) {
+        mainImgNode.dispatchEvent('wheel', { deltaY: 120 });
+      }
+      assert.strictEqual(state.zoom.scale, 1.0);
+      assert.strictEqual(mainImgNode.style.maxHeight, '662px', 'Wheeling back to 1.0x with UI visible must sync visible-UI size');
+      assert.strictEqual(stageNode.style.paddingTop, '52px');
+      assert.strictEqual(stageNode.style.paddingBottom, '38px');
+    });
+  });
+  console.log('✅ Test 21: Zoom > 1.0 size-lock on UI toggle & 1.0x refit sync verified');
+
+  // 22. Verify content.css absolute overlay header/footer and stage height/padding transitions
+  assert(
+    /\.disagall-header\s*\{[^}]*position:\s*absolute;[^}]*top:\s*0;[^}]*left:\s*0;/s.test(cssContent),
+    'content.css .disagall-header must use position: absolute; top: 0; left: 0;'
+  );
+  assert(
+    /\.disagall-footer\s*\{[^}]*position:\s*absolute;[^}]*bottom:\s*0;[^}]*left:\s*0;/s.test(cssContent),
+    'content.css .disagall-footer must use position: absolute; bottom: 0; left: 0;'
+  );
+  assert(
+    /\.disagall-stage\s*\{[^}]*height:\s*100%;[^}]*transition:\s*padding-top[^;}]*padding-bottom/s.test(cssContent),
+    'content.css .disagall-stage must define height: 100% and padding-top/padding-bottom transition'
+  );
+  console.log('✅ Test 22: content.css absolute overlay header/footer and stage padding transitions verified');
+
+  // 23. Verify autoFullscreen CONFIG/state/popup.html/popup.js schema and storage sync
+  assert.strictEqual(CONFIG.STORAGE_KEY_AUTO_FULLSCREEN, 'autoFullscreen', 'CONFIG.STORAGE_KEY_AUTO_FULLSCREEN must be "autoFullscreen"');
+  assert.strictEqual(state.autoFullscreen, false, 'state.autoFullscreen must default to false');
+  assert.strictEqual(state.isFullscreenMode, false, 'state.isFullscreenMode must default to false');
+  assert.strictEqual(popup.STORAGE_KEYS.AUTO_FULLSCREEN, 'autoFullscreen');
+  assert.strictEqual(popup.DEFAULT_SETTINGS.autoFullscreen, false);
+  assert.strictEqual(typeof popup.saveAutoFullscreen, 'function', 'popup.js must export saveAutoFullscreen');
+  assert(popupHtml.includes('id="auto-fullscreen-toggle"'), 'popup.html must include auto-fullscreen-toggle switch');
+
+  await withFakeTimers(async () => {
+    const fsSlider = createMockElement('padding-slider', { value: '24' });
+    const fsValDisplay = createMockElement('padding-val', { textContent: '24px' });
+    const fsAutoHide = createMockElement('auto-hide-ui-toggle', { checked: true });
+    const fsAutoFullscreen = createMockElement('auto-fullscreen-toggle', { checked: false });
+    const fsPopupDoc = {
+      getElementById(id) {
+        if (id === 'padding-slider') return fsSlider;
+        if (id === 'padding-val') return fsValDisplay;
+        if (id === 'auto-hide-ui-toggle') return fsAutoHide;
+        if (id === 'auto-fullscreen-toggle') return fsAutoFullscreen;
+        return null;
+      },
+    };
+    const fsStorage = createMockStorage({ autoHideUi: true, autoFullscreen: true, defaultPadding: 24 });
+    popup.initPopup(fsPopupDoc, fsStorage);
+    assert.strictEqual(fsAutoFullscreen.checked, true, 'autoFullscreen toggle must initialize from storage');
+
+    fsAutoFullscreen.checked = false;
+    fsAutoFullscreen.dispatchEvent('change');
+    assert.strictEqual(fsStorage.store.autoFullscreen, false, 'Changing auto-fullscreen-toggle must persist false');
+
+    popup.handleStorageChange({ autoFullscreen: { newValue: true } }, 'sync', {
+      slider: fsSlider,
+      valDisplay: fsValDisplay,
+      autoHideToggle: fsAutoHide,
+      autoFullscreenToggle: fsAutoFullscreen,
+    });
+    assert.strictEqual(fsAutoFullscreen.checked, true, 'handleStorageChange must sync valid boolean autoFullscreen');
+
+    popup.handleStorageChange({ autoFullscreen: { newValue: undefined } }, 'sync', {
+      slider: fsSlider,
+      valDisplay: fsValDisplay,
+      autoHideToggle: fsAutoHide,
+      autoFullscreenToggle: fsAutoFullscreen,
+    });
+    assert.strictEqual(fsAutoFullscreen.checked, true, 'Deleted autoFullscreen key must not overwrite boolean toggle');
+  });
+  console.log('✅ Test 23: autoFullscreen CONFIG/state/popup.html/popup.js storage sync verified');
+
+  // 24. Verify header fullscreen button, 0px temporary padding, immediate UI hide, and fullscreenchange restore
+  await withControllerHarness(async ({
+    controller,
+    overlayNode,
+    stageNode,
+    mainImgNode,
+    fullscreenBtnNode,
+    fullscreenLabelNode,
+    mockDocument,
+  }) => {
+    const { applyFittingAndPadding } = await import('../src/ui/overlay.js');
+    assert(overlayHtml.includes('id="disagall-btn-fullscreen"'), 'Overlay HTML must include #disagall-btn-fullscreen button');
+
+    controller.initViewerBase();
+    controller.createOverlay();
+    overlayNode.classList.add('active');
+    mainImgNode.naturalWidth = 1000;
+    mainImgNode.naturalHeight = 2000;
+    state.currentPadding = 36;
+    applyFittingAndPadding();
+    assert.strictEqual(mainImgNode.style.maxHeight, '638px', 'Normal UI with 36px padding fits 800-52-38-72=638px');
+
+    // Click header fullscreen button -> enters OS fullscreen, sets 0px temp padding, hides UI immediately
+    fullscreenBtnNode.dispatchEvent('click');
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(mockDocument.fullscreenElement, overlayNode);
+    assert.strictEqual(state.isFullscreenMode, true, 'Entering fullscreen must set state.isFullscreenMode=true');
+    assert.strictEqual(overlayNode.classList.contains('disagall-fullscreen'), true);
+    assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true, 'Entering fullscreen must immediately hide UI');
+    assert.strictEqual(fullscreenBtnNode.classList.contains('active'), true);
+    assert.strictEqual(fullscreenBtnNode.getAttribute('aria-pressed'), 'true');
+    assert.strictEqual(fullscreenLabelNode.textContent, '전체화면 해제');
+    assert.strictEqual(mainImgNode.style.maxHeight, '800px', 'Fullscreen mode must temporarily apply 0px padding (800px)');
+    assert.strictEqual(stageNode.style.paddingTop, '0px');
+    assert.strictEqual(state.currentPadding, 36, 'Fullscreen temporary 0px must NOT mutate saved state.currentPadding');
+
+    // Native OS ESC exit -> browser clears fullscreenElement and fires fullscreenchange
+    mockDocument.fullscreenElement = null;
+    mockDocument.dispatchEvent('fullscreenchange');
+    assert.strictEqual(state.isFullscreenMode, false, 'fullscreenchange exit must clear state.isFullscreenMode');
+    assert.strictEqual(overlayNode.classList.contains('disagall-fullscreen'), false);
+    assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), false, 'Exiting fullscreen must restore UI');
+    assert.strictEqual(fullscreenBtnNode.classList.contains('active'), false);
+    assert.strictEqual(fullscreenBtnNode.getAttribute('aria-pressed'), 'false');
+    assert.strictEqual(fullscreenLabelNode.textContent, '전체화면');
+    assert.strictEqual(mainImgNode.style.maxHeight, '638px', 'Exiting fullscreen must restore saved 36px padding fitting');
+    assert.strictEqual(stageNode.style.paddingTop, '52px');
+    assert.strictEqual(stageNode.style.paddingBottom, '38px');
+  });
+  console.log('✅ Test 24: Header fullscreen button, 0px temp padding, immediate UI hide & fullscreenchange restore verified');
+
+  // 25. Verify autoFullscreen on openViewer (OS allowed vs rejected fallback) & closeViewer cleanup
+  await withControllerHarness(async ({
+    controller,
+    overlayNode,
+    mainImgNode,
+    toastNode,
+    mockDocument,
+    getFullscreenCalls,
+    setRejectFullscreen,
+  }) => {
+    // Prepare a body image in mockDocument for openViewer()
+    const origQuerySelectorAll = mockDocument.querySelectorAll;
+    const sampleBodyImg = createMockDomNode('sample-body-img');
+    sampleBodyImg.tagName = 'IMG';
+    sampleBodyImg.src = 'https://dcimg7.dcinside.co.kr/viewimage.php?id=hit&no=123';
+    sampleBodyImg.currentSrc = 'https://dcimg7.dcinside.co.kr/viewimage.php?id=hit&no=123';
+    sampleBodyImg.alt = 'sample';
+    sampleBodyImg.naturalWidth = 1000;
+    sampleBodyImg.naturalHeight = 2000;
+    const writeDiv = { querySelectorAll: () => [sampleBodyImg] };
+    sampleBodyImg.closest = (sel) => (sel.includes('.write_div') ? writeDiv : null);
+    sampleBodyImg.getAttribute = () => null;
+    mockDocument.querySelectorAll = (sel) => (sel.endsWith('img') ? [sampleBodyImg] : [writeDiv]);
+    const origImage = global.Image;
+    global.Image = class {
+      set src(val) {
+        this._src = val;
+        if (typeof this.onload === 'function') this.onload();
+      }
+      get src() { return this._src; }
+    };
+
+    try {
+      mainImgNode.naturalWidth = 1000;
+      mainImgNode.naturalHeight = 2000;
+      state.currentPadding = 24;
+      state.autoFullscreen = true;
+
+      // Case A: requestFullscreen allowed on openViewer()
+      controller.initViewerBase();
+      controller.openViewer();
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(getFullscreenCalls(), 1, 'autoFullscreen=true must attempt requestFullscreen on openViewer');
+      assert.strictEqual(state.isFullscreenMode, true);
+      assert.strictEqual(mockDocument.fullscreenElement, overlayNode);
+      assert.strictEqual(mainImgNode.style.maxHeight, '800px');
+
+      controller.closeViewer();
+      assert.strictEqual(state.isFullscreenMode, false, 'closeViewer must reset isFullscreenMode');
+      assert.strictEqual(overlayNode.classList.contains('disagall-fullscreen'), false);
+
+      // Case B: requestFullscreen rejected (e.g. Chrome context menu) -> fallback viewport-fill + toast
+      setRejectFullscreen(true);
+      controller.openViewer();
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(mockDocument.fullscreenElement, null);
+      assert.strictEqual(state.isFullscreenMode, true, 'Rejected autoFullscreen must engage 0px+hidden fallback');
+      assert.strictEqual(overlayNode.classList.contains('disagall-fullscreen'), true);
+      assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true);
+      assert.strictEqual(mainImgNode.style.maxHeight, '800px');
+      assert.strictEqual(state.currentPadding, 24, 'Fallback must preserve saved padding 24');
+      assert(toastNode.textContent.includes('전체화면'), 'Fallback must show guidance toast');
+
+      // Pressing F while in fallback when gesture is now allowed -> enters OS fullscreen
+      setRejectFullscreen(false);
+      controller.handleKeyDown({ key: 'f', preventDefault() {}, stopPropagation() {} });
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(mockDocument.fullscreenElement, overlayNode, 'Pressing F in fallback must retry OS fullscreen');
+      assert.strictEqual(state.isFullscreenMode, true);
+    } finally {
+      mockDocument.querySelectorAll = origQuerySelectorAll;
+      global.Image = origImage;
+    }
+  });
+  console.log('✅ Test 25: autoFullscreen on openViewer (OS allowed + rejected fallback) & closeViewer cleanup verified');
+
+  // 26. Verify Korean IME (e.code fallback: KeyF/KeyH), range slider focus pass-through & manual F fallback toggle
+  await withControllerHarness(async ({
+    controller,
+    overlayNode,
+    mainImgNode,
+    toastNode,
+    mockDocument,
+    setRejectFullscreen,
+  }) => {
+    controller.initViewerBase();
+    controller.createOverlay();
+    overlayNode.classList.add('active');
+    mainImgNode.naturalWidth = 1000;
+    mainImgNode.naturalHeight = 2000;
+    state.currentPadding = 24;
+
+    // 26.1 Korean IME: pressing F key produces key='ㄹ', code='KeyF'
+    controller.handleKeyDown({ key: 'ㄹ', code: 'KeyF', preventDefault() {}, stopPropagation() {} });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(mockDocument.fullscreenElement, overlayNode, 'Korean IME key="ㄹ" + code="KeyF" must enter fullscreen');
+    assert.strictEqual(state.isFullscreenMode, true);
+
+    // Exit fullscreen via Korean IME KeyF
+    controller.handleKeyDown({ key: 'ㄹ', code: 'KeyF', preventDefault() {}, stopPropagation() {} });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(mockDocument.fullscreenElement, null);
+    assert.strictEqual(state.isFullscreenMode, false);
+
+    // 26.2 Range slider focus (<input type="range">) must NOT block shortcuts, while text input still blocks
+    controller.handleKeyDown({
+      key: 'ㅗ',
+      code: 'KeyH',
+      target: { tagName: 'INPUT', type: 'range' },
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    assert.strictEqual(state.isUiHidden, true, 'Focused range slider must allow KeyH shortcut');
+    controller.handleKeyDown({ key: 'h', preventDefault() {}, stopPropagation() {} });
+    assert.strictEqual(state.isUiHidden, false);
+
+    controller.handleKeyDown({
+      key: 'f',
+      code: 'KeyF',
+      target: { tagName: 'INPUT', type: 'text' },
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    assert.strictEqual(state.isFullscreenMode, false, 'Focused text input must still block KeyF shortcut');
+
+    // 26.3 Manual F when requestFullscreen() is rejected -> enters fallback, second F exits fallback
+    setRejectFullscreen(true);
+    controller.handleKeyDown({ key: 'f', code: 'KeyF', preventDefault() {}, stopPropagation() {} });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(state.isFullscreenMode, true, 'Manual F fallback must activate when requestFullscreen rejects');
+    assert.strictEqual(mainImgNode.style.maxHeight, '800px');
+    assert(toastNode.textContent.includes('창 전체 채움'));
+
+    controller.handleKeyDown({ key: 'f', code: 'KeyF', preventDefault() {}, stopPropagation() {} });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(state.isFullscreenMode, false, 'Second F in fallback must exit fallback mode');
+    assert.strictEqual(mainImgNode.style.maxHeight, '662px');
+  });
+  console.log('✅ Test 26: Korean IME KeyF/KeyH, range slider focus pass-through & manual F fallback toggle verified');
 
   console.log('\n🎉 ALL VIEWER IMMERSION UNIT TESTS PASSED! 🎉');
 }
