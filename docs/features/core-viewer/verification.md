@@ -1,8 +1,8 @@
 # 🧪 [core-viewer] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`4건 OPEN DEFECT` — `deep-bug-hunter` 실증 등록)
-- **인수 조건 통과율**: `5 / 5 (기존 단위 PASS / 실런타임 결함 4건 발견)`
-- **미해결 티켓**: `🚨 DEFECT: 4건` | `🧐 REFACTOR: 0건`
+- **검증 상태**: `🩹 Debugging` (`3건 OPEN DEFECT` — `DEFECT-01` 해결 완료, `DEFECT-02~04` 잔여)
+- **인수 조건 통과율**: `5 / 9 Scenarios PASS (56%)` (`DEFECT-01` 해결, `DEFECT-02~04` OPEN)
+- **미해결 티켓**: `🚨 DEFECT: 3건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -37,9 +37,9 @@
 | :--- | :---: | :--- | :--- :---: | :---: | :--- |
 | `TC-HP-01` | Happy | 우클릭 메뉴로 정확한 클릭 위치 사진 뷰어 즉시 활성화 | `AC-01` | `FAIL` | [`DEFECT-04`](#defect-04-bindcontextmenutracker-%EC%A7%80%EC%97%B0-%EB%A1%9C%EB%94%A9-%EC%9D%B4%EB%AF%B8%EC%A7%80-url-%EC%A0%80%EC%9E%A5%EC%9C%BC%EB%A1%9C-%EC%9A%B0%ED%81%B4%EB%A6%AD-%EB%8C%80%EC%83%81-%EC%9D%B8%EB%8D%B1%EC%8A%A4-%EB%A7%A4%EC%B9%AD-%EC%8B%A4%ED%8C%A8) |
 | `TC-HP-02` | Happy | 가로/세로 사진 화면 맞춤 렌더링 및 패딩 슬라이더 0~100px 실시간 반영 | `AC-02` | `PASS` | - |
-| `TC-HP-03` | Happy | 마우스 휠 1.0x~5.0x 확대, 더블클릭 2.0x 토글, 드래그 팬 동작 | `AC-03` | `FAIL` | [`DEFECT-01`](#defect-01-userscript-%EC%BA%A1%EC%B2%98-click-%EC%9E%90%EA%B0%80-%EC%9E%AC%EC%A7%84%EC%9E%85-%EB%B0%8F-openviewer-%EC%A4%91%EB%B3%B5-%ED%98%B8%EC%B6%9C-%EC%8B%9C-%EC%8A%A4%ED%81%AC%EB%A1%A4-%EC%98%81%EA%B5%AC-%EC%9E%A0%EA%B8%88), [`DEFECT-03`](#defect-03-%EC%A4%8C-%EC%83%81%ED%83%9C-%EC%9D%B4%EB%AF%B8%EC%A7%80-%EB%B0%96-%EB%93%9C%EB%9E%98%EA%B7%B8-%EC%A2%85%EB%A3%8C-%EC%8B%9C-%EB%B0%B1%EB%93%9C%EB%A1%AD-%ED%81%B4%EB%A6%AD-%EC%98%A4%EC%9D%B8-%EB%B7%B0%EC%96%B4-%EB%8B%AB%ED%9E%98) |
+| `TC-HP-03` | Happy | 마우스 휠 1.0x~5.0x 확대, 더블클릭 2.0x 토글, 드래그 팬 동작 | `AC-03` | `FAIL` | [`DEFECT-03`](#defect-03-%EC%A4%8C-%EC%83%81%ED%83%9C-%EC%9D%B4%EB%AF%B8%EC%A7%80-%EB%B0%96-%EB%93%9C%EB%9E%98%EA%B7%B8-%EC%A2%85%EB%A3%8C-%EC%8B%9C-%EB%B0%B1%EB%93%9C%EB%A1%AD-%ED%81%B4%EB%A6%AD-%EC%98%A4%EC%9D%B8-%EB%B7%B0%EC%96%B4-%EB%8B%AB%ED%9E%98) |
 | `TC-HP-04` | Happy | 방향키 `←`/`→` 사진 이동 및 카운터 동기화 | `AC-04` | `FAIL` | [`DEFECT-02`](#defect-02-showimage-%EB%B9%84%EB%8F%99%EA%B8%B0-tempimg-%EC%8A%A4%ED%85%8C%EC%9D%BC-%EC%BD%9C%EB%B0%B1-%EB%8D%AE%EC%96%B4%EC%93%B0%EA%B8%B0-%EB%B0%8F-onerror-%ED%8F%B4%EB%B0%B1-%ED%94%BC%ED%8C%85-%EB%88%84%EB%9D%BD) |
-| `TC-HP-05` | Happy | `ESC` 및 배경 클릭 시 뷰어 닫힘 및 바디 스크롤 복원 | `AC-05` | `FAIL` | [`DEFECT-01`](#defect-01-userscript-%EC%BA%A1%EC%B2%98-click-%EC%9E%90%EA%B0%80-%EC%9E%AC%EC%A7%84%EC%9E%85-%EB%B0%8F-openviewer-%EC%A4%91%EB%B3%B5-%ED%98%B8%EC%B6%9C-%EC%8B%9C-%EC%8A%A4%ED%81%AC%EB%A1%A4-%EC%98%81%EA%B5%AC-%EC%9E%A0%EA%B8%88) |
+| `TC-HP-05` | Happy | `ESC` 및 배경 클릭 시 뷰어 닫힘 및 바디 스크롤 복원 | `AC-05` | `PASS (Fixed in DEFECT-01)` | [`DEFECT-01`](#defect-01-userscript-%EC%BA%A1%EC%B2%98-click-%EC%9E%90%EA%B0%80-%EC%9E%AC%EC%A7%84%EC%9E%85-%EB%B0%8F-openviewer-%EC%A4%91%EB%B3%B5-%ED%98%B8%EC%B6%9C-%EC%8B%9C-%EC%8A%A4%ED%81%AC%EB%A1%A4-%EC%98%81%EA%B5%AC-%EC%9E%A0%EA%B8%88) |
 | `TC-BD-01` | Boundary | 본문 사진 1장 이하일 때 좌우 내비게이션 버튼 `.disabled` 비활성화 | `AC-04` | `PASS` | - |
 | `TC-BD-02` | Boundary | 지연 로딩(`data-original`) 사진 사전 강제 로드 및 다운스케일 쿼리 제거 | `AC-01` | `FAIL` | [`DEFECT-02`](#defect-02-showimage-%EB%B9%84%EB%8F%99%EA%B8%B0-tempimg-%EC%8A%A4%ED%85%8C%EC%9D%BC-%EC%BD%9C%EB%B0%B1-%EB%8D%AE%EC%96%B4%EC%93%B0%EA%B8%B0-%EB%B0%8F-onerror-%ED%8F%B4%EB%B0%B1-%ED%94%BC%ED%8C%85-%EB%88%84%EB%9D%BD), [`DEFECT-04`](#defect-04-bindcontextmenutracker-%EC%A7%80%EC%97%B0-%EB%A1%9C%EB%94%A9-%EC%9D%B4%EB%AF%B8%EC%A7%80-url-%EC%A0%80%EC%9E%A5%EC%9C%BC%EB%A1%9C-%EC%9A%B0%ED%81%B4%EB%A6%AD-%EB%8C%80%EC%83%81-%EC%9D%B8%EB%8D%B1%EC%8A%A4-%EB%A7%A4%EC%B9%AD-%EC%8B%A4%ED%8C%A8) |
 | `TC-NG-01` | Negative | 본문 사진 0장일 때 조기 리턴 및 알림 표시 | `AC-01` | `PASS` | - |
@@ -50,10 +50,13 @@
 ## 🚨 3. 결함 리포트 (Defect Logs)
 
 ### [DEFECT-01] Userscript 캡처 `click` 자가 재진입 및 `openViewer()` 중복 호출 시 스크롤 영구 잠금
-- **현재 상태**: 🟡 OPEN
-- **심각도 & 위치**: 🔴 P0 Critical | [`src/userscript.js#L65-L71`](../../../src/userscript.js#L65-L71), [`src/parser/image_parser.js#L3-L26`](../../../src/parser/image_parser.js#L3-L26), [`src/controller/viewer_controller.js#L366-L395`](../../../src/controller/viewer_controller.js#L366-L395)
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **심각도 & 위치**: 🔴 P0 Critical | [`src/userscript.js#L65-L76`](../../../src/userscript.js#L65-L76), [`src/parser/image_parser.js#L3-L27`](../../../src/parser/image_parser.js#L3-L27), [`src/controller/viewer_controller.js#L385-L390`](../../../src/controller/viewer_controller.js#L385-L390)
 - **원인 및 실증**: `#disagall-viewer-overlay`가 `EXCLUDED_CONTAINER_SELECTORS`에 없어 Userscript 캡처 리스너가 `#disagall-main-img` 클릭·더블클릭·드래그 종료 시 `openViewer()`를 재호출함(또한 non-Element `e.target.closest` 시 `TypeError`). `openViewer()`가 활성 가드 없이 `state.previousBodyOverflow`를 `'hidden'`으로 덮어써 `closeViewer()` 후에도 스크롤이 영구 잠금됨(`Empirical Probe Reproduced`: `bodyOverflowAfterClose === 'hidden'`).
-- **최소 수정 설계**: `userscript.js`에서 `typeof e.target?.closest !== 'function'` 및 `isOverlayActive()`/`#disagall-viewer-overlay` 내부 클릭 차단, `openViewer()`에서 `!isOverlayActive()`일 때만 `previousBodyOverflow` 저장.
+- **해결 내역**:
+  - **수정 파일**: [`src/parser/image_parser.js`](../../../src/parser/image_parser.js#L26), [`src/userscript.js`](../../../src/userscript.js#L65-L76), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js#L385-L390), [`tests/core_viewer.test.js`](../../../tests/core_viewer.test.js)
+  - **원인 및 조치**: `EXCLUDED_CONTAINER_SELECTORS`에 `#disagall-viewer-overlay`를 추가해 뷰어 이미지 오탐을 차단하고, `userscript.js` 캡처 `click` 리스너에 `isOverlayActive()`·`typeof target.closest !== 'function'`·`#disagall-viewer-overlay` 내부 클릭 차단 가드를 적용(Devil's Advocate 교차 검증 완료). `openViewer()`에서 `!isOverlayActive()`일 때만 `state.previousBodyOverflow`를 백업하도록 수정하고 `npm run build`로 `content.js`/`disagall_viewer.user.js` 동기화.
+  - **회귀 테스트 결과**: `npm test` (`tests/core_viewer.test.js` 3/3 포함 전 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`15/15 PASS`), `npm run build` (`PASS`)
 
 ### [DEFECT-02] `showImage()` 비동기 `tempImg` 스테일 콜백 덮어쓰기 및 `onerror` 폴백 피팅 누락
 - **현재 상태**: 🟡 OPEN
