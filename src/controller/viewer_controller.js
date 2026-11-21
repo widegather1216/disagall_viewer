@@ -37,6 +37,7 @@ import {
 } from './immersion_controller.js';
 
 export {
+  isOverlayActive,
   clearIdleTimer,
   showUi,
   hideUi,
@@ -381,8 +382,11 @@ export function openViewer(targetSrc, isAuto = false) {
   if (typeof document !== 'undefined' && isEditableTarget(document.activeElement) && typeof document.activeElement.blur === 'function') {
     document.activeElement.blur();
   }
+  const wasActive = isOverlayActive();
   overlayEl.classList.add('active');
-  state.previousBodyOverflow = document.body.style.overflow;
+  if (!wasActive) {
+    state.previousBodyOverflow = document.body.style.overflow;
+  }
   document.body.style.overflow = 'hidden';
 
   showUi();

@@ -97,7 +97,8 @@
     "header",
     "footer",
     ".gnb",
-    ".lnb"
+    ".lnb",
+    "#disagall-viewer-overlay"
   ].join(", ");
   var POST_BODY_CONTAINER_SELECTORS = [
     ".write_div",
@@ -1457,8 +1458,11 @@
     if (typeof document !== "undefined" && isEditableTarget(document.activeElement) && typeof document.activeElement.blur === "function") {
       document.activeElement.blur();
     }
+    const wasActive = isOverlayActive();
     overlayEl.classList.add("active");
-    state.previousBodyOverflow = document.body.style.overflow;
+    if (!wasActive) {
+      state.previousBodyOverflow = document.body.style.overflow;
+    }
     document.body.style.overflow = "hidden";
     showUi();
     resetIdleTimer();
@@ -1602,7 +1606,11 @@
       }
     });
     document.addEventListener("click", (e) => {
-      const img = e.target.closest("img");
+      if (isOverlayActive()) return;
+      const target = e?.target;
+      if (!target || typeof target.closest !== "function") return;
+      if (target.closest("#disagall-viewer-overlay")) return;
+      const img = target.closest("img");
       if (img && isPostBodyImage(img)) {
         const url = getBestImgUrl(img);
         openViewer(url);

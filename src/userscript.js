@@ -2,7 +2,7 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { isPostBodyImage, getBestImgUrl } from './parser/image_parser.js';
-import { openViewer, initViewerBase } from './controller/viewer_controller.js';
+import { openViewer, initViewerBase, isOverlayActive } from './controller/viewer_controller.js';
 
 (function () {
   'use strict';
@@ -63,7 +63,12 @@ import { openViewer, initViewerBase } from './controller/viewer_controller.js';
 
   // Direct image click listener
   document.addEventListener('click', (e) => {
-    const img = e.target.closest('img');
+    if (isOverlayActive()) return;
+    const target = e?.target;
+    if (!target || typeof target.closest !== 'function') return;
+    if (target.closest('#disagall-viewer-overlay')) return;
+
+    const img = target.closest('img');
     if (img && isPostBodyImage(img)) {
       const url = getBestImgUrl(img);
       openViewer(url);

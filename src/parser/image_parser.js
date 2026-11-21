@@ -22,7 +22,8 @@ export const EXCLUDED_CONTAINER_SELECTORS = [
   'header',
   'footer',
   '.gnb',
-  '.lnb'
+  '.lnb',
+  '#disagall-viewer-overlay'
 ].join(', ');
 
 export const POST_BODY_CONTAINER_SELECTORS = [
