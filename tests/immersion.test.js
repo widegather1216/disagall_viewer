@@ -1343,6 +1343,229 @@ async function run() {
   });
   console.log('✅ Test 26: Korean IME KeyF/KeyH, range slider focus pass-through & manual F fallback toggle verified');
 
+  // 27. DEFECT-01: Async requestFullscreen/exitFullscreen Promise race vs closeViewer/openViewer & rapid toggle
+  await withControllerHarness(async ({
+    controller,
+    overlayNode,
+    mainImgNode,
+    toastNode,
+    mockDocument,
+  }) => {
+    const origQuerySelectorAll = mockDocument.querySelectorAll;
+    const sampleBodyImg = createMockDomNode('defect01-body-img');
+    sampleBodyImg.tagName = 'IMG';
+    sampleBodyImg.src = 'https://dcimg7.dcinside.co.kr/viewimage.php?id=hit&no=456';
+    sampleBodyImg.currentSrc = sampleBodyImg.src;
+    sampleBodyImg.alt = 'defect01';
+    sampleBodyImg.naturalWidth = 1000;
+    sampleBodyImg.naturalHeight = 2000;
+    const writeDiv = { querySelectorAll: () => [sampleBodyImg] };
+    sampleBodyImg.closest = (sel) => (sel.includes('.write_div') ? writeDiv : null);
+    sampleBodyImg.getAttribute = () => null;
+    mockDocument.querySelectorAll = (sel) => (sel.endsWith('img') ? [sampleBodyImg] : [writeDiv]);
+    const origImage = global.Image;
+    global.Image = class {
+      set src(val) {
+        this._src = val;
+        if (typeof this.onload === 'function') this.onload();
+      }
+      get src() { return this._src; }
+    };
+
+    const createDeferred = () => {
+      let resolve;
+      let reject;
+      const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+
+    try {
+      mainImgNode.naturalWidth = 1000;
+      mainImgNode.naturalHeight = 2000;
+      controller.initViewerBase();
+
+      // Case A: Pending requestFullscreen() resolves AFTER closeViewer() -> must NOT leave hidden overlay trapped in OS fullscreen
+      let pendingReqA = null;
+      overlayNode.requestFullscreen = () => {
+        pendingReqA = createDeferred();
+        return pendingReqA.promise;
+      };
+      state.autoFullscreen = true;
+      controller.openViewer();
+      assert(pendingReqA !== null, 'Case A: requestFullscreen must be called');
+      controller.closeViewer();
+      assert.strictEqual(overlayNode.classList.contains('active'), false);
+
+      mockDocument.fullscreenElement = overlayNode;
+      pendingReqA.resolve();
+      mockDocument.dispatchEvent('fullscreenchange');
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(
+        mockDocument.fullscreenElement,
+        null,
+        'Case A: Late requestFullscreen resolve after closeViewer must immediately exit OS fullscreen'
+      );
+      assert.strictEqual(state.isFullscreenMode, false);
+      assert.strictEqual(overlayNode.classList.contains('disagall-fullscreen'), false);
+
+      // Case B: Pending requestFullscreen() from Session 1 rejects AFTER closeViewer() -> openViewer() Session 2 (autoFullscreen=false)
+      let pendingReqB = null;
+      overlayNode.requestFullscreen = () => {
+        pendingReqB = createDeferred();
+        return pendingReqB.promise;
+      };
+      state.autoFullscreen = true;
+      controller.openViewer();
+      controller.closeViewer();
+
+      state.autoFullscreen = false;
+      toastNode.textContent = '';
+      controller.openViewer();
+      pendingReqB.reject(new Error('Gesture blocked'));
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(
+        state.isFullscreenMode,
+        false,
+        'Case B: Stale Session 1 reject must NOT force Session 2 into fallback fullscreen'
+      );
+      assert.strictEqual(overlayNode.classList.contains('disagall-fullscreen'), false);
+      assert.strictEqual(toastNode.textContent, '', 'Case B: Stale Session 1 reject must NOT show fallback toast in Session 2');
+      controller.closeViewer();
+
+      // Case C: Pending requestFullscreen() from Session 1 resolves AFTER closeViewer() -> openViewer() Session 2 (autoFullscreen=false)
+      let pendingReqC = null;
+      overlayNode.requestFullscreen = () => {
+        pendingReqC = createDeferred();
+        return pendingReqC.promise;
+      };
+      state.autoFullscreen = true;
+      controller.openViewer();
+      controller.closeViewer();
+
+      state.autoFullscreen = false;
+      controller.openViewer();
+      mockDocument.fullscreenElement = overlayNode;
+      pendingReqC.resolve();
+      mockDocument.dispatchEvent('fullscreenchange');
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(
+        mockDocument.fullscreenElement,
+        null,
+        'Case C: Stale Session 1 resolve in Session 2 must exit stale OS fullscreen'
+      );
+      assert.strictEqual(
+        state.isFullscreenMode,
+        false,
+        'Case C: Session 2 with autoFullscreen=false must NOT become fullscreen from Session 1'
+      );
+      controller.closeViewer();
+
+      // Case D: Delayed exitFullscreen() from Session 1 resolves AFTER Session 2 enters fallback fullscreen
+      const pendingExitD = createDeferred();
+      const origExit = mockDocument.exitFullscreen;
+      mockDocument.fullscreenElement = overlayNode;
+      state.isFullscreenMode = true;
+      overlayNode.classList.add('active', 'disagall-fullscreen', 'disagall-ui-hidden');
+      mockDocument.exitFullscreen = () => {
+        mockDocument.fullscreenElement = null;
+        return pendingExitD.promise;
+      };
+
+      controller.closeViewer();
+
+      overlayNode.requestFullscreen = () => Promise.reject(new Error('Permissions check failed'));
+      state.autoFullscreen = true;
+      controller.openViewer();
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(state.isFullscreenMode, true, 'Case D: Session 2 must be in fallback fullscreen');
+
+      pendingExitD.resolve();
+      mockDocument.dispatchEvent('fullscreenchange');
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(
+        state.isFullscreenMode,
+        true,
+        'Case D: Stale Session 1 exitFullscreen/fullscreenchange must NOT overwrite Session 2 fallback fullscreen'
+      );
+      assert.strictEqual(overlayNode.classList.contains('disagall-fullscreen'), true);
+      mockDocument.exitFullscreen = origExit;
+      controller.closeViewer();
+
+      // Case E: Rapid double toggleFullscreen() while requestFullscreen is pending -> no duplicate call / false-positive toast
+      let callCountE = 0;
+      let pendingReqE1 = null;
+      overlayNode.requestFullscreen = () => {
+        callCountE++;
+        if (callCountE === 1) {
+          pendingReqE1 = createDeferred();
+          return pendingReqE1.promise;
+        }
+        return Promise.reject(new Error('Duplicate request rejected'));
+      };
+      state.autoFullscreen = false;
+      toastNode.textContent = '';
+      controller.openViewer();
+      controller.handleKeyDown({ key: 'f', preventDefault() {}, stopPropagation() {} });
+      controller.handleKeyDown({ key: 'f', preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(callCountE, 1, 'Case E: In-flight requestFullscreen must ignore duplicate toggleFullscreen');
+
+      mockDocument.fullscreenElement = overlayNode;
+      pendingReqE1.resolve();
+      mockDocument.dispatchEvent('fullscreenchange');
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(state.isFullscreenMode, true);
+      assert.strictEqual(toastNode.textContent, '', 'Case E: Successful OS fullscreen must NOT show fallback toast');
+      controller.closeViewer();
+
+      // Case F: Session 1 pending requestFullscreen resolves AFTER Session 2 (autoFullscreen=true) fires P2 which rejects
+      let callCountF = 0;
+      let pendingReqF1 = null;
+      let pendingReqF2 = null;
+      overlayNode.requestFullscreen = () => {
+        callCountF++;
+        if (callCountF === 1) {
+          pendingReqF1 = createDeferred();
+          return pendingReqF1.promise;
+        }
+        pendingReqF2 = createDeferred();
+        return pendingReqF2.promise;
+      };
+      state.autoFullscreen = true;
+      toastNode.textContent = '';
+      controller.openViewer();
+      controller.closeViewer();
+      controller.openViewer();
+      assert.strictEqual(callCountF, 2);
+
+      mockDocument.fullscreenElement = overlayNode;
+      pendingReqF1.resolve();
+      mockDocument.dispatchEvent('fullscreenchange');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      pendingReqF2.reject(new Error('Already fullscreen'));
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(mockDocument.fullscreenElement, overlayNode, 'Case F: Session 2 must remain in OS fullscreen');
+      assert.strictEqual(state.isFullscreenMode, true);
+      assert.strictEqual(toastNode.textContent, '', 'Case F: P2 reject when already fullscreen must NOT show fallback toast');
+      controller.closeViewer();
+    } finally {
+      mockDocument.querySelectorAll = origQuerySelectorAll;
+      global.Image = origImage;
+    }
+  });
+  console.log('✅ Test 27: DEFECT-01 async fullscreen Promise vs closeViewer/openViewer & rapid toggle races verified');
+
   console.log('\n🎉 ALL VIEWER IMMERSION UNIT TESTS PASSED! 🎉');
 }
 

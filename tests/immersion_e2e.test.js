@@ -745,6 +745,24 @@ async function run() {
     timers.advanceBy(3000);
     assert.strictEqual(overlay.classList.contains('disagall-idle'), false, 'TC-NG-02: No ghost .disagall-idle after backdrop close');
 
+    // 4. DEFECT-01: Pending requestFullscreen resolves after closeViewer -> must exit OS fullscreen immediately
+    let resolvePendingFs = null;
+    const origReqFs = overlay.requestFullscreen;
+    overlay.requestFullscreen = () => new Promise((resolve) => { resolvePendingFs = resolve; });
+    env.win.postMessage({ action: 'disagall_test_open' }, '*');
+    env.win.dispatchEvent({ type: 'keydown', key: 'f' });
+    assert.strictEqual(typeof resolvePendingFs, 'function', 'TC-NG-02: requestFullscreen must be pending');
+    closeBtn.dispatchEvent('click');
+    assert.strictEqual(overlay.classList.contains('active'), false);
+    env.doc.fullscreenElement = overlay;
+    resolvePendingFs();
+    env.doc.dispatchEvent('fullscreenchange');
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(env.doc.fullscreenElement, null, 'TC-NG-02 (DEFECT-01): Late resolve after closeViewer must exit OS fullscreen');
+    assert.strictEqual(overlay.classList.contains('disagall-fullscreen'), false);
+    overlay.requestFullscreen = origReqFs;
+
     console.log('✅ TC-NG-02 PASS: closeViewer (closeBtn/Escape/backdrop/fullscreen) timer cleanup & ghost-callback defense verified');
   }
 
