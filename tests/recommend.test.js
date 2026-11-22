@@ -267,4 +267,396 @@ function dispatchRecommendClick(btn) {
   console.log('✅ Test 7: Single-dispatch verification (prevents 1일 1회 duplicate alert) passed');
 }
 
-console.log('\n🎉 ALL RECOMMEND UNIT & INTEGRATION TESTS PASSED! 🎉');
+// Test 8: DEFECT-03 Red-to-Green regression tests against real src/ modules
+function createRecommendMockDom() {
+  const allElements = [];
+
+  function matchesSimpleSelector(el, sel) {
+    if (!el || !sel) return false;
+    const trimmed = sel.trim();
+    if (!trimmed) return false;
+
+    // Handle descendant combinator (e.g., '.btn_recommend_box button.btn_recom_up')
+    if (trimmed.includes(' ')) {
+      const parts = trimmed.split(/\s+/);
+      const targetPart = parts[parts.length - 1];
+      if (!matchesSimpleSelector(el, targetPart)) return false;
+      let cur = el.parentElement;
+      for (let i = parts.length - 2; i >= 0; i--) {
+        while (cur && !matchesSimpleSelector(cur, parts[i])) {
+          cur = cur.parentElement;
+        }
+        if (!cur) return false;
+        cur = cur.parentElement;
+      }
+      return true;
+    }
+
+    // Parse compound selector: tag, #id, .class, [attr], [attr="val"], [attr*="val"], [attr^="val"]
+    let rest = trimmed;
+    const tagMatch = rest.match(/^[a-zA-Z][a-zA-Z0-9_-]*/);
+    if (tagMatch) {
+      if (el.tagName !== tagMatch[0].toUpperCase()) return false;
+      rest = rest.slice(tagMatch[0].length);
+    }
+
+    while (rest.length > 0) {
+      if (rest.startsWith('#')) {
+        const m = rest.match(/^#([a-zA-Z0-9_-]+)/);
+        if (!m || el.id !== m[1]) return false;
+        rest = rest.slice(m[0].length);
+      } else if (rest.startsWith('.')) {
+        const m = rest.match(/^\.([a-zA-Z0-9_-]+)/);
+        if (!m || !el.classList.contains(m[1])) return false;
+        rest = rest.slice(m[0].length);
+      } else if (rest.startsWith('[')) {
+        const m = rest.match(/^\[([a-zA-Z0-9_-]+)(?:(\*|\^)?="([^"]*)")?\]/);
+        if (!m) return false;
+        const [, attrName, op, attrVal] = m;
+        const actual = el.getAttribute(attrName);
+        if (actual === null || actual === undefined) return false;
+        if (op === '*') {
+          if (!String(actual).includes(attrVal)) return false;
+        } else if (op === '^') {
+          if (!String(actual).startsWith(attrVal)) return false;
+        } else if (attrVal !== undefined) {
+          if (String(actual) !== attrVal) return false;
+        }
+        rest = rest.slice(m[0].length);
+      } else {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function matchesSelectorList(el, selectorList) {
+    if (!selectorList) return false;
+    const list = Array.isArray(selectorList) ? selectorList : String(selectorList).split(',');
+    return list.some((part) => matchesSimpleSelector(el, part));
+  }
+
+  function createElement(tagName, { id = '', classes = [], attrs = {}, textContent = '' } = {}) {
+    const attrMap = { ...attrs };
+    if (id) attrMap.id = id;
+    const classSet = new Set(classes);
+    const el = {
+      tagName: tagName.toUpperCase(),
+      id,
+      value: attrs.value || '',
+      disabled: Boolean(attrs.disabled),
+      textContent,
+      title: '',
+      innerHTML: '',
+      style: {},
+      parentElement: null,
+      children: [],
+      classList: {
+        add: (...names) => names.forEach((n) => classSet.add(n)),
+        remove: (...names) => names.forEach((n) => classSet.delete(n)),
+        contains: (name) => classSet.has(name),
+      },
+      setAttribute: (k, v) => {
+        attrMap[k] = String(v);
+        if (k === 'id') el.id = String(v);
+      },
+      getAttribute: (k) => (Object.prototype.hasOwnProperty.call(attrMap, k) ? attrMap[k] : null),
+      appendChild: (child) => {
+        child.parentElement = el;
+        el.children.push(child);
+        return child;
+      },
+      closest: (selectorList) => {
+        let cur = el;
+        while (cur) {
+          if (matchesSelectorList(cur, selectorList)) return cur;
+          cur = cur.parentElement;
+        }
+        return null;
+      },
+    };
+    allElements.push(el);
+    return el;
+  }
+
+  const root = createElement('div', { id: 'mock-root' });
+
+  function collectMatches(node, selectorList, out = []) {
+    for (const child of node.children) {
+      if (matchesSelectorList(child, selectorList)) out.push(child);
+      collectMatches(child, selectorList, out);
+    }
+    return out;
+  }
+
+  const doc = {
+    body: root,
+    createElement: (tag) => createElement(tag),
+    getElementById: (id) => allElements.find((el) => el.id === id) || null,
+    querySelector: (selectorList) => collectMatches(root, selectorList)[0] || null,
+    querySelectorAll: (selectorList) => collectMatches(root, selectorList),
+  };
+
+  return { doc, root, createElement };
+}
+
+async function runDefect03Tests() {
+  const {
+    RECOMMEND_BUTTON_SELECTORS,
+    RECOMMEND_BUTTON_PRIORITY_SELECTORS,
+    getNativeRecommendButton,
+    getPostRecommendCount,
+    dispatchRecommendClick: realDispatchRecommendClick,
+  } = await import('../src/parser/recommend_parser.js');
+  const {
+    triggerPostRecommend,
+    clearRecommendTimers,
+  } = await import('../src/controller/recommend_controller.js');
+  const { closeViewer } = await import('../src/controller/viewer_controller.js');
+  const { CONFIG } = await import('../src/config.js');
+  const { state } = await import('../src/state.js');
+
+  // 8.1 Must NOT self-match #disagall-btn-recommend inside #disagall-viewer-overlay
+  {
+    const { doc, root, createElement } = createRecommendMockDom();
+    const overlay = createElement('div', { id: 'disagall-viewer-overlay' });
+    const viewerBtn = createElement('button', {
+      id: 'disagall-btn-recommend',
+      classes: ['disagall-btn', 'disagall-btn-recommend'],
+    });
+    overlay.appendChild(viewerBtn);
+    root.appendChild(overlay);
+
+    const matched = getNativeRecommendButton(doc);
+    assert.strictEqual(
+      matched,
+      null,
+      'DEFECT-03: getNativeRecommendButton must NOT self-match #disagall-btn-recommend'
+    );
+  }
+
+  // 8.2 Must NOT match non-recommend buttons (scrap close, silbechu, report, goList, downvote)
+  {
+    const { doc, root, createElement } = createRecommendMockDom();
+    const scrapCloseBtn = createElement('button', {
+      classes: ['poply_bgblueclose'],
+      attrs: { onclick: "$(this).closest('#scrapdone_non_recom').remove();" },
+    });
+    const recomBox = createElement('div', { classes: ['btn_recommend_box'] });
+    const downBtn = createElement('button', { classes: ['btn_recom_down'], attrs: { 'data-no': '1968506' } });
+    const silbechuBtn = createElement('button', { classes: ['btn_silbechu'], attrs: { 'data-no': '1968506' } });
+    const reportBtn = createElement('button', { classes: ['btn_report'], attrs: { 'data-no': '1968506' } });
+    const goListBtn = createElement('button', {
+      classes: ['btn_white', 'concept'],
+      attrs: { onclick: "goList('/mgallery/board/lists/?id=digitalpicture&exception_mode=recommend')" },
+    });
+    recomBox.appendChild(downBtn);
+    recomBox.appendChild(silbechuBtn);
+    recomBox.appendChild(reportBtn);
+    root.appendChild(scrapCloseBtn);
+    root.appendChild(recomBox);
+    root.appendChild(goListBtn);
+
+    assert.strictEqual(
+      getNativeRecommendButton(doc),
+      null,
+      'DEFECT-03: Must NOT falsely match scrap close, downvote, silbechu, report, or goList buttons'
+    );
+    assert(
+      !RECOMMEND_BUTTON_PRIORITY_SELECTORS.includes('button[data-no]') &&
+      !RECOMMEND_BUTTON_PRIORITY_SELECTORS.includes('button[onclick*="recom"]') &&
+      !RECOMMEND_BUTTON_PRIORITY_SELECTORS.includes('a[onclick*="recom"]') &&
+      !RECOMMEND_BUTTON_PRIORITY_SELECTORS.includes('button[id*="recommend"]') &&
+      !RECOMMEND_BUTTON_PRIORITY_SELECTORS.includes('.btn_recommend_box button'),
+      'DEFECT-03: Overly broad selectors must be removed from RECOMMEND_BUTTON_PRIORITY_SELECTORS'
+    );
+  }
+
+  // 8.3 Must match in selector priority order, not document order, and skip #disagall-viewer-overlay
+  {
+    const { doc, root, createElement } = createRecommendMockDom();
+    const overlay = createElement('div', { id: 'disagall-viewer-overlay' });
+    const viewerBtn = createElement('button', {
+      id: 'disagall-btn-recommend',
+      classes: ['btn_recom_up'],
+    });
+    overlay.appendChild(viewerBtn);
+
+    const lowerPriorityBtn = createElement('a', { classes: ['btn_recommend'] });
+    const recomBox = createElement('div', { classes: ['btn_recommend_box'] });
+    const nativeBtn = createElement('button', {
+      classes: ['btn_recom_up', 'on'],
+      attrs: { 'data-no': '1968506' },
+    });
+    recomBox.appendChild(nativeBtn);
+
+    root.appendChild(overlay);
+    root.appendChild(lowerPriorityBtn);
+    root.appendChild(recomBox);
+
+    assert(
+      Array.isArray(RECOMMEND_BUTTON_PRIORITY_SELECTORS),
+      'DEFECT-03: RECOMMEND_BUTTON_PRIORITY_SELECTORS must be an ordered priority array'
+    );
+    assert.strictEqual(
+      typeof RECOMMEND_BUTTON_SELECTORS,
+      'string',
+      'RECOMMEND_BUTTON_SELECTORS string export must remain backwards-compatible'
+    );
+    assert.strictEqual(
+      getNativeRecommendButton(doc),
+      nativeBtn,
+      'DEFECT-03: Must skip overlay and select highest-priority native button over earlier lower-priority match'
+    );
+  }
+
+  // 8.4 getPostRecommendCount exclusion & dispatchRecommendClick guards
+  {
+    const { doc, root, createElement } = createRecommendMockDom();
+    const overlay = createElement('div', { id: 'disagall-viewer-overlay' });
+    const fakeCount = createElement('span', { classes: ['recom_num'], textContent: '999' });
+    overlay.appendChild(fakeCount);
+    const realCount = createElement('p', {
+      id: 'recommend_view_up_1968506',
+      classes: ['up_num'],
+      textContent: '6',
+    });
+    root.appendChild(overlay);
+    root.appendChild(realCount);
+
+    assert.strictEqual(
+      getPostRecommendCount(doc),
+      6,
+      'getPostRecommendCount must exclude overlay elements and use priority order'
+    );
+
+    const viewerBtn = createElement('button', { id: 'disagall-btn-recommend' });
+    overlay.appendChild(viewerBtn);
+    assert.strictEqual(
+      realDispatchRecommendClick(viewerBtn),
+      false,
+      'dispatchRecommendClick must reject viewer-internal buttons'
+    );
+    const disabledAnchor = createElement('a', {
+      classes: ['btn_recom_up'],
+      attrs: { 'aria-disabled': 'true' },
+    });
+    assert.strictEqual(
+      realDispatchRecommendClick(disabledAnchor),
+      false,
+      'dispatchRecommendClick must reject aria-disabled elements'
+    );
+  }
+
+  // 8.5 triggerPostRecommend must NOT conceal dispatchRecommendClick() failure & closeViewer cleans timers
+  {
+    const origDoc = global.document;
+    const origSetTimeout = global.setTimeout;
+    const origClearTimeout = global.clearTimeout;
+    const origWindow = global.window;
+
+    const { doc, root, createElement } = createRecommendMockDom();
+    const overlay = createElement('div', { id: 'disagall-viewer-overlay', classes: ['active'] });
+    const viewerRecommendBtn = createElement('button', {
+      id: 'disagall-btn-recommend',
+      classes: ['disagall-btn', 'disagall-btn-recommend'],
+    });
+    const toastEl = createElement('div', { id: 'disagall-toast' });
+    overlay.appendChild(viewerRecommendBtn);
+    overlay.appendChild(toastEl);
+
+    const countEl = createElement('p', {
+      id: 'recommend_view_up_1968506',
+      classes: ['up_num'],
+      textContent: '6',
+    });
+    // Native button whose click is unavailable and dispatchEvent fails (returns false)
+    const failingNativeBtn = createElement('button', {
+      classes: ['btn_recom_up'],
+      attrs: { 'data-no': '1968506' },
+    });
+    failingNativeBtn.dispatchEvent = () => false;
+
+    root.appendChild(overlay);
+    root.appendChild(countEl);
+    root.appendChild(failingNativeBtn);
+
+    const activeTimers = new Map();
+    const scheduledDelays = [];
+    let nextTimerId = 1;
+    const prevElements = { ...state.elements };
+    state.elements.overlayEl = overlay;
+    state.elements.recommendBtnEl = viewerRecommendBtn;
+    state.elements.toastEl = toastEl;
+
+    global.document = doc;
+    global.window = doc;
+    global.setTimeout = (fn, delay) => {
+      const id = nextTimerId++;
+      scheduledDelays.push(delay);
+      activeTimers.set(id, fn);
+      return id;
+    };
+    global.clearTimeout = (id) => {
+      activeTimers.delete(id);
+    };
+
+    try {
+      const failResult = triggerPostRecommend();
+      assert.strictEqual(
+        failResult,
+        false,
+        'DEFECT-03: triggerPostRecommend must return false when dispatchRecommendClick returns false'
+      );
+      assert(
+        !toastEl.textContent.includes('개념글 추천을 눌렀습니다'),
+        `DEFECT-03: Must NOT display success toast when dispatch failed (got: "${toastEl.textContent}")`
+      );
+      assert(
+        CONFIG.RECOMMEND_SYNC_DELAYS.every((delay) => !scheduledDelays.includes(delay)),
+        'DEFECT-03: Must NOT schedule 500ms/1200ms sync timers when dispatch failed'
+      );
+
+      // Verify normal success path immediately after failed attempt (must not be stuck throttled/locked)
+      scheduledDelays.length = 0;
+      let clicked = 0;
+      failingNativeBtn.click = () => { clicked++; };
+      const okResult = triggerPostRecommend();
+      assert.strictEqual(okResult, true, 'Successful dispatch after failure must return true');
+      assert.strictEqual(clicked, 1, 'Native button click must fire once');
+      assert(
+        toastEl.textContent.includes('개념글 추천을 눌렀습니다'),
+        'Success path must display recommend toast'
+      );
+      assert(
+        CONFIG.RECOMMEND_SYNC_DELAYS.every((delay) => scheduledDelays.includes(delay)),
+        'Success path must schedule 500ms and 1200ms count sync timers'
+      );
+      assert.strictEqual(state.recommendTimers.length, 2, 'Sync timers must be registered in state.recommendTimers');
+
+      // Verify closeViewer() cancels pending recommend timers & unlock lock
+      closeViewer();
+      assert.strictEqual(state.recommendTimers.length, 0, 'closeViewer() must clear state.recommendTimers');
+      assert.strictEqual(state.recommendUnlockTimer, null, 'closeViewer() must clear state.recommendUnlockTimer');
+    } finally {
+      clearRecommendTimers();
+      state.elements = prevElements;
+      state.toastTimer = null;
+      global.document = origDoc;
+      global.window = origWindow;
+      global.setTimeout = origSetTimeout;
+      global.clearTimeout = origClearTimeout;
+    }
+  }
+
+  console.log('✅ Test 8: DEFECT-03 selector exclusion, priority order, dispatch failure & timer cleanup passed');
+}
+
+runDefect03Tests()
+  .then(() => {
+    console.log('\n🎉 ALL RECOMMEND UNIT & INTEGRATION TESTS PASSED! 🎉');
+  })
+  .catch((err) => {
+    console.error('❌ Recommend test failed:', err);
+    process.exit(1);
+  });
