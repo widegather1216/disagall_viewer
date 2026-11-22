@@ -2,6 +2,29 @@
 import { state } from '../state.js';
 import { applyFittingAndPadding } from './overlay.js';
 
+function clearSuppressBackdropClick() {
+  state.zoom.suppressNextBackdropClick = false;
+  if (state.zoom.suppressClickTimer !== null) {
+    clearTimeout(state.zoom.suppressClickTimer);
+    state.zoom.suppressClickTimer = null;
+  }
+}
+
+function armSuppressBackdropClick() {
+  clearSuppressBackdropClick();
+  state.zoom.suppressNextBackdropClick = true;
+  state.zoom.suppressClickTimer = setTimeout(() => {
+    state.zoom.suppressClickTimer = null;
+    state.zoom.suppressNextBackdropClick = false;
+  }, 0);
+}
+
+export function consumeSuppressedBackdropClick() {
+  if (!state.zoom.suppressNextBackdropClick) return false;
+  clearSuppressBackdropClick();
+  return true;
+}
+
 export function onWindowMouseMove(e) {
   if (!state.zoom.isDragging) return;
   state.zoom.panX = e.clientX - state.zoom.startX;
@@ -9,11 +32,17 @@ export function onWindowMouseMove(e) {
   updateImgTransform();
 }
 
-export function onWindowMouseUp() {
-  if (state.zoom.isDragging) {
-    state.zoom.isDragging = false;
-    window.removeEventListener('mousemove', onWindowMouseMove);
-    window.removeEventListener('mouseup', onWindowMouseUp);
+export function onWindowMouseUp(e) {
+  if (e && typeof e.button === 'number' && e.button !== 0) return;
+  if (!state.zoom.isDragging && !state.zoom.pendingDragRelease) return;
+
+  const wasDragging = state.zoom.isDragging;
+  state.zoom.isDragging = false;
+  state.zoom.pendingDragRelease = false;
+  armSuppressBackdropClick();
+  window.removeEventListener('mousemove', onWindowMouseMove);
+  window.removeEventListener('mouseup', onWindowMouseUp);
+  if (wasDragging) {
     updateImgTransform();
   }
 }
@@ -46,12 +75,18 @@ export function updateImgTransform() {
   });
 }
 
-export function resetZoom() {
+export function resetZoom(preservePendingRelease = false) {
   state.zoom.scale = 1.0;
   state.zoom.panX = 0;
   state.zoom.panY = 0;
-  if (state.zoom.isDragging) {
+  clearSuppressBackdropClick();
+  if (preservePendingRelease && state.zoom.isDragging) {
     state.zoom.isDragging = false;
+    state.zoom.pendingDragRelease = true;
+    window.removeEventListener('mousemove', onWindowMouseMove);
+  } else if (state.zoom.isDragging || state.zoom.pendingDragRelease) {
+    state.zoom.isDragging = false;
+    state.zoom.pendingDragRelease = false;
     window.removeEventListener('mousemove', onWindowMouseMove);
     window.removeEventListener('mouseup', onWindowMouseUp);
   }
@@ -86,10 +121,14 @@ export function setupZoomEvents(mainImgEl) {
   mainImgEl.addEventListener('mousedown', (e) => {
     if (state.zoom.scale > 1.0 && e.button === 0) {
       e.preventDefault();
+      clearSuppressBackdropClick();
+      state.zoom.pendingDragRelease = false;
       state.zoom.isDragging = true;
       state.zoom.startX = e.clientX - state.zoom.panX;
       state.zoom.startY = e.clientY - state.zoom.panY;
 
+      window.removeEventListener('mousemove', onWindowMouseMove);
+      window.removeEventListener('mouseup', onWindowMouseUp);
       window.addEventListener('mousemove', onWindowMouseMove);
       window.addEventListener('mouseup', onWindowMouseUp);
       updateImgTransform();

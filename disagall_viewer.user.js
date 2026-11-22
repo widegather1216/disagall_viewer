@@ -71,9 +71,12 @@
       panX: 0,
       panY: 0,
       isDragging: false,
+      pendingDragRelease: false,
       startX: 0,
       startY: 0,
-      transformRafId: null
+      transformRafId: null,
+      suppressNextBackdropClick: false,
+      suppressClickTimer: null
     }
   };
 
@@ -638,17 +641,42 @@
   }
 
   // src/ui/zoom_pan.js
+  function clearSuppressBackdropClick() {
+    state.zoom.suppressNextBackdropClick = false;
+    if (state.zoom.suppressClickTimer !== null) {
+      clearTimeout(state.zoom.suppressClickTimer);
+      state.zoom.suppressClickTimer = null;
+    }
+  }
+  function armSuppressBackdropClick() {
+    clearSuppressBackdropClick();
+    state.zoom.suppressNextBackdropClick = true;
+    state.zoom.suppressClickTimer = setTimeout(() => {
+      state.zoom.suppressClickTimer = null;
+      state.zoom.suppressNextBackdropClick = false;
+    }, 0);
+  }
+  function consumeSuppressedBackdropClick() {
+    if (!state.zoom.suppressNextBackdropClick) return false;
+    clearSuppressBackdropClick();
+    return true;
+  }
   function onWindowMouseMove(e) {
     if (!state.zoom.isDragging) return;
     state.zoom.panX = e.clientX - state.zoom.startX;
     state.zoom.panY = e.clientY - state.zoom.startY;
     updateImgTransform();
   }
-  function onWindowMouseUp() {
-    if (state.zoom.isDragging) {
-      state.zoom.isDragging = false;
-      window.removeEventListener("mousemove", onWindowMouseMove);
-      window.removeEventListener("mouseup", onWindowMouseUp);
+  function onWindowMouseUp(e) {
+    if (e && typeof e.button === "number" && e.button !== 0) return;
+    if (!state.zoom.isDragging && !state.zoom.pendingDragRelease) return;
+    const wasDragging = state.zoom.isDragging;
+    state.zoom.isDragging = false;
+    state.zoom.pendingDragRelease = false;
+    armSuppressBackdropClick();
+    window.removeEventListener("mousemove", onWindowMouseMove);
+    window.removeEventListener("mouseup", onWindowMouseUp);
+    if (wasDragging) {
       updateImgTransform();
     }
   }
@@ -676,12 +704,18 @@
       }
     });
   }
-  function resetZoom() {
+  function resetZoom(preservePendingRelease = false) {
     state.zoom.scale = 1;
     state.zoom.panX = 0;
     state.zoom.panY = 0;
-    if (state.zoom.isDragging) {
+    clearSuppressBackdropClick();
+    if (preservePendingRelease && state.zoom.isDragging) {
       state.zoom.isDragging = false;
+      state.zoom.pendingDragRelease = true;
+      window.removeEventListener("mousemove", onWindowMouseMove);
+    } else if (state.zoom.isDragging || state.zoom.pendingDragRelease) {
+      state.zoom.isDragging = false;
+      state.zoom.pendingDragRelease = false;
       window.removeEventListener("mousemove", onWindowMouseMove);
       window.removeEventListener("mouseup", onWindowMouseUp);
     }
@@ -711,9 +745,13 @@
     mainImgEl.addEventListener("mousedown", (e) => {
       if (state.zoom.scale > 1 && e.button === 0) {
         e.preventDefault();
+        clearSuppressBackdropClick();
+        state.zoom.pendingDragRelease = false;
         state.zoom.isDragging = true;
         state.zoom.startX = e.clientX - state.zoom.panX;
         state.zoom.startY = e.clientY - state.zoom.panY;
+        window.removeEventListener("mousemove", onWindowMouseMove);
+        window.removeEventListener("mouseup", onWindowMouseUp);
         window.addEventListener("mousemove", onWindowMouseMove);
         window.addEventListener("mouseup", onWindowMouseUp);
         updateImgTransform();
@@ -1552,7 +1590,7 @@
     if (state.postImages.length === 0) return;
     const seq = ++imageLoadSeq;
     renderedLoadSeq = -1;
-    resetZoom();
+    resetZoom(true);
     state.currentIndex = (index + state.postImages.length) % state.postImages.length;
     updateNavAndCounterUi();
     const imgData = state.postImages[state.currentIndex];
@@ -1725,6 +1763,7 @@
   }
   function bindOverlayBackdrop(overlayEl) {
     overlayEl.addEventListener("click", (e) => {
+      if (consumeSuppressedBackdropClick()) return;
       if (e.target === overlayEl || e.target.id === "disagall-stage" || e.target.id === "disagall-img-wrapper") {
         closeViewer();
       }

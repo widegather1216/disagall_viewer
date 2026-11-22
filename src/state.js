@@ -42,8 +42,11 @@ export const state = {
     panX: 0,
     panY: 0,
     isDragging: false,
+    pendingDragRelease: false,
     startX: 0,
     startY: 0,
     transformRafId: null,
+    suppressNextBackdropClick: false,
+    suppressClickTimer: null,
   }
 };

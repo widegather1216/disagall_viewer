@@ -18,7 +18,7 @@ import {
   isEditableTarget,
   isExternalModalOpen
 } from '../ui/overlay.js';
-import { resetZoom, setupZoomEvents } from '../ui/zoom_pan.js';
+import { resetZoom, setupZoomEvents, consumeSuppressedBackdropClick } from '../ui/zoom_pan.js';
 import { triggerPostRecommend, updateRecommendButtonUi, clearRecommendTimers } from './recommend_controller.js';
 import {
   isOverlayActive,
@@ -136,7 +136,7 @@ export function showImage(index) {
 
   const seq = ++imageLoadSeq;
   renderedLoadSeq = -1;
-  resetZoom();
+  resetZoom(true);
   state.currentIndex = (index + state.postImages.length) % state.postImages.length;
   updateNavAndCounterUi();
 
@@ -333,6 +333,7 @@ function bindPaddingSlider(sliderEl, sliderValEl) {
 
 function bindOverlayBackdrop(overlayEl) {
   overlayEl.addEventListener('click', (e) => {
+    if (consumeSuppressedBackdropClick()) return;
     if (e.target === overlayEl || e.target.id === 'disagall-stage' || e.target.id === 'disagall-img-wrapper') {
       closeViewer();
     }
