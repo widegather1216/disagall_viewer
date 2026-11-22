@@ -1,7 +1,7 @@
 # Verification & Defect Log - Post Navigation
 
-- **검증 상태**: `🩹 Debugging` (`3건 OPEN DEFECT` — `deep-bug-hunter` 실증 등록 · `REFACTOR-05` 1건 유지)
-- **미해결 티켓**: `🚨 DEFECT: 3건` | `🧐 REFACTOR: 1건`
+- **검증 상태**: `🩹 Debugging` (`2건 OPEN DEFECT` — `DEFECT-01~02` 해결 완료, `DEFECT-03~04`·`REFACTOR-05` 잔여)
+- **미해결 티켓**: `🚨 DEFECT: 2건` | `🧐 REFACTOR: 1건`
 
 ---
 
@@ -11,10 +11,13 @@
 - **현재 상태**: 🟢 RESOLVED — `isCurrentPost` 선행 판별(`crt`/`crt_icon`/`currentPostNo`) 적용 및 `tests/post_navigation.test.js` 라이브/샘플 픽스처 회귀 테스트 `PASS`.
 
 ### [DEFECT-02] `showNoPhotoNotice()` `keydown` 리스너 영구 누수 및 입력창/`Cmd+W` 단축키 가로채기
-- **현재 상태**: 🟡 OPEN
-- **심각도 & 위치**: 🔴 P0 Critical | [`src/ui/overlay.js#L198-L249`](../../../src/ui/overlay.js#L198-L249)
-- **원인 및 실증**: `closeBtn` 클릭(`#L225`)·중복 호출(`#L200`) 시 `noticeEl.remove()`만 실행하고 `window.removeEventListener('keydown', handleNoticeKey)`와 타이머를 해제하지 않아 리스너가 영구 누수됨. `handleNoticeKey`(`#L227-L240`)에 입력창(`INPUT`/`TEXTAREA`/`isContentEditable`) 및 수정자 키(`ctrlKey`/`metaKey`/`altKey`) 가드가 없어 공지 닫은 후에도 댓글 입력 `w`/`s`나 `Cmd+W`가 `onNavigatePost`로 가로채짐(`Empirical Probe Reproduced`).
-- **최소 수정 설계**: `dismissNotice()` 헬퍼로 DOM 제거·타이머 해제·리스너 제거 통합 및 입력창/수정자 키 가드 추가.
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **심각도 & 위치**: 🔴 P0 Critical | [`src/ui/overlay.js#L198-L339`](../../../src/ui/overlay.js#L198-L339), [`src/state.js#L28`](../../../src/state.js#L28), [`src/controller/viewer_controller.js#L349-L375`](../../../src/controller/viewer_controller.js#L349-L375)
+- **원인 및 실증**: `closeBtn` 클릭·중복 호출 시 `noticeEl.remove()`만 실행하고 `window.removeEventListener('keydown', handleNoticeKey)`와 `setTimeout` 타이머를 해제하지 않아 리스너/타이머가 영구 누수됨. 또한 `handleNoticeKey`에 `e.repeat`, 입력창(`INPUT`/`TEXTAREA`/`SELECT`/`isContentEditable`), 수정자 키(`ctrlKey`/`metaKey`/`altKey`), 외부 모달(`isExternalModalOpen`), 활성 뷰어(`overlayEl.active`) 가드가 없어 공지 닫은 후에도 댓글 입력 `w`/`s`나 `Cmd+W`가 `onNavigatePost`로 가로채짐(`tests/post_navigation.test.js` Test 8 Red 재현 확인).
+- **해결 내역**:
+  - **수정 파일**: [`src/state.js`](../../../src/state.js#L28), [`src/ui/overlay.js`](../../../src/ui/overlay.js#L198-L339), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js#L11-L20), [`tests/post_navigation.test.js`](../../../tests/post_navigation.test.js#L345-L625)
+  - **원인 및 조치**: Devil's Advocate 교차 검증을 반영해 `state.noPhotoNoticeTimer` 등록 및 `dismissNoPhotoNotice()`/`dismissNotice()` 멱등 정리(DOM 제거·`clearTimeout`·`window.removeEventListener` 완료 후 콜백 실행으로 재진입 레이스 차단) 구현. `isEditableTarget`/`isExternalModalOpen`을 `src/ui/overlay.js`로 단일화(중복 제거)하고 `handleNoticeKey`에 입력창·수정자 키·`repeat`·외부 모달·활성 오버레이 가드 및 한글 IME(`KeyW`/`KeyS`) 폴백을 추가했으며 `openViewer()`/`closeViewer()`에서 `dismissNoPhotoNotice()`를 호출해 잔존 배너/타이머를 차단하고 `npm run build`로 `content.js`/`disagall_viewer.user.js` 동기화.
+  - **회귀 테스트 결과**: `node tests/post_navigation.test.js` (8/8 PASS), `npm test` (5개 스위트 전량 PASS), `node tests/immersion_e2e.test.js` (15/15 PASS), `npm run build` (`PASS`), `node --check` (`PASS`)
 
 ### [DEFECT-03] `post_navigator.js` 하단 경계 `'bottom'` 도달 불가, 공지/AD `innerHTML` 우회 및 `javascript:` 통과
 - **현재 상태**: 🟡 OPEN

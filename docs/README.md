@@ -5,10 +5,10 @@
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
 - **Active 도메인**: 전 도메인 (`core-viewer`, `post-navigation`, `post-recommend`, `viewer-immersion`, `modular-bundler-migration`)
-- **현재 단계 (Stage)**: `🩹 Debugging` (`잔여 결함 11건 OPEN` — P0 3건 / P1 8건; `core-viewer/DEFECT-01` 해결 완료)
-- **직전 완료 작업**: `systematic-debugger`로 `core-viewer/DEFECT-01` (Userscript 캡처 `click` 자가 재진입 및 `openViewer()` 중복 호출 시 스크롤 영구 잠금) 해결, `tests/core_viewer.test.js`(3/3)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build` PASS
+- **현재 단계 (Stage)**: `🩹 Debugging` (`잔여 결함 10건 OPEN` — P0 2건 / P1 8건; `core-viewer/DEFECT-01`, `post-navigation/DEFECT-02` 해결 완료)
+- **직전 완료 작업**: `systematic-debugger`로 `post-navigation/DEFECT-02` (`showNoPhotoNotice()` `keydown` 리스너·타이머 누수 및 입력창/`Cmd+W` 가로채기) 해결, `tests/post_navigation.test.js`(8/8)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build`·`node --check` PASS
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `post-navigation/DEFECT-02`, `post-recommend/DEFECT-03`, `viewer-immersion/DEFECT-01` (남은 P0 3건) 및 `core-viewer/DEFECT-02` 순차 디버깅해줘
+  > `post-recommend/DEFECT-03`, `viewer-immersion/DEFECT-01` (남은 P0 2건) 및 `core-viewer/DEFECT-02` 순차 디버깅해줘
 
 ---
 
@@ -18,7 +18,7 @@
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 기술 스택/동시성 제약 확립 |
 | [`core-viewer`](./features/core-viewer/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `5/9 (56%)` | `3 / 0` | `DEFECT-01` 해결 완료, `DEFECT-02~04` 잔여 (이미지 레이스, 드래그 닫힘, 지연 로딩 우클릭) |
-| [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `-` | `3 / 1` | `DEFECT-02~04` 등록 (무사진 키누수, `'bottom'` dead code, 이동/폴링 타이머 충돌) |
+| [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `-` | `2 / 1` | `DEFECT-02` 해결 완료, `DEFECT-03~04` 잔여 (`'bottom'` dead code, 이동/폴링 타이머 충돌) |
 | [`post-recommend`](./features/post-recommend/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `3/4 (75%)` | `1 / 0` | `DEFECT-03` 등록 (셀렉터 자가 매칭·오클릭 및 `dispatchRecommendClick` 실패 은폐) |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `1/3 (33%)` | `1 / 0` | `DEFECT-01` 등록 (Safari v1.0.0 번들 미동기화 및 `#disagall-quick-launcher` CSS 누락) |
 | [`viewer-immersion`](./features/viewer-immersion/README.md) | 🩹 Debugging | `[■■■■■■■■] 8/8` | `4/6 (67%)` | `3 / 0` | `DEFECT-01~03` 등록 (전체화면 Promise 레이스, `mouseleave` 숨김 취소, `defaultPadding` sync) |
@@ -30,6 +30,8 @@
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
 
+- **`[2026-11-22]` `[atomic-commit-crafter]` [`post-navigation`]**: `0db8e14` (`fix(post-navigation)` `DEFECT-02`), `f97ae7a` (`test(post-navigation)` Test 8 회귀 테스트) 및 위키/관제탑 동기화 커밋 완료.
+- **`[2026-11-21]` `[systematic-debugger]` [`post-navigation`]**: `DEFECT-02` 해결 — `state.noPhotoNoticeTimer` 등록·`dismissNoPhotoNotice()`/`dismissNotice()` 멱등 정리·`isEditableTarget`/`isExternalModalOpen`/수정자 키/한글 IME(`KeyW`/`KeyS`) 가드·`openViewer()`/`closeViewer()` 연동 및 `tests/post_navigation.test.js`(8/8)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build` PASS.
 - **`[2026-11-21]` `[atomic-commit-crafter]` [`core-viewer`]**: `ca063d3` (`fix(core-viewer)` `DEFECT-01`), `eff67f6` (`test(core-viewer)` 회귀 테스트 3건) 및 위키/관제탑 동기화 커밋 완료.
 - **`[2026-11-21]` `[systematic-debugger]` [`core-viewer`]**: `DEFECT-01` 해결 — `#disagall-viewer-overlay` 파서 제외·`userscript.js` 캡처 `click` 3중 가드·`openViewer()` `!wasActive` 스크롤 백업 가드 적용 및 `tests/core_viewer.test.js`(3/3)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build` PASS.
 - **`[2026-11-19]` `[atomic-commit-crafter]` [전 도메인]**: `36851e1` (`feat(immersion)` ADR-05/06), `a7bc857` (`test(immersion)` 26개 단위/14개 E2E), 위키·결함 티켓 문서 원자적 커밋 및 핸드오프 동기화 완료.
