@@ -1,8 +1,8 @@
 # 📦 [post-recommend] 뷰어 내 개념글 추천 연동 (Post Recommend)
 
-- **현재 상태 (Lifecycle)**: `🩹 Debugging`
+- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 1건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,12 +29,17 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-19 / `deep-bug-hunter` / 3-Lens 병렬 헌팅으로 `DEFECT-03`(P0: 셀렉터 자가 매칭·비추천 버튼 오클릭·실패 은폐) 등록
+- **직전 완료 작업**: 2026-11-22 / `systematic-debugger` / `DEFECT-03` 해결 (`RECOMMEND_BUTTON_PRIORITY_SELECTORS` 우선순위 순회·`#disagall-*` 배제·오탐 셀렉터 제거·`dispatchRecommendClick()` 반환값 검증·`state.recommendTimers` 수명주기 정리)
 - **생성/수정된 핵심 파일**:
-  - `src/parser/recommend_parser.js`: 데스크톱/모바일 추천 버튼 및 추천수 크롤러
-  - `src/controller/recommend_controller.js`: 단일 디스패치 및 2단계 비동기 갱신 컨트롤러
-  - `tests/recommend.test.js`: 통합 단위 테스트 7종
+  - `src/parser/recommend_parser.js`: 우선순위 배열 순회(`findFirstValidMatch`), 오버레이/뷰어 내부 배제(`isExcludedRecommendElement`), 비활성/분리 가드(`isRecommendButtonDisabled`, `dispatchRecommendClick`)
+  - `src/controller/recommend_controller.js`: `dispatchRecommendClick` 실패 처리, `clearRecommendTimers()` 및 활성 오버레이 가드
+  - `src/state.js` / `src/controller/viewer_controller.js`: `recommendTimers`/`recommendUnlockTimer` 등록 및 `closeViewer()` 정리 연동
+  - `tests/recommend.test.js`: Test 8 (`DEFECT-03` 실모듈 회귀 테스트 추가, 8/8 PASS)
 - **검증 완료된 테스트 실행 명령어**:
-  - `node tests/recommend.test.js`: 기존 단위 PASS (`dc_sample.html`에서 `button[data-no]`/`onclick*="recom"` 오매칭 실증)
+  - `node tests/recommend.test.js` (`8/8 PASS`), `npm test` (전 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`15/15 PASS`), `npm run build` (`PASS`), `node --check` (`PASS`)
+- **Recent Commits**:
+  - `9acefcd` - `fix(post-recommend): prevent selector self-matching, misclicks, and silent failure`
+  - `dc974f8` - `test(post-recommend): add regression tests for DEFECT-03 selector isolation and failure handling`
+- **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `DEFECT-03` 해결 시 `#disagall-viewer-overlay` 배제, 우선순위 셀렉터 순회, `dispatchRecommendClick()` 반환값 검증 및 실제 `recommend_parser.js` 기반 테스트 보강 필요.
+  - `post-recommend` 도메인 미해결 티켓 `0건` (`🟢 Sign-Off`). 잔여 타 도메인 P0/P1 티켓(`viewer-immersion/DEFECT-01` 등) 진행.
