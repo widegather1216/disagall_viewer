@@ -5,10 +5,10 @@
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
 - **Active 도메인**: 전 도메인 (`core-viewer`, `post-navigation`, `post-recommend`, `viewer-immersion`, `modular-bundler-migration`)
-- **현재 단계 (Stage)**: `🩹 Debugging` (`잔여 결함 9건 OPEN` — P0 1건 / P1 8건; `core-viewer/DEFECT-01`, `post-navigation/DEFECT-02`, `post-recommend/DEFECT-03` 해결 완료)
-- **직전 완료 작업**: `systematic-debugger`로 `post-recommend/DEFECT-03` (셀렉터 자가 매칭·오클릭 제거, `dispatchRecommendClick` 실패 처리 및 `state` 타이머 정리) 해결, `tests/recommend.test.js`(8/8)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build`·`node --check` PASS (`post-recommend` `🟢 Sign-Off`)
+- **현재 단계 (Stage)**: `🩹 Debugging` (`잔여 결함 8건 OPEN` — P0 0건 / P1 8건; `core-viewer/DEFECT-01`, `post-navigation/DEFECT-02`, `post-recommend/DEFECT-03`, `viewer-immersion/DEFECT-01` 해결 완료)
+- **직전 완료 작업**: `systematic-debugger`로 `viewer-immersion/DEFECT-01` (P0 전체화면 Promise vs `closeViewer`/`openViewer` 레이스 — 세대 토큰·고아 OS 전체화면 해제·연타/에러 가드) 해결, `tests/immersion.test.js`(27/27)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build`·`node --check` PASS
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `viewer-immersion/DEFECT-01` (남은 P0 1건) 및 `core-viewer/DEFECT-02` 순차 디버깅해줘
+  > `viewer-immersion` 도메인의 `DEFECT-02` 티켓 해결해줘 (또는 `core-viewer/DEFECT-02`)
 
 ---
 
@@ -21,7 +21,7 @@
 | [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `-` | `2 / 1` | `DEFECT-02` 해결 완료, `DEFECT-03~04` 잔여 (`'bottom'` dead code, 이동/폴링 타이머 충돌) |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `DEFECT-03` 해결 완료 (우선순위 셀렉터·뷰어 배제·디스패치 실패/타이머 정리) |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `1/3 (33%)` | `1 / 0` | `DEFECT-01` 등록 (Safari v1.0.0 번들 미동기화 및 `#disagall-quick-launcher` CSS 누락) |
-| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🩹 Debugging | `[■■■■■■■■] 8/8` | `4/6 (67%)` | `3 / 0` | `DEFECT-01~03` 등록 (전체화면 Promise 레이스, `mouseleave` 숨김 취소, `defaultPadding` sync) |
+| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🩹 Debugging | `[■■■■■■■■] 8/8` | `11/15 (73%)` | `2 / 0` | `DEFECT-01` 해결 완료, `DEFECT-02~03` 잔여 (`mouseleave` 숨김 취소, `defaultPadding` sync) |
 
 *(※ 상태 범례: `📐 Planning` | `🛠️ Implementing` | `🧐 Auditing` | `🧪 QA Testing` | `🩹 Debugging` | `🟢 Sign-Off`)*
 *(※ 미해결 티켓: `🚨D` = Open `DEFECT-xx` 개수, `🧐R` = Open `REFACTOR-xx` 개수)*
@@ -30,6 +30,8 @@
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
 
+- **`[2026-11-22]` `[atomic-commit-crafter]` [`viewer-immersion`]**: `57e7826` (`fix(immersion)` `DEFECT-01`), `94ca0e8` (`test(immersion)` Test 27/E2E) 및 위키/관제탑 동기화 커밋 완료.
+- **`[2026-11-22]` `[systematic-debugger]` [`viewer-immersion`]**: `DEFECT-01` 해결 — `fullscreenTransitionSeq` 세대 토큰·물리적 in-flight(`inFlightRequestSeq`/`inFlightExitSeq`/`asyncPendingRequestCount`) 분리·`!isOverlayActive()`/구 세션 지연 resolve 시 고아 OS 전체화면 즉시 `exitFullscreenSafely()` 해제·`fullscreenerror` 리스너·연타 가드 적용 및 `tests/immersion.test.js`(27/27)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build` PASS.
 - **`[2026-11-22]` `[atomic-commit-crafter]` [`post-recommend`]**: `9acefcd` (`fix(post-recommend)` `DEFECT-03`), `dc974f8` (`test(post-recommend)` Test 8 회귀 테스트) 및 `🟢 Sign-Off` 위키/관제탑 동기화 커밋 완료.
 - **`[2026-11-22]` `[systematic-debugger]` [`post-recommend`]**: `DEFECT-03` 해결 및 `🟢 Sign-Off` 전환 — `RECOMMEND_BUTTON_PRIORITY_SELECTORS` 순회·`#disagall-*` 배제·`button[data-no]`/`[onclick*="recom"]` 등 오탐 셀렉터 제거·`dispatchRecommendClick()` 실패 시 토스트/타이머 차단·`state.recommendTimers` 수명주기 정리 및 `tests/recommend.test.js`(8/8)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build` PASS.
 - **`[2026-11-22]` `[atomic-commit-crafter]` [`post-navigation`]**: `0db8e14` (`fix(post-navigation)` `DEFECT-02`), `f97ae7a` (`test(post-navigation)` Test 8 회귀 테스트) 및 위키/관제탑 동기화 커밋 완료.

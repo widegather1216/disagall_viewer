@@ -1,8 +1,8 @@
 # 🧪 [viewer-immersion] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`3건 OPEN DEFECT` — `deep-bug-hunter` 실증 등록 · 감사 티켓 `REFACTOR-01~03` 완료)
-- **인수 조건 통과율**: `6 / 6 (기존 E2E 15/15 PASS / 실런타임 비동기·이벤트 결함 3건 발견)`
-- **미해결 티켓**: `🚨 DEFECT: 3건` | `🧐 REFACTOR: 0건`
+- **검증 상태**: `🩹 Debugging` (`2건 OPEN DEFECT` — `DEFECT-01` 해결 완료, `DEFECT-02~03` 잔여 · 감사 티켓 `REFACTOR-01~03` 완료)
+- **인수 조건 통과율**: `11 / 15 Scenarios PASS (73%)` (`DEFECT-01` 해결, `DEFECT-02~03` OPEN)
+- **미해결 티켓**: `🚨 DEFECT: 2건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -46,12 +46,12 @@
 | `TC-BD-01` | Boundary | 패딩 슬라이더 드래그 중이거나 헤더 호버 중 2.5초 경과 시 숨김 유예 | `AC-01` | `✅ PASS` | Chrome CDP + [`immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js) (`header` 호버·`#disagall-slider` 드래그 중 2.7s `opacity:1` 유예, 이탈 후 2.95s 숨김 확인; [`tc-bd-01-slider-deferred.png`](./evidence/tc-bd-01-slider-deferred.png)) |
 | `TC-BD-02` | Boundary | 사진 확대(Zoom > 1.0) 후 드래그 팬(Pan) 조작 중 마우스 커서 정상 유지 | `AC-01` | `✅ PASS` | Chrome CDP + [`immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js) (200% 팬 드래그 중 2.7s 숨김 유예 및 `.disagall-ui-hidden` 상태 `:not([style*="grabbing"])` `grabbing` 커서 보존 확인; [`tc-bd-02-zoom-pan-dragging.png`](./evidence/tc-bd-02-zoom-pan-dragging.png)) |
 | `TC-NG-01` | Negative | 뷰어 비활성(`!active`) 상태에서 마우스 이동 또는 H/F 키 입력 시 오동작 방지 | `AC-02` | `✅ PASS` | Chrome CDP + [`immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js) (`!active` `mousemove`/H/F 무시, `INPUT`/`TEXTAREA`/`contentEditable`/조합키/외부 `<dialog open>` 차단 확인; [`boundary-negative-qa.log`](./evidence/boundary-negative-qa.log)) |
-| `TC-NG-02` | Negative | 뷰어 닫기(`closeViewer`) 시 타이머 미해제로 인한 백그라운드 콜백 발생 방지 | `AC-01` | `FAIL` | [`DEFECT-01`](#defect-01-requestfullscreen--exitfullscreen-promise-vs-closevieweropenviewer-%EB%A0%88%EC%9D%B4%EC%8A%A4) (`closeViewer` 직후 지연 `requestFullscreen` resolve 시 숨겨진 OS 전체화면 감금) |
+| `TC-NG-02` | Negative | 뷰어 닫기(`closeViewer`) 시 타이머 미해제로 인한 백그라운드 콜백 발생 방지 | `AC-01` | `PASS (Fixed in DEFECT-01)` | [`DEFECT-01`](#defect-01-requestfullscreen--exitfullscreen-promise-vs-closevieweropenviewer-%EB%A0%88%EC%9D%B4%EC%8A%A4) (`closeViewer`/`openViewer` 세대 토큰 격리 및 고아 OS 전체화면 즉시 해제) |
 | `TC-HP-05` | Happy | UI 자동/수동 숨김 시 헤더·푸터 높이를 회수해 이미지 크기·스테이지 패딩 확장 및 복원 시 축소 | `AC-05` | `✅ PASS` | [`immersion.test.js`](../../../tests/immersion.test.js) (Test 20) + [`immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js) (`662px`→`752px` 확장, `paddingTop/Bottom: 0px`, `←`/`→` 숨김 연속 탐색 확장 및 복원 검증) |
 | `TC-BD-03` | Boundary | 사용자 여백 `0px` 설정 시 UI 표시 중 겹침 방지 및 숨김 시 풀블리드(`window.innerHeight`) 확장 | `AC-05` | `✅ PASS` | [`immersion.test.js`](../../../tests/immersion.test.js) (Test 20) + [`immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js) (`padding=0` 표시 `710px` / `stage.paddingTop=52px`·`Bottom=38px` 비겹침, 숨김 `800px` 풀블리드 검증) |
 | `TC-BD-04` | Boundary | `scale > 1.0` 확대 중 UI 숨김/복원 시 이미지 크기 고정 및 `1.0x` 복귀 시 즉시 리피팅 동기화 | `AC-05` | `✅ PASS` | [`immersion.test.js`](../../../tests/immersion.test.js) (Test 21) + [`immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js) (`2.0x` 확대 중 `H`/유휴 숨김 시 `662px` 고정, `resetZoom`/휠·더블클릭 `1.0x` 복귀 시 `752px` 즉시 동기화 검증) |
 | `TC-HP-06` | Happy | 헤더 전체화면 버튼(`#disagall-btn-fullscreen`)·`F` 전환 및 `fullscreenchange` 해제 시 여백 `0px`↔원래 여백/UI 동기화 | `AC-06` | `FAIL` | [`DEFECT-02`](#defect-02-pointer-events-none-%EC%A0%84%ED%99%98-%EC%8B%9C-disagall-header-mouseleave%EA%B0%80-ui-%EC%88%A8%EA%B9%80%EC%9D%84-%EC%A6%89%EC%8B%9C-%EC%B7%A8%EC%86%8C) (버튼 클릭 직후 `mouseleave`로 UI 재노출) |
-| `TC-BD-05` | Boundary | 팝업 `autoFullscreen` 토글 연동 및 `openViewer` 시 OS 전체화면 진입(허용 시) · `0px`+UI숨김 폴백(거부 시) | `AC-06` | `FAIL` | [`DEFECT-01`](#defect-01-requestfullscreen--exitfullscreen-promise-vs-closevieweropenviewer-%EB%A0%88%EC%9D%B4%EC%8A%A4), [`DEFECT-03`](#defect-03-chromestoragesync-%EC%84%A4%EC%A0%95-%EB%8F%99%EA%B8%B0%ED%99%94-%EB%8B%A8%EC%A0%88defaultpadding-%EB%B0%8F-%EB%B9%84%EB%8F%99%EA%B8%B0-%EC%B4%88%EA%B8%B0%ED%99%94-%EB%A0%88%EC%9D%B4%EC%8A%A4) |
+| `TC-BD-05` | Boundary | 팝업 `autoFullscreen` 토글 연동 및 `openViewer` 시 OS 전체화면 진입(허용 시) · `0px`+UI숨김 폴백(거부 시) | `AC-06` | `FAIL` | [`DEFECT-03`](#defect-03-chromestoragesync-%EC%84%A4%EC%A0%95-%EB%8F%99%EA%B8%B0%ED%99%94-%EB%8B%A8%EC%A0%88defaultpadding-%EB%B0%8F-%EB%B9%84%EB%8F%99%EA%B8%B0-%EC%B4%88%EA%B8%B0%ED%99%94-%EB%A0%88%EC%9D%B4%EC%8A%A4) (`autoFullscreen` 초기화 동기화 누락) |
 | `TC-NG-03` | Negative | 전체화면 진입·해제 반복 및 `closeViewer` 호출 시 사용자 저장 여백(`state.currentPadding`) 훼손 방지 | `AC-06` | `✅ PASS` | [`immersion.test.js`](../../../tests/immersion.test.js) (Test 24~25) + [`immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js) (`defaultPadding=44` 보존 및 해제 후 `622px` 복원·`closeViewer` 정리 검증) |
 | `TC-BD-06` | Boundary | 한글 IME(`key='ㄹ'`, `code='KeyF'`) 및 패딩 슬라이더(`type="range"`) 포커스 상태에서 `F` 전체화면 토글 검증 | `AC-06` | `✅ PASS` | [`immersion.test.js`](../../../tests/immersion.test.js) (Test 26) + [`immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js) (한글 IME `KeyF`/`KeyH`·슬라이더 포커스 통과·텍스트 `<input>` 차단 유지·수동 `F` 폴백 토글 검증) |
 
@@ -60,10 +60,13 @@
 ## 🚨 3. 결함 리포트 (Defect Logs - by `deep-bug-hunter`)
 
 ### [DEFECT-01] `requestFullscreen()` / `exitFullscreen()` Promise vs `closeViewer()`/`openViewer()` 레이스
-- **현재 상태**: 🟡 OPEN
-- **심각도 & 위치**: 🔴 P0 Critical | [`src/controller/immersion_controller.js#L148-L198`](../../../src/controller/immersion_controller.js#L148-L198), [`#L225-L294`](../../../src/controller/immersion_controller.js#L225-L294), [`src/controller/viewer_controller.js#L397-L412`](../../../src/controller/viewer_controller.js#L397-L412)
-- **원인 및 실증**: `requestFullscreen()` 대기 중 `closeViewer()` 호출 시 아직 `fullscreenElement`가 `null`이라 `exitFullscreenSafely()`가 무반응 종료된 뒤, Promise resolve 시 `.active`가 제거된(`visibility: hidden`) 오버레이가 OS 전체화면으로 진입해 검은 화면에 갇힘(`Empirical Probe Reproduced`: `overlayActive: false`, `fullscreenElementIsOverlay: true`). 반대로 지연된 `exitFullscreen()`이 재오픈된 뷰어의 `isFullscreenMode`를 덮어씀.
-- **최소 수정 설계**: `fullscreenTransitionSeq` 세대 토큰 도입 및 `!isOverlayActive() && getFullscreenElement() === overlayEl` 시 즉시 `exitFullscreenSafely()` 호출.
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **심각도 & 위치**: 🔴 P0 Critical | [`src/controller/immersion_controller.js#L136-L397`](../../../src/controller/immersion_controller.js#L136-L397), [`src/controller/viewer_controller.js#L357-L393`](../../../src/controller/viewer_controller.js#L357-L393)
+- **원인 및 실증**: `requestFullscreen()` 대기 중 `closeViewer()` 호출 시 아직 `fullscreenElement`가 `null`이라 `exitFullscreenSafely()`가 무반응 종료된 뒤, Promise resolve 시 `.active`가 제거된(`visibility: hidden`) 오버레이가 OS 전체화면으로 진입해 검은 화면에 갇힘(`Empirical Probe Reproduced`: `overlayActive: false`, `fullscreenElementIsOverlay: true`). 또한 `closeViewer()`➔`openViewer()` 재오픈 또는 `toggleFullscreen()` 연타 시 이전 세션의 지연된 `requestFullscreen`/`exitFullscreen` resolve/reject 및 `fullscreenchange`가 새 세션의 `isFullscreenMode`/UI/토스트를 덮어씀(`tests/immersion.test.js` Test 27 Red 재현 확인).
+- **해결 내역**:
+  - **수정 파일**: [`src/controller/immersion_controller.js`](../../../src/controller/immersion_controller.js#L10-L433), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js#L357-L374), [`tests/immersion.test.js`](../../../tests/immersion.test.js#L1346-L1570), [`tests/immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js#L750-L767)
+  - **원인 및 조치**: Competing Hypotheses(`Tracer A/B`) 및 Devil's Advocate 교차 검증을 반영해 물리적 in-flight 추적(`inFlightRequestSeq`, `inFlightExitSeq`, `asyncPendingRequestCount`)과 세션 의도(`fullscreenTransitionSeq` 단조 증가, `osFullscreenWanted`, `hasObservedOsFullscreen`)를 분리함. `resetFullscreenState()` 및 `openViewer()`(`!wasActive`)에서 세대 토큰을 무효화하고, `!isOverlayActive() && isOverlayFullscreenElement()` 또는 구 세션 지연 resolve 감지 시 즉시 `exitFullscreenSafely()`로 고아 OS 전체화면을 해제함. `fullscreenerror`/`webkitfullscreenerror` 리스너 추가, `exitFullscreenSafely()` 실패 정리, `toggleFullscreen()` 연타 가드 적용 후 `npm run build`로 `content.js`/`disagall_viewer.user.js`를 동기화함.
+  - **회귀 테스트 결과**: `node tests/immersion.test.js` (`27/27 PASS`), `npm test` (`5개 스위트 전량 PASS`), `node tests/immersion_e2e.test.js` (`15/15 PASS`), `npm run build` (`PASS`), `node --check` (`PASS`)
 
 ### [DEFECT-02] `pointer-events: none` 전환 시 `.disagall-header` `mouseleave`가 UI 숨김을 즉시 취소
 - **현재 상태**: 🟡 OPEN

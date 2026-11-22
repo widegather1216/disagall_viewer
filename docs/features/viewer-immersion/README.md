@@ -2,7 +2,7 @@
 
 - **현재 상태 (Lifecycle)**: `🩹 Debugging`
 - **구현 진척도**: `[■■■■■■■■] 8/8 Steps` (기본 4/4 + 확장 피팅 2/2 + 전체화면 모드 2/2)
-- **미해결 티켓 현황**: `🚨 DEFECT: 3건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 2건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -47,19 +47,21 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-19 / `deep-bug-hunter` / 3-Lens 병렬 헌팅으로 `DEFECT-01`~`03`(전체화면 Promise 레이스·`mouseleave` 숨김 취소·`defaultPadding` sync 누락) 등록
+- **직전 완료 작업**: 2026-11-22 / `systematic-debugger` / `DEFECT-01` (P0: `requestFullscreen`/`exitFullscreen` Promise vs `closeViewer`/`openViewer` 레이스 — 세대 토큰 격리·고아 OS 전체화면 해제·연타/에러 가드) 해결 (`src/controller/immersion_controller.js`, `src/controller/viewer_controller.js`, `tests/immersion.test.js` Test 27, `tests/immersion_e2e.test.js` TC-NG-02)
 - **Recent Commits**:
+  - `57e7826`: `fix(immersion): guard fullscreen Promise races against viewer close and reopen`
+  - `94ca0e8`: `test(immersion): add unit and E2E regression tests for DEFECT-01 fullscreen races`
   - `36851e1`: `feat(immersion): implement stage expansion on UI hide and fullscreen mode UX`
   - `a7bc857`: `test(immersion): add unit and built-bundle E2E tests for ADR-05 and ADR-06`
   - `ea1fb73`: `docs(immersion): resolve REFACTOR-03 and mark domain Sign-Off`
-  - `bd57dbd`: `refactor(popup): modularize popup bindings, debounce padding save, and guard storage types`
-  - `0cf815f`: `test(immersion): add popup debounce, NaN guard, and onChanged key-deletion tests`
+- **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **실행 검증 명령 및 결과**:
   - `npm run build`: `content.js`, `disagall_viewer.user.js` 번들 생성 PASS
-  - `npm test`: 4개 테스트 스위트(`module_import`, `post_navigation`, `recommend`, `immersion` 25개 테스트) 전원 PASS
-  - `node tests/immersion_e2e.test.js`: 실제 번들(`content.js`, `content.css`, `popup.js`, `test_page.html`) 기반 Happy Path 6건 + Boundary/Negative 8건 총 14개 시나리오 전원 PASS
-  - 미해결 티켓 (`3 / 0` — `🚨 DEFECT: 3건`, `🧐 REFACTOR: 0건`; `verify_all_bugs.mjs` 실증)
+  - `npm test`: 5개 테스트 스위트(`module_import`, `core_viewer`, `post_navigation`, `recommend`, `immersion` 27개 테스트) 전원 PASS
+  - `node tests/immersion_e2e.test.js`: 실제 번들(`content.js`, `content.css`, `popup.js`, `test_page.html`) 기반 15개 시나리오(`TC-NG-02` `DEFECT-01` 포함) 전원 PASS
+  - `node --check`: 수정된 `src/controller/*.js`, `tests/*.js`, 번들(`content.js`, `disagall_viewer.user.js`) 구문 검사 PASS
+  - 미해결 티켓 (`2 / 0` — `🚨 DEFECT: 2건`, `🧐 REFACTOR: 0건`)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `systematic-debugger`로 `DEFECT-01`(P0: `requestFullscreen` Promise 레이스 숨겨진 전체화면 감금), `DEFECT-02`(`pointer-events: none` `mouseleave`), `DEFECT-03`(`defaultPadding` `onChanged`·비동기 초기화 레이스) 수정 필요.
+  - `systematic-debugger`로 `DEFECT-02`(`pointer-events: none` `mouseleave`), `DEFECT-03`(`defaultPadding` `onChanged`·비동기 초기화 레이스) 순차 수정 필요.
   - 참고: 실제 오버레이 패딩 슬라이더의 DOM ID는 `#disagall-slider`(스펙 표기 `#disagall-padding-slider` 대신 실제 마크업 `src/ui/overlay.js#L30`)임.
   - Chrome `--headless=new` 환경은 OS 전체화면 권한 제약(`TypeError: not granted`)이 있으므로, 전체화면 중 `closeViewer` 해제 경로는 `tests/immersion_e2e.test.js`의 Fullscreen API 계약 시뮬레이션과 실브라우저 `closeViewer` 경로를 병행해 검증함.
