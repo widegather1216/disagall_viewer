@@ -342,4 +342,290 @@ if (fs.existsSync('dc_sample.html')) {
   console.log('✅ Test 7: Fallback to adjacent post when no photo posts remain passed');
 }
 
-console.log('\n🎉 ALL UNIT & INTEGRATION TESTS PASSED SUCCESSFULLY! 🎉');
+// Test 8: DEFECT-02 showNoPhotoNotice() listener/timer leak & input/modifier shortcut guard
+async function runDefect02Tests() {
+  const { showNoPhotoNotice, dismissNoPhotoNotice } = await import('../src/ui/overlay.js');
+  const { state } = await import('../src/state.js');
+  const { closeViewer } = await import('../src/controller/viewer_controller.js');
+
+  function createNoticeTestEnv() {
+    const winListeners = new Map();
+    const timers = new Map();
+    let nextTimerId = 1;
+    let bodyChildren = [];
+    let openModal = null;
+
+    function createNode(tagName, id = '', className = '') {
+      const listeners = {};
+      const node = {
+        tagName: tagName.toUpperCase(),
+        id,
+        className,
+        children: [],
+        parentNode: null,
+        addEventListener(ev, fn) {
+          if (!listeners[ev]) listeners[ev] = [];
+          listeners[ev].push(fn);
+        },
+        dispatchEvent(evObj) {
+          (listeners[evObj.type] || []).forEach((fn) => fn(evObj));
+        },
+        querySelector(sel) {
+          if (sel.startsWith('#')) {
+            const targetId = sel.slice(1);
+            return node.children.find((c) => c.id === targetId) || null;
+          }
+          return null;
+        },
+        remove() {
+          if (node.parentNode) {
+            bodyChildren = bodyChildren.filter((c) => c !== node);
+            node.parentNode = null;
+          }
+        },
+      };
+      return node;
+    }
+
+    const body = {
+      appendChild(child) {
+        child.parentNode = body;
+        bodyChildren.push(child);
+        return child;
+      },
+    };
+
+    const doc = {
+      activeElement: null,
+      body,
+      getElementById(id) {
+        return bodyChildren.find((c) => c.id === id) || null;
+      },
+      querySelector(sel) {
+        if (sel.includes('dialog[open]')) return openModal;
+        return null;
+      },
+      createElement(tag) {
+        const node = createNode(tag);
+        let htmlCache = '';
+        Object.defineProperty(node, 'innerHTML', {
+          get: () => htmlCache,
+          set: (html) => {
+            htmlCache = html;
+            if (html.includes('disagall-notice-close')) {
+              const prevBtn = createNode('button', 'disagall-notice-prev');
+              const nextBtn = createNode('button', 'disagall-notice-next');
+              const closeBtn = createNode('button', 'disagall-notice-close');
+              node.children.push(prevBtn, nextBtn, closeBtn);
+            }
+          },
+        });
+        return node;
+      },
+    };
+
+    const win = {
+      addEventListener(ev, fn) {
+        if (!winListeners.has(ev)) winListeners.set(ev, new Set());
+        winListeners.get(ev).add(fn);
+      },
+      removeEventListener(ev, fn) {
+        if (winListeners.has(ev)) winListeners.get(ev).delete(fn);
+      },
+      dispatchKey(evProps) {
+        let prevented = false;
+        const ev = {
+          type: 'keydown',
+          ctrlKey: false,
+          metaKey: false,
+          altKey: false,
+          repeat: false,
+          target: { tagName: 'BODY' },
+          preventDefault() { prevented = true; },
+          stopPropagation() {},
+          ...evProps,
+        };
+        const listeners = Array.from(winListeners.get('keydown') || []);
+        listeners.forEach((fn) => fn(ev));
+        return { prevented };
+      },
+    };
+
+    const fakeSetTimeout = (fn) => {
+      const id = nextTimerId++;
+      timers.set(id, fn);
+      return id;
+    };
+    const fakeClearTimeout = (id) => {
+      timers.delete(id);
+    };
+
+    return {
+      doc,
+      win,
+      fakeSetTimeout,
+      fakeClearTimeout,
+      setOpenModal: (modal) => { openModal = modal; },
+      getKeyListenerCount: () => (winListeners.get('keydown') || new Set()).size,
+      getActiveTimerCount: () => timers.size,
+      getBodyChildCount: () => bodyChildren.length,
+      runAllTimers: () => {
+        const pending = Array.from(timers.entries());
+        timers.clear();
+        pending.forEach(([, fn]) => fn());
+      },
+    };
+  }
+
+  const origWindow = global.window;
+  const origDocument = global.document;
+  const origSetTimeout = global.setTimeout;
+  const origClearTimeout = global.clearTimeout;
+
+  const env = createNoticeTestEnv();
+  global.window = env.win;
+  global.document = env.doc;
+  global.setTimeout = env.fakeSetTimeout;
+  global.clearTimeout = env.fakeClearTimeout;
+
+  try {
+    // 8.1 Close button click must remove DOM, keydown listener, and timer
+    let navCalls = [];
+    showNoPhotoNotice((dir) => navCalls.push(dir));
+    assert.strictEqual(env.getBodyChildCount(), 1, 'Notice element must be mounted');
+    assert.strictEqual(env.getKeyListenerCount(), 1, 'One keydown listener must be attached');
+    assert.strictEqual(env.getActiveTimerCount(), 1, 'One timeout must be scheduled');
+
+    const closeBtn = env.doc.getElementById('disagall-no-photo-notice').querySelector('#disagall-notice-close');
+    closeBtn.dispatchEvent({ type: 'click' });
+    assert.strictEqual(env.getBodyChildCount(), 0, 'Close button must remove notice element');
+    assert.strictEqual(env.getKeyListenerCount(), 0, 'DEFECT-02: Close button must remove keydown listener');
+    assert.strictEqual(env.getActiveTimerCount(), 0, 'DEFECT-02: Close button must clear pending timeout');
+    env.win.dispatchKey({ key: 'w' });
+    assert.strictEqual(navCalls.length, 0, 'DEFECT-02: Keydown after close must not trigger navigation');
+
+    // 8.2 Duplicate showNoPhotoNotice() must clean up previous listener and timer
+    const firstCalls = [];
+    const secondCalls = [];
+    showNoPhotoNotice((dir) => firstCalls.push(dir));
+    showNoPhotoNotice((dir) => secondCalls.push(dir));
+    assert.strictEqual(env.getBodyChildCount(), 1, 'Duplicate call must keep only 1 notice element');
+    assert.strictEqual(env.getKeyListenerCount(), 1, 'DEFECT-02: Duplicate call must not leak prior keydown listener');
+    assert.strictEqual(env.getActiveTimerCount(), 1, 'DEFECT-02: Duplicate call must clear prior timeout');
+    env.win.dispatchKey({ key: 'w' });
+    assert.deepStrictEqual(firstCalls, [], 'DEFECT-02: Stale notice callback must not fire after duplicate call');
+    assert.deepStrictEqual(secondCalls, ['up'], 'Active notice callback must fire once');
+    assert.strictEqual(env.getKeyListenerCount(), 0, 'Navigation key must clean up listener');
+    assert.strictEqual(env.getActiveTimerCount(), 0, 'Navigation key must clear timeout');
+
+    // 8.3 Editable targets (INPUT/TEXTAREA/SELECT/contentEditable) must be ignored
+    navCalls = [];
+    showNoPhotoNotice((dir) => navCalls.push(dir));
+    const editableTargets = [
+      { tagName: 'INPUT', type: 'text' },
+      { tagName: 'TEXTAREA' },
+      { tagName: 'SELECT' },
+      { tagName: 'DIV', isContentEditable: true },
+    ];
+    for (const target of editableTargets) {
+      for (const key of ['w', 's', 'ArrowUp', 'ArrowDown']) {
+        const res = env.win.dispatchKey({ key, target });
+        assert.strictEqual(res.prevented, false, `DEFECT-02: Editable target (${target.tagName}) must not call preventDefault for ${key}`);
+      }
+    }
+    assert.strictEqual(navCalls.length, 0, 'DEFECT-02: Typing in editable targets must not trigger navigation');
+    assert.strictEqual(env.getKeyListenerCount(), 1, 'Editable target guard must keep notice active');
+
+    // 8.4 Modifier keys (Cmd+W / Ctrl+W / Alt+S / Ctrl+ArrowUp) must be ignored
+    const modifierCombos = [
+      { key: 'w', metaKey: true },
+      { key: 'w', ctrlKey: true },
+      { key: 's', altKey: true },
+      { key: 'ArrowUp', ctrlKey: true },
+      { key: 'ArrowDown', metaKey: true },
+    ];
+    for (const combo of modifierCombos) {
+      const res = env.win.dispatchKey(combo);
+      assert.strictEqual(res.prevented, false, `DEFECT-02: Modifier combo (${JSON.stringify(combo)}) must not call preventDefault`);
+    }
+    assert.strictEqual(navCalls.length, 0, 'DEFECT-02: Modifier shortcuts (e.g. Cmd+W) must not trigger navigation');
+    assert.strictEqual(env.getKeyListenerCount(), 1, 'Modifier guard must keep notice active');
+
+    // 8.5 Escape key must dismiss DOM, listener, and timer
+    env.win.dispatchKey({ key: 'Escape' });
+    assert.strictEqual(env.getBodyChildCount(), 0, 'Escape must remove notice element');
+    assert.strictEqual(env.getKeyListenerCount(), 0, 'Escape must remove keydown listener');
+    assert.strictEqual(env.getActiveTimerCount(), 0, 'Escape must clear pending timeout');
+
+    // 8.6 Auto-timeout & prev/next button click cleanup
+    showNoPhotoNotice((dir) => navCalls.push(dir));
+    env.runAllTimers();
+    assert.strictEqual(env.getBodyChildCount(), 0, 'Timeout must remove notice element');
+    assert.strictEqual(env.getKeyListenerCount(), 0, 'Timeout must remove keydown listener');
+    assert.strictEqual(env.getActiveTimerCount(), 0, 'Timeout must leave 0 active timers');
+
+    showNoPhotoNotice((dir) => navCalls.push(dir));
+    const prevBtn = env.doc.getElementById('disagall-no-photo-notice').querySelector('#disagall-notice-prev');
+    prevBtn.dispatchEvent({ type: 'click' });
+    assert.deepStrictEqual(navCalls, ['up'], 'Prev button must invoke navigation callback');
+    assert.strictEqual(env.getKeyListenerCount(), 0, 'Prev button click must clean up keydown listener');
+    assert.strictEqual(env.getActiveTimerCount(), 0, 'Prev button click must clear pending timeout');
+    assert.strictEqual(state.noPhotoNoticeTimer, null, 'state.noPhotoNoticeTimer must be cleared to null');
+
+    // 8.7 Repeat, external modal, active overlay, Korean IME KeyS, re-entrancy & closeViewer() cleanup
+    navCalls = [];
+    showNoPhotoNotice((dir) => navCalls.push(dir));
+    assert(state.noPhotoNoticeTimer !== null, 'Timer ID must be registered on state.noPhotoNoticeTimer');
+
+    // Repeat event guard
+    assert.strictEqual(env.win.dispatchKey({ key: 'w', repeat: true }).prevented, false);
+    // External modal guard
+    env.setOpenModal({ tagName: 'DIALOG' });
+    assert.strictEqual(env.win.dispatchKey({ key: 'w' }).prevented, false);
+    env.setOpenModal(null);
+    // Active overlay guard
+    const prevOverlayEl = state.elements.overlayEl;
+    state.elements.overlayEl = { classList: { contains: (c) => c === 'active', remove() {} }, contains: () => false };
+    assert.strictEqual(env.win.dispatchKey({ key: 'w' }).prevented, false);
+    state.elements.overlayEl = prevOverlayEl;
+    assert.strictEqual(navCalls.length, 0, 'Repeat/modal/active-overlay guards must block navigation');
+
+    // Korean IME e.code ('KeyS') fallback
+    const imeRes = env.win.dispatchKey({ key: 'ㄴ', code: 'KeyS' });
+    assert.strictEqual(imeRes.prevented, true, 'Korean IME KeyS must trigger down navigation');
+    assert.deepStrictEqual(navCalls, ['down']);
+
+    // Re-entrant callback spawning another notice must keep new notice active
+    showNoPhotoNotice(() => {
+      showNoPhotoNotice(() => {});
+    });
+    env.win.dispatchKey({ key: 'w' });
+    assert.strictEqual(env.getBodyChildCount(), 1, 'Re-entrant notice must remain mounted');
+    assert.strictEqual(env.getKeyListenerCount(), 1, 'Re-entrant notice listener must remain attached');
+    assert.strictEqual(env.getActiveTimerCount(), 1, 'Re-entrant notice timer must remain scheduled');
+
+    // closeViewer() must clean up active notice DOM, listener, and state timer
+    closeViewer();
+    assert.strictEqual(env.getBodyChildCount(), 0, 'closeViewer() must dismiss active notice');
+    assert.strictEqual(env.getKeyListenerCount(), 0, 'closeViewer() must remove notice keydown listener');
+    assert.strictEqual(env.getActiveTimerCount(), 0, 'closeViewer() must clear notice timeout');
+    assert.strictEqual(state.noPhotoNoticeTimer, null, 'closeViewer() must clear state.noPhotoNoticeTimer');
+    dismissNoPhotoNotice();
+
+    console.log('✅ Test 8: DEFECT-02 showNoPhotoNotice() cleanup & shortcut guardrails passed');
+  } finally {
+    global.window = origWindow;
+    global.document = origDocument;
+    global.setTimeout = origSetTimeout;
+    global.clearTimeout = origClearTimeout;
+  }
+}
+
+runDefect02Tests()
+  .then(() => {
+    console.log('\n🎉 ALL UNIT & INTEGRATION TESTS PASSED SUCCESSFULLY! 🎉');
+  })
+  .catch((err) => {
+    console.error('❌ Post navigation test failed:', err);
+    process.exit(1);
+  });
