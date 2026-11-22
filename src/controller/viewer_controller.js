@@ -57,6 +57,9 @@ export {
 
 const PADDING_SAVE_DEBOUNCE_MS = 250;
 let paddingSaveTimer = null;
+let imageLoadSeq = 0;
+let renderedLoadSeq = -1;
+const boundMainImgEls = new WeakSet();
 
 function resolveLazyOriginalUrl(img) {
   const attrUrl = img.getAttribute('data-original') || img.getAttribute('data-src') || img.getAttribute('data-url');
@@ -100,18 +103,39 @@ function updateNavAndCounterUi() {
   if (nextBtnEl) nextBtnEl.classList.toggle('disabled', total <= 1);
 }
 
-function renderViewerImage(mainImgEl, loaderEl, src, alt) {
-  if (!mainImgEl) return;
+function handleMainImgLoad() {
+  if (renderedLoadSeq !== imageLoadSeq || !isOverlayActive()) return;
+  if (state.zoom.scale <= 1.001) {
+    applyFittingAndPadding();
+  }
+}
+
+function ensureMainImgLoadListener(mainImgEl) {
+  if (!mainImgEl || typeof mainImgEl.addEventListener !== 'function' || boundMainImgEls.has(mainImgEl)) {
+    return;
+  }
+  mainImgEl.addEventListener('load', handleMainImgLoad);
+  boundMainImgEls.add(mainImgEl);
+}
+
+function renderViewerImage(mainImgEl, loaderEl, src, alt, seq) {
+  if (!mainImgEl || seq !== imageLoadSeq || !isOverlayActive()) return;
+  ensureMainImgLoadListener(mainImgEl);
+  renderedLoadSeq = seq;
   mainImgEl.src = src;
   mainImgEl.alt = alt;
   if (loaderEl) loaderEl.style.display = 'none';
   mainImgEl.style.opacity = '1';
-  applyFittingAndPadding();
+  if (state.zoom.scale <= 1.001) {
+    applyFittingAndPadding();
+  }
 }
 
 export function showImage(index) {
   if (state.postImages.length === 0) return;
 
+  const seq = ++imageLoadSeq;
+  renderedLoadSeq = -1;
   resetZoom();
   state.currentIndex = (index + state.postImages.length) % state.postImages.length;
   updateNavAndCounterUi();
@@ -126,10 +150,18 @@ export function showImage(index) {
 
   const tempImg = new Image();
   tempImg.referrerPolicy = 'no-referrer-when-downgrade';
-  tempImg.onload = () => renderViewerImage(mainImgEl, loaderEl, tempImg.src, imgData.alt);
+  tempImg.onload = () => {
+    tempImg.onload = null;
+    tempImg.onerror = null;
+    if (seq !== imageLoadSeq || !isOverlayActive()) return;
+    renderViewerImage(mainImgEl, loaderEl, tempImg.src, imgData.alt, seq);
+  };
   tempImg.onerror = () => {
+    tempImg.onload = null;
+    tempImg.onerror = null;
+    if (seq !== imageLoadSeq || !isOverlayActive()) return;
     const fallbackSrc = (imgData.element && (imgData.element.currentSrc || imgData.element.src)) || imgData.url;
-    renderViewerImage(mainImgEl, loaderEl, fallbackSrc, imgData.alt);
+    renderViewerImage(mainImgEl, loaderEl, fallbackSrc, imgData.alt, seq);
   };
   tempImg.src = imgData.url;
 }
@@ -321,6 +353,7 @@ export function createOverlay() {
   bindPaddingSlider(sliderEl, sliderValEl);
   bindOverlayBackdrop(overlayEl);
   bindImmersionEvents(overlayEl, sliderEl);
+  ensureMainImgLoadListener(mainImgEl);
   setupZoomEvents(mainImgEl);
   window.addEventListener('keydown', handleKeyDown, true);
 }
@@ -374,6 +407,8 @@ export function openViewer(targetSrc, isAuto = false) {
 }
 
 export function closeViewer() {
+  imageLoadSeq += 1;
+  renderedLoadSeq = -1;
   dismissNoPhotoNotice();
   clearRecommendTimers();
   clearIdleTimer();
