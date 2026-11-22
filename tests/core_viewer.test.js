@@ -426,6 +426,210 @@ async function run() {
     console.log('✅ Test 3: DEFECT-01 userscript capture click guard & non-Element safety verified');
   }
 
+  // Test 4 (DEFECT-02): stale tempImg.onload/onerror must not overwrite newer navigation or closed viewer
+  {
+    const dom = createMockDom();
+    const writeDiv = dom.createElement('div', '', ['write_div']);
+    const img1 = dom.createElement('img');
+    img1.src = 'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=101';
+    img1.alt = 'First';
+    const img2 = dom.createElement('img');
+    img2.src = 'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=102';
+    img2.alt = 'Second';
+    writeDiv.appendChild(img1);
+    writeDiv.appendChild(img2);
+    dom.body.appendChild(writeDiv);
+
+    const origWindow = global.window;
+    const origDocument = global.document;
+    const origImage = global.Image;
+    const origEvent = global.Event;
+    const origRAF = global.requestAnimationFrame;
+    const origCAF = global.cancelAnimationFrame;
+
+    const pendingImages = [];
+    global.window = dom.win;
+    global.document = dom.doc;
+    global.Event = class { constructor(type) { this.type = type; } };
+    global.requestAnimationFrame = () => 1;
+    global.cancelAnimationFrame = () => {};
+    global.Image = class {
+      set src(v) {
+        this._src = v;
+        pendingImages.push(this);
+      }
+      get src() { return this._src; }
+    };
+
+    try {
+      const { state } = await import('../src/state.js');
+      Object.keys(state.elements).forEach((k) => { state.elements[k] = null; });
+      state.previousBodyOverflow = '';
+      state.postImages = [];
+      state.currentIndex = 0;
+      state.zoom.scale = 1.0;
+
+      const controller = await import('../src/controller/viewer_controller.js');
+      controller.openViewer();
+      assert.strictEqual(pendingImages.length, 1);
+
+      // Rapidly navigate to 2nd image before 1st tempImg settles
+      controller.navigate(1);
+      assert.strictEqual(pendingImages.length, 2);
+      assert.strictEqual(state.elements.counterEl.textContent, '2 / 2');
+
+      // Fast 2nd image finishes first
+      pendingImages[1].onload();
+      assert.strictEqual(state.elements.mainImgEl.src, img2.src);
+      assert.strictEqual(state.elements.loaderEl.style.display, 'none');
+
+      // Slow 1st image settles late -> must be discarded!
+      pendingImages[0].onload();
+      assert.strictEqual(
+        state.elements.mainImgEl.src,
+        img2.src,
+        'DEFECT-02: stale tempImg.onload from previous index must not overwrite current mainImgEl.src'
+      );
+      assert.strictEqual(state.elements.counterEl.textContent, '2 / 2');
+
+      // Navigate back to 1st image, then close viewer before tempImg settles
+      controller.navigate(-1);
+      assert.strictEqual(pendingImages.length, 3);
+      assert.strictEqual(state.elements.loaderEl.style.display, 'flex');
+      assert.strictEqual(state.elements.mainImgEl.style.opacity, '0');
+
+      controller.closeViewer();
+      pendingImages[2].onerror();
+      assert.strictEqual(
+        state.elements.mainImgEl.src,
+        img2.src,
+        'DEFECT-02: tempImg.onerror firing after closeViewer() must not mutate mainImgEl.src'
+      );
+      assert.strictEqual(
+        state.elements.mainImgEl.style.opacity,
+        '0',
+        'DEFECT-02: tempImg callback after closeViewer() must not reveal mainImgEl'
+      );
+
+      // Reopen viewer at index 0, close before settling, reopen at index 1, and ensure pre-close onload cannot leak
+      controller.openViewer(img1.src);
+      assert.strictEqual(pendingImages.length, 4);
+      controller.closeViewer();
+
+      controller.openViewer(img2.src);
+      assert.strictEqual(pendingImages.length, 5);
+      pendingImages[4].onload();
+      pendingImages[3].onload();
+      assert.strictEqual(
+        state.elements.mainImgEl.src,
+        img2.src,
+        'DEFECT-02: pre-close tempImg callback must not leak into reopened viewer session'
+      );
+      controller.closeViewer();
+      console.log('✅ Test 4: DEFECT-02 stale tempImg.onload/onerror & closeViewer race defense verified');
+    } finally {
+      global.window = origWindow;
+      global.document = origDocument;
+      global.Image = origImage;
+      global.Event = origEvent;
+      global.requestAnimationFrame = origRAF;
+      global.cancelAnimationFrame = origCAF;
+    }
+  }
+
+  // Test 5 (DEFECT-02): onerror fallback with initially uncached naturalWidth=0 must refit on mainImgEl load
+  {
+    const dom = createMockDom();
+    const writeDiv = dom.createElement('div', '', ['write_div']);
+    const img1 = dom.createElement('img');
+    img1.src = 'https://dcimg7.dcinside.co.kr/fallback_1.jpg';
+    img1.setAttribute('data-original', 'https://dcimg7.dcinside.co.kr/original_1.jpg');
+    img1.alt = 'Uncached Fallback';
+    const img2 = dom.createElement('img');
+    img2.src = 'https://dcimg7.dcinside.co.kr/fallback_2.jpg';
+    img2.alt = 'Second';
+    writeDiv.appendChild(img1);
+    writeDiv.appendChild(img2);
+    dom.body.appendChild(writeDiv);
+
+    const origWindow = global.window;
+    const origDocument = global.document;
+    const origImage = global.Image;
+    const origEvent = global.Event;
+    const origRAF = global.requestAnimationFrame;
+    const origCAF = global.cancelAnimationFrame;
+
+    const pendingImages = [];
+    global.window = dom.win;
+    global.document = dom.doc;
+    global.Event = class { constructor(type) { this.type = type; } };
+    global.requestAnimationFrame = () => 1;
+    global.cancelAnimationFrame = () => {};
+    global.Image = class {
+      set src(v) {
+        this._src = v;
+        pendingImages.push(this);
+      }
+      get src() { return this._src; }
+    };
+
+    try {
+      const { state } = await import('../src/state.js');
+      Object.keys(state.elements).forEach((k) => { state.elements[k] = null; });
+      state.previousBodyOverflow = '';
+      state.postImages = [];
+      state.currentIndex = 0;
+      state.zoom.scale = 1.0;
+
+      const controller = await import('../src/controller/viewer_controller.js');
+      controller.openViewer();
+
+      const { mainImgEl, infoBadgeEl } = state.elements;
+      // Simulate uncached image: naturalWidth/naturalHeight are 0 when src is assigned
+      mainImgEl.naturalWidth = 0;
+      mainImgEl.naturalHeight = 0;
+      infoBadgeEl.textContent = '화면 맞춤';
+
+      pendingImages[0].onerror();
+      assert.strictEqual(mainImgEl.src, img1.src, 'onerror must fall back to original img.src');
+      assert.strictEqual(infoBadgeEl.textContent, '화면 맞춤', 'Before load, naturalWidth=0 returns early');
+
+      // Browser finishes loading fallbackSrc into mainImgEl
+      mainImgEl.naturalWidth = 800;
+      mainImgEl.naturalHeight = 1600;
+      mainImgEl.dispatchEvent({ type: 'load', preventDefault() {}, stopPropagation() {} });
+
+      assert.strictEqual(
+        infoBadgeEl.textContent,
+        '세로 사진 (800x1600)',
+        'DEFECT-02: mainImgEl load event must re-run applyFittingAndPadding() for uncached fallback URL'
+      );
+      assert.strictEqual(mainImgEl.classList.contains('portrait'), true);
+      assert(mainImgEl.style.maxWidth && mainImgEl.style.maxHeight, 'Fallback image dimensions must be fitted');
+
+      // Stale mainImgEl load event after navigating to next image must be ignored
+      controller.navigate(1);
+      mainImgEl.naturalWidth = 2000;
+      mainImgEl.naturalHeight = 1000;
+      mainImgEl.dispatchEvent({ type: 'load', preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(
+        infoBadgeEl.textContent,
+        '세로 사진 (800x1600)',
+        'DEFECT-02: stale mainImgEl load during next pending tempImg must not refit old dimensions'
+      );
+
+      controller.closeViewer();
+      console.log('✅ Test 5: DEFECT-02 onerror uncached fallback refit & stale load guard verified');
+    } finally {
+      global.window = origWindow;
+      global.document = origDocument;
+      global.Image = origImage;
+      global.Event = origEvent;
+      global.requestAnimationFrame = origRAF;
+      global.cancelAnimationFrame = origCAF;
+    }
+  }
+
   console.log('\n🎉 ALL CORE VIEWER TESTS PASSED SUCCESSFULLY! 🎉');
 }
 
