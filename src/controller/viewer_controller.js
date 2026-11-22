@@ -355,10 +355,11 @@ export function openViewer(targetSrc, isAuto = false) {
     document.activeElement.blur();
   }
   const wasActive = isOverlayActive();
-  overlayEl.classList.add('active');
   if (!wasActive) {
+    resetFullscreenState();
     state.previousBodyOverflow = document.body.style.overflow;
   }
+  overlayEl.classList.add('active');
   document.body.style.overflow = 'hidden';
 
   showUi();
@@ -367,6 +368,8 @@ export function openViewer(targetSrc, isAuto = false) {
   showImage(targetIndex);
   if (state.autoFullscreen) {
     enterAutoFullscreenOnOpen();
+  } else if (!wasActive && getFullscreenElement() === overlayEl) {
+    exitFullscreenSafely();
   }
 }
 

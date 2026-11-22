@@ -986,6 +986,12 @@
   var isSliderInteracting = false;
   var hasBoundStorageSync = false;
   var boundFullscreenDoc = null;
+  var fullscreenTransitionSeq = 0;
+  var inFlightRequestSeq = 0;
+  var inFlightExitSeq = 0;
+  var asyncPendingRequestCount = 0;
+  var osFullscreenWanted = false;
+  var hasObservedOsFullscreen = false;
   function isOverlayActive() {
     const { overlayEl } = state.elements;
     return Boolean(overlayEl && overlayEl.classList.contains("active"));
@@ -1078,6 +1084,10 @@
     if (typeof document === "undefined") return null;
     return document.fullscreenElement || document.webkitFullscreenElement || null;
   }
+  function isOverlayFullscreenElement() {
+    const { overlayEl } = state.elements;
+    return Boolean(overlayEl && getFullscreenElement() === overlayEl);
+  }
   function updateFullscreenButtonUi(active) {
     const { fullscreenBtnEl } = state.elements;
     if (!fullscreenBtnEl) return;
@@ -1121,6 +1131,11 @@
     }
   }
   function resetFullscreenState() {
+    fullscreenTransitionSeq += 1;
+    inFlightRequestSeq = 0;
+    inFlightExitSeq = 0;
+    osFullscreenWanted = false;
+    hasObservedOsFullscreen = false;
     state.isFullscreenMode = false;
     const { overlayEl } = state.elements;
     if (overlayEl) {
@@ -1129,13 +1144,33 @@
     updateFullscreenButtonUi(false);
   }
   function syncFullscreenState() {
-    if (!isOverlayActive()) return;
-    if (getFullscreenElement()) {
+    if (!isOverlayActive()) {
+      if (isOverlayFullscreenElement()) {
+        exitFullscreenSafely();
+      }
+      return;
+    }
+    if (isOverlayFullscreenElement()) {
+      const isStaleOrExiting = !osFullscreenWanted && (asyncPendingRequestCount > 0 || inFlightExitSeq === fullscreenTransitionSeq);
+      if (isStaleOrExiting) {
+        exitFullscreenSafely();
+        return;
+      }
+      hasObservedOsFullscreen = true;
       enterFullscreenVisualState();
       return;
     }
-    if (state.isFullscreenMode) {
+    if (hasObservedOsFullscreen && state.isFullscreenMode) {
+      hasObservedOsFullscreen = false;
+      osFullscreenWanted = false;
       exitFullscreenVisualState();
+    }
+  }
+  function handleFullscreenError() {
+    inFlightRequestSeq = 0;
+    if (!isOverlayFullscreenElement()) {
+      osFullscreenWanted = false;
+      hasObservedOsFullscreen = false;
     }
   }
   function bindFullscreenChangeListener() {
@@ -1144,51 +1179,143 @@
     boundFullscreenDoc = document;
     document.addEventListener("fullscreenchange", syncFullscreenState);
     document.addEventListener("webkitfullscreenchange", syncFullscreenState);
+    document.addEventListener("fullscreenerror", handleFullscreenError);
+    document.addEventListener("webkitfullscreenerror", handleFullscreenError);
   }
   function handleFullscreenPromise(result, onSuccess, onFailure) {
     if (!result || typeof result.then !== "function") {
-      if (typeof onSuccess === "function") onSuccess();
+      if (typeof onSuccess === "function") onSuccess(false);
       return;
     }
-    result.then(() => {
-      if (typeof onSuccess === "function") onSuccess();
-    }).catch((err) => {
-      if (typeof onFailure === "function") onFailure(err);
-      return err;
-    });
+    result.then(
+      () => {
+        if (typeof onSuccess === "function") onSuccess(true);
+      },
+      (err) => {
+        if (typeof onFailure === "function") onFailure(err, true);
+        return err;
+      }
+    );
+  }
+  function getFullscreenRequestFn(overlayEl) {
+    if (!overlayEl) return null;
+    if (typeof overlayEl.requestFullscreen === "function") {
+      return () => overlayEl.requestFullscreen();
+    }
+    if (typeof overlayEl.webkitRequestFullscreen === "function") {
+      return () => overlayEl.webkitRequestFullscreen();
+    }
+    return null;
+  }
+  function handleRequestSuccess(seq, isAsync, onSuccess) {
+    if (isAsync) {
+      asyncPendingRequestCount = Math.max(0, asyncPendingRequestCount - 1);
+    }
+    if (inFlightRequestSeq === seq) {
+      inFlightRequestSeq = 0;
+    }
+    if (seq !== fullscreenTransitionSeq || !isOverlayActive()) {
+      if (isOverlayFullscreenElement() && (!isOverlayActive() || !osFullscreenWanted)) {
+        exitFullscreenSafely();
+        return;
+      }
+      if (isOverlayActive() && osFullscreenWanted && isOverlayFullscreenElement()) {
+        hasObservedOsFullscreen = true;
+        enterFullscreenVisualState();
+      }
+      return;
+    }
+    if (isOverlayFullscreenElement()) {
+      hasObservedOsFullscreen = true;
+    }
+    if (typeof onSuccess === "function") onSuccess();
+  }
+  function handleRequestFailure(seq, isAsync, err, onFailure) {
+    if (isAsync) {
+      asyncPendingRequestCount = Math.max(0, asyncPendingRequestCount - 1);
+    }
+    if (inFlightRequestSeq === seq) {
+      inFlightRequestSeq = 0;
+    }
+    if (seq !== fullscreenTransitionSeq || !isOverlayActive()) {
+      return;
+    }
+    if (isOverlayFullscreenElement()) {
+      hasObservedOsFullscreen = true;
+      enterFullscreenVisualState();
+      return;
+    }
+    osFullscreenWanted = false;
+    if (typeof onFailure === "function") onFailure(err);
   }
   function requestOverlayFullscreen(overlayEl, { onSuccess, onFailure } = {}) {
-    try {
-      if (overlayEl && typeof overlayEl.requestFullscreen === "function") {
-        handleFullscreenPromise(overlayEl.requestFullscreen(), onSuccess, onFailure);
-        return true;
-      }
-      if (overlayEl && typeof overlayEl.webkitRequestFullscreen === "function") {
-        handleFullscreenPromise(overlayEl.webkitRequestFullscreen(), onSuccess, onFailure);
-        return true;
-      }
-    } catch (err) {
-      if (typeof onFailure === "function") onFailure(err);
+    if (inFlightRequestSeq !== 0 && inFlightRequestSeq === fullscreenTransitionSeq) {
       return false;
     }
-    if (typeof onFailure === "function") onFailure(new Error("Fullscreen API unavailable"));
-    return false;
+    const requestFn = getFullscreenRequestFn(overlayEl);
+    if (!requestFn) {
+      osFullscreenWanted = false;
+      if (typeof onFailure === "function") onFailure(new Error("Fullscreen API unavailable"));
+      return false;
+    }
+    const seq = ++fullscreenTransitionSeq;
+    inFlightRequestSeq = seq;
+    osFullscreenWanted = true;
+    try {
+      const result = requestFn();
+      if (result && typeof result.then === "function") {
+        asyncPendingRequestCount += 1;
+      }
+      handleFullscreenPromise(
+        result,
+        (isAsync) => handleRequestSuccess(seq, isAsync, onSuccess),
+        (err, isAsync) => handleRequestFailure(seq, isAsync, err, onFailure)
+      );
+      return true;
+    } catch (err) {
+      handleRequestFailure(seq, false, err, onFailure);
+      return false;
+    }
+  }
+  function getExitFullscreenFn() {
+    if (typeof document === "undefined") return null;
+    if (typeof document.exitFullscreen === "function") {
+      return () => document.exitFullscreen();
+    }
+    if (typeof document.webkitExitFullscreen === "function") {
+      return () => document.webkitExitFullscreen();
+    }
+    return null;
   }
   function exitFullscreenSafely() {
     if (!getFullscreenElement()) return false;
-    try {
-      if (typeof document.exitFullscreen === "function") {
-        handleFullscreenPromise(document.exitFullscreen(), exitFullscreenVisualState);
-        return true;
-      }
-      if (typeof document.webkitExitFullscreen === "function") {
-        handleFullscreenPromise(document.webkitExitFullscreen(), exitFullscreenVisualState);
-        return true;
-      }
-    } catch (err) {
+    if (inFlightExitSeq !== 0 && inFlightExitSeq === fullscreenTransitionSeq) {
       return false;
     }
-    return false;
+    const exitFn = getExitFullscreenFn();
+    if (!exitFn) return false;
+    const seq = ++fullscreenTransitionSeq;
+    inFlightExitSeq = seq;
+    osFullscreenWanted = false;
+    hasObservedOsFullscreen = false;
+    const finalizeExit = () => {
+      if (inFlightExitSeq === seq) {
+        inFlightExitSeq = 0;
+      }
+      if (seq !== fullscreenTransitionSeq || !isOverlayActive()) return;
+      if (!isOverlayFullscreenElement()) {
+        exitFullscreenVisualState();
+      }
+    };
+    try {
+      handleFullscreenPromise(exitFn(), finalizeExit, finalizeExit);
+      return true;
+    } catch (err) {
+      if (inFlightExitSeq === seq) {
+        inFlightExitSeq = 0;
+      }
+      return false;
+    }
   }
   function toggleFullscreen() {
     if (!isOverlayActive()) return false;
@@ -1224,8 +1351,13 @@
   }
   function applyAutoFullscreenSetting(enabled) {
     state.autoFullscreen = Boolean(enabled);
-    if (!state.autoFullscreen && state.isFullscreenMode && !getFullscreenElement() && isOverlayActive()) {
-      exitFullscreenVisualState();
+    if (!state.autoFullscreen) {
+      if (!isOverlayFullscreenElement()) {
+        osFullscreenWanted = false;
+      }
+      if (state.isFullscreenMode && !getFullscreenElement() && isOverlayActive()) {
+        exitFullscreenVisualState();
+      }
     }
   }
   function applyAutoHideUiSetting(enabled) {
@@ -1595,10 +1727,11 @@
       document.activeElement.blur();
     }
     const wasActive = isOverlayActive();
-    overlayEl.classList.add("active");
     if (!wasActive) {
+      resetFullscreenState();
       state.previousBodyOverflow = document.body.style.overflow;
     }
+    overlayEl.classList.add("active");
     document.body.style.overflow = "hidden";
     showUi();
     resetIdleTimer();
@@ -1606,6 +1739,8 @@
     showImage(targetIndex);
     if (state.autoFullscreen) {
       enterAutoFullscreenOnOpen();
+    } else if (!wasActive && getFullscreenElement() === overlayEl) {
+      exitFullscreenSafely();
     }
   }
   function closeViewer() {
