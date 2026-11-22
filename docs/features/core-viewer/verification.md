@@ -1,8 +1,8 @@
 # 🧪 [core-viewer] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`3건 OPEN DEFECT` — `DEFECT-01` 해결 완료, `DEFECT-02~04` 잔여)
-- **인수 조건 통과율**: `5 / 9 Scenarios PASS (56%)` (`DEFECT-01` 해결, `DEFECT-02~04` OPEN)
-- **미해결 티켓**: `🚨 DEFECT: 3건` | `🧐 REFACTOR: 0건`
+- **검증 상태**: `🩹 Debugging` (`2건 OPEN DEFECT` — `DEFECT-01~02` 해결 완료, `DEFECT-03~04` 잔여)
+- **인수 조건 통과율**: `6 / 9 Scenarios PASS (67%)` (`DEFECT-01~02` 해결, `DEFECT-03~04` OPEN)
+- **미해결 티켓**: `🚨 DEFECT: 2건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -38,10 +38,10 @@
 | `TC-HP-01` | Happy | 우클릭 메뉴로 정확한 클릭 위치 사진 뷰어 즉시 활성화 | `AC-01` | `FAIL` | [`DEFECT-04`](#defect-04-bindcontextmenutracker-%EC%A7%80%EC%97%B0-%EB%A1%9C%EB%94%A9-%EC%9D%B4%EB%AF%B8%EC%A7%80-url-%EC%A0%80%EC%9E%A5%EC%9C%BC%EB%A1%9C-%EC%9A%B0%ED%81%B4%EB%A6%AD-%EB%8C%80%EC%83%81-%EC%9D%B8%EB%8D%B1%EC%8A%A4-%EB%A7%A4%EC%B9%AD-%EC%8B%A4%ED%8C%A8) |
 | `TC-HP-02` | Happy | 가로/세로 사진 화면 맞춤 렌더링 및 패딩 슬라이더 0~100px 실시간 반영 | `AC-02` | `PASS` | - |
 | `TC-HP-03` | Happy | 마우스 휠 1.0x~5.0x 확대, 더블클릭 2.0x 토글, 드래그 팬 동작 | `AC-03` | `FAIL` | [`DEFECT-03`](#defect-03-%EC%A4%8C-%EC%83%81%ED%83%9C-%EC%9D%B4%EB%AF%B8%EC%A7%80-%EB%B0%96-%EB%93%9C%EB%9E%98%EA%B7%B8-%EC%A2%85%EB%A3%8C-%EC%8B%9C-%EB%B0%B1%EB%93%9C%EB%A1%AD-%ED%81%B4%EB%A6%AD-%EC%98%A4%EC%9D%B8-%EB%B7%B0%EC%96%B4-%EB%8B%AB%ED%9E%98) |
-| `TC-HP-04` | Happy | 방향키 `←`/`→` 사진 이동 및 카운터 동기화 | `AC-04` | `FAIL` | [`DEFECT-02`](#defect-02-showimage-%EB%B9%84%EB%8F%99%EA%B8%B0-tempimg-%EC%8A%A4%ED%85%8C%EC%9D%BC-%EC%BD%9C%EB%B0%B1-%EB%8D%AE%EC%96%B4%EC%93%B0%EA%B8%B0-%EB%B0%8F-onerror-%ED%8F%B4%EB%B0%B1-%ED%94%BC%ED%8C%85-%EB%88%84%EB%9D%BD) |
+| `TC-HP-04` | Happy | 방향키 `←`/`→` 사진 이동 및 카운터 동기화 | `AC-04` | `PASS (Fixed in DEFECT-02)` | [`DEFECT-02`](#defect-02-showimage-%EB%B9%84%EB%8F%99%EA%B8%B0-tempimg-%EC%8A%A4%ED%85%8C%EC%9D%BC-%EC%BD%9C%EB%B0%B1-%EB%8D%AE%EC%96%B4%EC%93%B0%EA%B8%B0-%EB%B0%8F-onerror-%ED%8F%B4%EB%B0%B1-%ED%94%BC%ED%8C%85-%EB%88%84%EB%9D%BD) |
 | `TC-HP-05` | Happy | `ESC` 및 배경 클릭 시 뷰어 닫힘 및 바디 스크롤 복원 | `AC-05` | `PASS (Fixed in DEFECT-01)` | [`DEFECT-01`](#defect-01-userscript-%EC%BA%A1%EC%B2%98-click-%EC%9E%90%EA%B0%80-%EC%9E%AC%EC%A7%84%EC%9E%85-%EB%B0%8F-openviewer-%EC%A4%91%EB%B3%B5-%ED%98%B8%EC%B6%9C-%EC%8B%9C-%EC%8A%A4%ED%81%AC%EB%A1%A4-%EC%98%81%EA%B5%AC-%EC%9E%A0%EA%B8%88) |
 | `TC-BD-01` | Boundary | 본문 사진 1장 이하일 때 좌우 내비게이션 버튼 `.disabled` 비활성화 | `AC-04` | `PASS` | - |
-| `TC-BD-02` | Boundary | 지연 로딩(`data-original`) 사진 사전 강제 로드 및 다운스케일 쿼리 제거 | `AC-01` | `FAIL` | [`DEFECT-02`](#defect-02-showimage-%EB%B9%84%EB%8F%99%EA%B8%B0-tempimg-%EC%8A%A4%ED%85%8C%EC%9D%BC-%EC%BD%9C%EB%B0%B1-%EB%8D%AE%EC%96%B4%EC%93%B0%EA%B8%B0-%EB%B0%8F-onerror-%ED%8F%B4%EB%B0%B1-%ED%94%BC%ED%8C%85-%EB%88%84%EB%9D%BD), [`DEFECT-04`](#defect-04-bindcontextmenutracker-%EC%A7%80%EC%97%B0-%EB%A1%9C%EB%94%A9-%EC%9D%B4%EB%AF%B8%EC%A7%80-url-%EC%A0%80%EC%9E%A5%EC%9C%BC%EB%A1%9C-%EC%9A%B0%ED%81%B4%EB%A6%AD-%EB%8C%80%EC%83%81-%EC%9D%B8%EB%8D%B1%EC%8A%A4-%EB%A7%A4%EC%B9%AD-%EC%8B%A4%ED%8C%A8) |
+| `TC-BD-02` | Boundary | 지연 로딩(`data-original`) 사진 사전 강제 로드 및 다운스케일 쿼리 제거 | `AC-01` | `FAIL` | [`DEFECT-04`](#defect-04-bindcontextmenutracker-%EC%A7%80%EC%97%B0-%EB%A1%9C%EB%94%A9-%EC%9D%B4%EB%AF%B8%EC%A7%80-url-%EC%A0%80%EC%9E%A5%EC%9C%BC%EB%A1%9C-%EC%9A%B0%ED%81%B4%EB%A6%AD-%EB%8C%80%EC%83%81-%EC%9D%B8%EB%8D%B1%EC%8A%A4-%EB%A7%A4%EC%B9%AD-%EC%8B%A4%ED%8C%A8) |
 | `TC-NG-01` | Negative | 본문 사진 0장일 때 조기 리턴 및 알림 표시 | `AC-01` | `PASS` | - |
 | `TC-NG-02` | Negative | 댓글창 디시콘, 사이드바 배너 등 비본문 이미지 오탐 배제 | `AC-01` | `PASS` | - |
 
@@ -59,10 +59,13 @@
   - **회귀 테스트 결과**: `npm test` (`tests/core_viewer.test.js` 3/3 포함 전 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`15/15 PASS`), `npm run build` (`PASS`)
 
 ### [DEFECT-02] `showImage()` 비동기 `tempImg` 스테일 콜백 덮어쓰기 및 `onerror` 폴백 피팅 누락
-- **현재 상태**: 🟡 OPEN
-- **심각도 & 위치**: 🟠 P1 High | [`src/controller/viewer_controller.js#L99-L131`](../../../src/controller/viewer_controller.js#L99-L131), [`src/ui/overlay.js#L140-L143`](../../../src/ui/overlay.js#L140-L143)
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **심각도 & 위치**: 🟠 P1 High | [`src/controller/viewer_controller.js#L60-L167`](../../../src/controller/viewer_controller.js#L60-L167), [`src/ui/overlay.js#L140-L143`](../../../src/ui/overlay.js#L140-L143)
 - **원인 및 실증**: `tempImg.onload`/`onerror`에 세대 토큰 및 `isOverlayActive()` 검증이 없어 느린 이전 이미지가 현재 `mainImgEl.src`를 덮어씀(`Empirical Probe Reproduced`: `counter: '2 / 2'`, `src: ...&no=abc`). 또한 `onerror` 폴백 URL이 미캐시 상태일 때 `naturalWidth === 0`으로 `applyFittingAndPadding()`이 조기 반환되어 리피팅이 누락됨.
-- **최소 수정 설계**: `imageLoadSeq` 세대 토큰으로 스테일 콜백 폐기 및 `mainImgEl.onload`에서 `applyFittingAndPadding()` 재실행.
+- **해결 내역**:
+  - **수정 파일**: [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js#L60-L167), [`tests/core_viewer.test.js`](../../../tests/core_viewer.test.js#L430-L638)
+  - **원인 및 조치**: Devil's Advocate 교차 검증(`WeakSet` 기반 단일 리스너 등록 및 `null` 요소 가드 포함)을 거쳐 `imageLoadSeq`/`renderedLoadSeq` 세대 토큰과 `isOverlayActive()` 가드를 `showImage()`/`renderViewerImage()`/`closeViewer()`에 적용하여 빠른 탐색·닫기·재오픈 시 스테일 `tempImg` 콜백을 폐기함. 또한 `ensureMainImgLoadListener()`로 `mainImgEl` `load` 이벤트를 바인딩해 미캐시 폴백 로드 완료 후(`renderedLoadSeq === imageLoadSeq && isOverlayActive() && state.zoom.scale <= 1.001`) `applyFittingAndPadding()`을 재실행하고 `npm run build`로 번들(`content.js`, `disagall_viewer.user.js`)을 동기화함.
+  - **회귀 테스트 결과**: `node tests/core_viewer.test.js` (`5/5 PASS`), `npm test` (`PASS`), `node tests/immersion_e2e.test.js` (`15/15 PASS`), `npm run build` (`PASS`), `node --check` (`PASS`)
 
 ### [DEFECT-03] 줌 상태 이미지 밖 드래그 종료 시 백드롭 클릭 오인 뷰어 닫힘
 - **현재 상태**: 🟡 OPEN

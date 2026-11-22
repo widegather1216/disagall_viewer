@@ -2,7 +2,7 @@
 
 - **현재 상태 (Lifecycle)**: `🩹 Debugging`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 3건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 2건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,19 +29,21 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-21 / `systematic-debugger` / `core-viewer` [`DEFECT-01`](./verification.md#defect-01-userscript-%EC%BA%A1%EC%B2%98-click-%EC%9E%90%EA%B0%80-%EC%9E%AC%EC%A7%84%EC%9E%85-%EB%B0%8F-openviewer-%EC%A4%91%EB%B3%B5-%ED%98%B8%EC%B6%9C-%EC%8B%9C-%EC%8A%A4%ED%81%AC%EB%A1%A4-%EC%98%81%EA%B5%AC-%EC%9E%A0%EA%B8%88) 해결 완료 (Userscript 캡처 `click` 자가 재진입 차단 및 `openViewer()` `previousBodyOverflow` 덮어쓰기 방지)
+- **직전 완료 작업**: 2026-11-22 / `systematic-debugger` / `core-viewer` [`DEFECT-02`](./verification.md#defect-02-showimage-%EB%B9%84%EB%8F%99%EA%B8%B0-tempimg-%EC%8A%A4%ED%85%8C%EC%9D%BC-%EC%BD%9C%EB%B0%B1-%EB%8D%AE%EC%96%B4%EC%93%B0%EA%B8%B0-%EB%B0%8F-onerror-%ED%8F%B4%EB%B0%B1-%ED%94%BC%ED%8C%85-%EB%88%84%EB%9D%BD) 해결 완료 (`imageLoadSeq`/`renderedLoadSeq` 세대 토큰으로 스테일 `tempImg`/닫기 레이스 차단 및 `mainImgEl` `load` 이벤트 미캐시 폴백 리피팅 보완)
 - **생성/수정된 핵심 파일**:
-  - `src/parser/image_parser.js`: `EXCLUDED_CONTAINER_SELECTORS`에 `#disagall-viewer-overlay` 추가
-  - `src/userscript.js`: `isOverlayActive()`, `typeof target.closest !== 'function'`, `#disagall-viewer-overlay` 가드 적용
-  - `src/controller/viewer_controller.js`: `isOverlayActive` re-export 및 `openViewer()` `!wasActive`일 때만 `previousBodyOverflow` 저장
-  - `tests/core_viewer.test.js` & `package.json`: `DEFECT-01` 회귀 테스트 3종 추가 및 `npm test` 연동
+  - `src/controller/viewer_controller.js`: `imageLoadSeq`/`renderedLoadSeq`/`boundMainImgEls`(`WeakSet`), `handleMainImgLoad()`, `ensureMainImgLoadListener()`, `renderViewerImage()`, `showImage()`, `closeViewer()` 가드 적용
+  - `tests/core_viewer.test.js`: `DEFECT-02` 회귀 테스트 2건(Test 4~5: 스테일 `tempImg`/닫기·재오픈 레이스 및 `onerror` 미캐시 폴백 `load` 리피팅) 추가
+  - `content.js` & `disagall_viewer.user.js`: `npm run build` 번들 동기화
 - **검증 완료된 테스트 실행 명령어**:
   - `npm run build` (`PASS` — `content.js`, `disagall_viewer.user.js` 번들 생성)
-  - `npm test` (`PASS` — `module_import`, `core_viewer` 3/3, `post_navigation`, `recommend`, `immersion` 26/26)
+  - `npm test` (`PASS` — `module_import`, `core_viewer` 5/5, `post_navigation` 8/8, `recommend` 8/8, `immersion` 27/27)
   - `node tests/immersion_e2e.test.js` (`PASS` — 15/15)
+  - `node --check` (`src/controller/viewer_controller.js`, `content.js`, `disagall_viewer.user.js`, `tests/core_viewer.test.js` `PASS`)
 - **Recent Commits**:
+  - `e5def17` - `fix(core-viewer): guard stale showImage callbacks and refit fallback image load`
+  - `4f72617` - `test(core-viewer): add regression tests for DEFECT-02 stale load and fallback refit`
   - `ca063d3` - `fix(core-viewer): guard userscript click re-entry and duplicate openViewer overflow lock`
   - `eff67f6` - `test(core-viewer): add unit and userscript regression tests for DEFECT-01`
 - **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `systematic-debugger`로 잔여 `DEFECT-02`(비동기 `tempImg` 스테일 콜백 덮어쓰기 및 `onerror` 폴백 피팅 누락)부터 `DEFECT-04`까지 순차 수정 필요.
+  - `systematic-debugger`로 잔여 `DEFECT-03`(줌 상태 이미지 밖 드래그 종료 시 백드롭 클릭 오인 닫힘) 및 `DEFECT-04`(지연 로딩 이미지 우클릭 인덱스 매칭 실패) 순차 수정 필요.
