@@ -74,6 +74,7 @@ function createMockDom() {
       tagName: tagName.toUpperCase(),
       id,
       _initialClasses: classNames,
+      _listeners: elListeners,
       children: [],
       parentElement: null,
       style: {},
@@ -92,7 +93,19 @@ function createMockDom() {
         elListeners[ev].push(fn);
       },
       dispatchEvent: (evObj) => {
-        (elListeners[evObj.type] || []).forEach((fn) => fn(evObj));
+        const ev = typeof evObj === 'string' ? { type: evObj } : evObj;
+        let stopped = false;
+        const origStop = ev.stopPropagation;
+        ev.stopPropagation = () => {
+          stopped = true;
+          if (typeof origStop === 'function') origStop.call(ev);
+        };
+        if (!ev.target) ev.target = el;
+        let cur = el;
+        while (cur && !stopped) {
+          (cur._listeners?.[ev.type] || []).forEach((fn) => fn(ev));
+          cur = ev.bubbles ? cur.parentElement : null;
+        }
       },
       setAttribute: (k, v) => {
         attrs[k] = String(v);
@@ -230,7 +243,14 @@ function createMockDom() {
       if (!winListeners[ev]) winListeners[ev] = [];
       winListeners[ev].push(fn);
     },
-    dispatchEvent: () => {},
+    removeEventListener: (ev, fn) => {
+      if (!winListeners[ev]) return;
+      winListeners[ev] = winListeners[ev].filter((item) => item !== fn);
+    },
+    dispatchEvent: (evObj) => {
+      const ev = typeof evObj === 'string' ? { type: evObj } : evObj;
+      (winListeners[ev.type] || []).slice().forEach((fn) => fn(ev));
+    },
   };
 
   return { doc, win, body, createElement };
@@ -620,6 +640,184 @@ async function run() {
 
       controller.closeViewer();
       console.log('✅ Test 5: DEFECT-02 onerror uncached fallback refit & stale load guard verified');
+    } finally {
+      global.window = origWindow;
+      global.document = origDocument;
+      global.Image = origImage;
+      global.Event = origEvent;
+      global.requestAnimationFrame = origRAF;
+      global.cancelAnimationFrame = origCAF;
+    }
+  }
+
+  // Test 6 (DEFECT-03): Releasing zoom pan drag outside mainImgEl must NOT close viewer as backdrop click,
+  // while subsequent genuine backdrop clicks still close the viewer.
+  {
+    const dom = createMockDom();
+    const writeDiv = dom.createElement('div', '', ['write_div']);
+    const img1 = dom.createElement('img');
+    img1.src = 'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=301';
+    const img2 = dom.createElement('img');
+    img2.src = 'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=302';
+    writeDiv.appendChild(img1);
+    writeDiv.appendChild(img2);
+    dom.body.appendChild(writeDiv);
+
+    const origWindow = global.window;
+    const origDocument = global.document;
+    const origImage = global.Image;
+    const origEvent = global.Event;
+    const origRAF = global.requestAnimationFrame;
+    const origCAF = global.cancelAnimationFrame;
+
+    global.window = dom.win;
+    global.document = dom.doc;
+    global.Event = class { constructor(type) { this.type = type; } };
+    global.requestAnimationFrame = () => 1;
+    global.cancelAnimationFrame = () => {};
+    global.Image = class {
+      set src(v) {
+        this._src = v;
+        if (typeof this.onload === 'function') this.onload();
+      }
+      get src() { return this._src; }
+    };
+
+    try {
+      const { state } = await import('../src/state.js');
+      Object.keys(state.elements).forEach((k) => { state.elements[k] = null; });
+      state.previousBodyOverflow = '';
+      state.postImages = [];
+      state.currentIndex = 0;
+      state.zoom.scale = 1.0;
+      state.zoom.panX = 0;
+      state.zoom.panY = 0;
+      state.zoom.isDragging = false;
+      state.zoom.pendingDragRelease = false;
+      state.zoom.suppressNextBackdropClick = false;
+      if (state.zoom.suppressClickTimer !== null) {
+        clearTimeout(state.zoom.suppressClickTimer);
+        state.zoom.suppressClickTimer = null;
+      }
+
+      const controller = await import('../src/controller/viewer_controller.js');
+      controller.openViewer();
+
+      const overlay = dom.doc.getElementById('disagall-viewer-overlay');
+      const stage = dom.doc.getElementById('disagall-stage');
+      const wrapper = dom.doc.getElementById('disagall-img-wrapper');
+      const mainImg = dom.doc.getElementById('disagall-main-img');
+      assert.strictEqual(overlay.classList.contains('active'), true);
+
+      // 6.1 Zoom in > 1.0, start drag on mainImg, move, release on stage -> synthetic click on stage must NOT close viewer
+      mainImg.dispatchEvent({ type: 'wheel', deltaY: -120, preventDefault() {} });
+      assert(state.zoom.scale > 1.0, 'Wheel zoom must increase scale > 1.0');
+
+      mainImg.dispatchEvent({ type: 'mousedown', button: 0, clientX: 100, clientY: 100, preventDefault() {} });
+      assert.strictEqual(state.zoom.isDragging, true);
+      dom.win.dispatchEvent({ type: 'mousemove', clientX: 160, clientY: 140 });
+      dom.win.dispatchEvent({ type: 'mouseup', clientX: 160, clientY: 140 });
+      assert.strictEqual(state.zoom.isDragging, false);
+
+      stage.dispatchEvent({ type: 'click', bubbles: true, preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(
+        overlay.classList.contains('active'),
+        true,
+        'DEFECT-03: Drag release outside zoomed image (#disagall-stage click) must NOT close viewer'
+      );
+
+      // 6.2 Subsequent genuine click on #disagall-stage without dragging MUST close viewer
+      stage.dispatchEvent({ type: 'click', bubbles: true, preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(
+        overlay.classList.contains('active'),
+        false,
+        'DEFECT-03: Genuine backdrop click after drag must still close viewer'
+      );
+
+      // 6.3 Reopen, zoom, drag, release on #disagall-img-wrapper -> must NOT close; then genuine wrapper click MUST close
+      controller.openViewer();
+      mainImg.dispatchEvent({ type: 'wheel', deltaY: -120, preventDefault() {} });
+      mainImg.dispatchEvent({ type: 'mousedown', button: 0, clientX: 50, clientY: 50, preventDefault() {} });
+      dom.win.dispatchEvent({ type: 'mouseup', clientX: 20, clientY: 20 });
+      wrapper.dispatchEvent({ type: 'click', bubbles: true, preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(
+        overlay.classList.contains('active'),
+        true,
+        'DEFECT-03: Drag release on #disagall-img-wrapper must NOT close viewer'
+      );
+
+      wrapper.dispatchEvent({ type: 'click', bubbles: true, preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(
+        overlay.classList.contains('active'),
+        false,
+        'DEFECT-03: Subsequent genuine click on #disagall-img-wrapper must close viewer'
+      );
+
+      // 6.4 Reopen, zoom, drag, release on mainImg itself (click target=mainImg) -> subsequent genuine stage click MUST still close
+      controller.openViewer();
+      mainImg.dispatchEvent({ type: 'wheel', deltaY: -120, preventDefault() {} });
+      mainImg.dispatchEvent({ type: 'mousedown', button: 0, clientX: 10, clientY: 10, preventDefault() {} });
+      dom.win.dispatchEvent({ type: 'mouseup', clientX: 15, clientY: 15 });
+      mainImg.dispatchEvent({ type: 'click', bubbles: true, preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(overlay.classList.contains('active'), true);
+
+      stage.dispatchEvent({ type: 'click', bubbles: true, preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(
+        overlay.classList.contains('active'),
+        false,
+        'DEFECT-03: Click on mainImg after drag must consume suppression so next backdrop click closes viewer'
+      );
+
+      // 6.5 Reopen, zoom, drag, release outside overlay (no click reaches overlay) -> after macrotask turn, backdrop click MUST close
+      controller.openViewer();
+      mainImg.dispatchEvent({ type: 'wheel', deltaY: -120, preventDefault() {} });
+      mainImg.dispatchEvent({ type: 'mousedown', button: 0, clientX: 10, clientY: 10, preventDefault() {} });
+      dom.win.dispatchEvent({ type: 'mouseup', clientX: 9999, clientY: 9999 });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      stage.dispatchEvent({ type: 'click', bubbles: true, preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(
+        overlay.classList.contains('active'),
+        false,
+        'DEFECT-03: Suppression flag must auto-expire if mouseup occurred outside overlay without reaching backdrop click'
+      );
+
+      // 6.6 Non-left mouseup (e.button === 2) during left drag must NOT terminate drag or consume suppression early
+      controller.openViewer();
+      mainImg.dispatchEvent({ type: 'wheel', deltaY: -120, preventDefault() {} });
+      mainImg.dispatchEvent({ type: 'mousedown', button: 0, clientX: 20, clientY: 20, preventDefault() {} });
+      dom.win.dispatchEvent({ type: 'mouseup', button: 2, clientX: 30, clientY: 30 });
+      assert.strictEqual(state.zoom.isDragging, true, 'DEFECT-03: Right-click mouseup must not cancel left-click drag');
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      dom.win.dispatchEvent({ type: 'mouseup', button: 0, clientX: 200, clientY: 200 });
+      assert.strictEqual(state.zoom.isDragging, false);
+      stage.dispatchEvent({ type: 'click', bubbles: true, preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(
+        overlay.classList.contains('active'),
+        true,
+        'DEFECT-03: Left-click drag release on stage after right-click interference must still suppress backdrop close'
+      );
+      controller.closeViewer();
+
+      // 6.7 Keyboard navigate() during zoomed drag resets zoom while preserving drag-release suppression until mouseup
+      controller.openViewer();
+      mainImg.dispatchEvent({ type: 'wheel', deltaY: -120, preventDefault() {} });
+      mainImg.dispatchEvent({ type: 'mousedown', button: 0, clientX: 30, clientY: 30, preventDefault() {} });
+      controller.navigate(1);
+      assert.strictEqual(state.zoom.scale, 1.0, 'navigate() must reset zoom to 1.0');
+      assert.strictEqual(state.zoom.isDragging, false);
+      assert.strictEqual(state.zoom.pendingDragRelease, true);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      dom.win.dispatchEvent({ type: 'mouseup', button: 0, clientX: 250, clientY: 250 });
+      stage.dispatchEvent({ type: 'click', bubbles: true, preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(
+        overlay.classList.contains('active'),
+        true,
+        'DEFECT-03: Mouseup on stage after navigate() during drag must NOT close viewer'
+      );
+      stage.dispatchEvent({ type: 'click', bubbles: true, preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(overlay.classList.contains('active'), false, 'Subsequent genuine stage click closes viewer');
+
+      console.log('✅ Test 6: DEFECT-03 zoomed drag-release backdrop click suppression verified');
     } finally {
       global.window = origWindow;
       global.document = origDocument;
