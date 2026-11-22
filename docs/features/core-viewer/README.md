@@ -2,7 +2,7 @@
 
 - **현재 상태 (Lifecycle)**: `🩹 Debugging`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 2건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 1건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,21 +29,25 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-22 / `systematic-debugger` / `core-viewer` [`DEFECT-02`](./verification.md#defect-02-showimage-%EB%B9%84%EB%8F%99%EA%B8%B0-tempimg-%EC%8A%A4%ED%85%8C%EC%9D%BC-%EC%BD%9C%EB%B0%B1-%EB%8D%AE%EC%96%B4%EC%93%B0%EA%B8%B0-%EB%B0%8F-onerror-%ED%8F%B4%EB%B0%B1-%ED%94%BC%ED%8C%85-%EB%88%84%EB%9D%BD) 해결 완료 (`imageLoadSeq`/`renderedLoadSeq` 세대 토큰으로 스테일 `tempImg`/닫기 레이스 차단 및 `mainImgEl` `load` 이벤트 미캐시 폴백 리피팅 보완)
+- **직전 완료 작업**: 2026-11-22 / `systematic-debugger` / `core-viewer` [`DEFECT-03`](./verification.md#defect-03-%EC%A4%8C-%EC%83%81%ED%83%9C-%EC%9D%B4%EB%AF%B8%EC%A7%80-%EB%B0%96-%EB%93%9C%EB%9E%98%EA%B7%B8-%EC%A2%85%EB%A3%8C-%EC%8B%9C-%EB%B0%B1%EB%93%9C%EB%A1%AD-%ED%81%B4%EB%A6%AD-%EC%98%A4%EC%9D%B8-%EB%B7%B0%EC%96%B4-%EB%8B%AB%ED%9E%98) 해결 완료 (줌 상태 팬 드래그 종료 시 백드롭 클릭 오인 닫힘 방지, 우클릭 간섭·드래그 중 `navigate()`·오버레이 외부 릴리즈 0ms 만료 가드 적용)
 - **생성/수정된 핵심 파일**:
-  - `src/controller/viewer_controller.js`: `imageLoadSeq`/`renderedLoadSeq`/`boundMainImgEls`(`WeakSet`), `handleMainImgLoad()`, `ensureMainImgLoadListener()`, `renderViewerImage()`, `showImage()`, `closeViewer()` 가드 적용
-  - `tests/core_viewer.test.js`: `DEFECT-02` 회귀 테스트 2건(Test 4~5: 스테일 `tempImg`/닫기·재오픈 레이스 및 `onerror` 미캐시 폴백 `load` 리피팅) 추가
+  - `src/state.js`: `state.zoom`에 `pendingDragRelease`, `suppressNextBackdropClick`, `suppressClickTimer` 상태 추가
+  - `src/ui/zoom_pan.js`: `consumeSuppressedBackdropClick()`, `clearSuppressBackdropClick()`, `armSuppressBackdropClick()`, `onWindowMouseUp(e)` 좌클릭/드래그 억제 및 `resetZoom(preservePendingRelease)` 가드 적용
+  - `src/controller/viewer_controller.js`: `bindOverlayBackdrop()` 최상단 `consumeSuppressedBackdropClick()` 가드 및 `showImage()` `resetZoom(true)` 연동
+  - `tests/core_viewer.test.js`: `DEFECT-03` 회귀 테스트(Test 6.1~6.7: `#disagall-stage`/`#disagall-img-wrapper`/`#disagall-main-img`/오버레이 밖 릴리즈/우클릭 간섭/드래그 중 `navigate()`) 추가
   - `content.js` & `disagall_viewer.user.js`: `npm run build` 번들 동기화
 - **검증 완료된 테스트 실행 명령어**:
   - `npm run build` (`PASS` — `content.js`, `disagall_viewer.user.js` 번들 생성)
-  - `npm test` (`PASS` — `module_import`, `core_viewer` 5/5, `post_navigation` 8/8, `recommend` 8/8, `immersion` 27/27)
+  - `npm test` (`PASS` — `module_import`, `core_viewer` 6/6, `post_navigation` 8/8, `recommend` 8/8, `immersion` 27/27)
   - `node tests/immersion_e2e.test.js` (`PASS` — 15/15)
-  - `node --check` (`src/controller/viewer_controller.js`, `content.js`, `disagall_viewer.user.js`, `tests/core_viewer.test.js` `PASS`)
+  - `node --check` (`src/state.js`, `src/ui/zoom_pan.js`, `src/controller/viewer_controller.js`, `content.js`, `disagall_viewer.user.js`, `tests/core_viewer.test.js` `PASS`)
 - **Recent Commits**:
+  - `1b001e6` - `fix(core-viewer): suppress backdrop click after zoomed pan drag release`
+  - `2fb2576` - `test(core-viewer): add regression tests for DEFECT-03 pan drag backdrop suppression`
   - `e5def17` - `fix(core-viewer): guard stale showImage callbacks and refit fallback image load`
   - `4f72617` - `test(core-viewer): add regression tests for DEFECT-02 stale load and fallback refit`
   - `ca063d3` - `fix(core-viewer): guard userscript click re-entry and duplicate openViewer overflow lock`
   - `eff67f6` - `test(core-viewer): add unit and userscript regression tests for DEFECT-01`
 - **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `systematic-debugger`로 잔여 `DEFECT-03`(줌 상태 이미지 밖 드래그 종료 시 백드롭 클릭 오인 닫힘) 및 `DEFECT-04`(지연 로딩 이미지 우클릭 인덱스 매칭 실패) 순차 수정 필요.
+  - `systematic-debugger`로 잔여 `DEFECT-04`(지연 로딩 이미지 우클릭 인덱스 매칭 실패) 수정 필요.

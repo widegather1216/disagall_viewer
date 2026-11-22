@@ -1,8 +1,8 @@
 # 🧪 [core-viewer] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`2건 OPEN DEFECT` — `DEFECT-01~02` 해결 완료, `DEFECT-03~04` 잔여)
-- **인수 조건 통과율**: `6 / 9 Scenarios PASS (67%)` (`DEFECT-01~02` 해결, `DEFECT-03~04` OPEN)
-- **미해결 티켓**: `🚨 DEFECT: 2건` | `🧐 REFACTOR: 0건`
+- **검증 상태**: `🩹 Debugging` (`1건 OPEN DEFECT` — `DEFECT-01~03` 해결 완료, `DEFECT-04` 잔여)
+- **인수 조건 통과율**: `7 / 9 Scenarios PASS (78%)` (`DEFECT-01~03` 해결, `DEFECT-04` OPEN)
+- **미해결 티켓**: `🚨 DEFECT: 1건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -37,7 +37,7 @@
 | :--- | :---: | :--- | :--- :---: | :---: | :--- |
 | `TC-HP-01` | Happy | 우클릭 메뉴로 정확한 클릭 위치 사진 뷰어 즉시 활성화 | `AC-01` | `FAIL` | [`DEFECT-04`](#defect-04-bindcontextmenutracker-%EC%A7%80%EC%97%B0-%EB%A1%9C%EB%94%A9-%EC%9D%B4%EB%AF%B8%EC%A7%80-url-%EC%A0%80%EC%9E%A5%EC%9C%BC%EB%A1%9C-%EC%9A%B0%ED%81%B4%EB%A6%AD-%EB%8C%80%EC%83%81-%EC%9D%B8%EB%8D%B1%EC%8A%A4-%EB%A7%A4%EC%B9%AD-%EC%8B%A4%ED%8C%A8) |
 | `TC-HP-02` | Happy | 가로/세로 사진 화면 맞춤 렌더링 및 패딩 슬라이더 0~100px 실시간 반영 | `AC-02` | `PASS` | - |
-| `TC-HP-03` | Happy | 마우스 휠 1.0x~5.0x 확대, 더블클릭 2.0x 토글, 드래그 팬 동작 | `AC-03` | `FAIL` | [`DEFECT-03`](#defect-03-%EC%A4%8C-%EC%83%81%ED%83%9C-%EC%9D%B4%EB%AF%B8%EC%A7%80-%EB%B0%96-%EB%93%9C%EB%9E%98%EA%B7%B8-%EC%A2%85%EB%A3%8C-%EC%8B%9C-%EB%B0%B1%EB%93%9C%EB%A1%AD-%ED%81%B4%EB%A6%AD-%EC%98%A4%EC%9D%B8-%EB%B7%B0%EC%96%B4-%EB%8B%AB%ED%9E%98) |
+| `TC-HP-03` | Happy | 마우스 휠 1.0x~5.0x 확대, 더블클릭 2.0x 토글, 드래그 팬 동작 | `AC-03` | `PASS (Fixed in DEFECT-03)` | [`DEFECT-03`](#defect-03-%EC%A4%8C-%EC%83%81%ED%83%9C-%EC%9D%B4%EB%AF%B8%EC%A7%80-%EB%B0%96-%EB%93%9C%EB%9E%98%EA%B7%B8-%EC%A2%85%EB%A3%8C-%EC%8B%9C-%EB%B0%B1%EB%93%9C%EB%A1%AD-%ED%81%B4%EB%A6%AD-%EC%98%A4%EC%9D%B8-%EB%B7%B0%EC%96%B4-%EB%8B%AB%ED%9E%98) |
 | `TC-HP-04` | Happy | 방향키 `←`/`→` 사진 이동 및 카운터 동기화 | `AC-04` | `PASS (Fixed in DEFECT-02)` | [`DEFECT-02`](#defect-02-showimage-%EB%B9%84%EB%8F%99%EA%B8%B0-tempimg-%EC%8A%A4%ED%85%8C%EC%9D%BC-%EC%BD%9C%EB%B0%B1-%EB%8D%AE%EC%96%B4%EC%93%B0%EA%B8%B0-%EB%B0%8F-onerror-%ED%8F%B4%EB%B0%B1-%ED%94%BC%ED%8C%85-%EB%88%84%EB%9D%BD) |
 | `TC-HP-05` | Happy | `ESC` 및 배경 클릭 시 뷰어 닫힘 및 바디 스크롤 복원 | `AC-05` | `PASS (Fixed in DEFECT-01)` | [`DEFECT-01`](#defect-01-userscript-%EC%BA%A1%EC%B2%98-click-%EC%9E%90%EA%B0%80-%EC%9E%AC%EC%A7%84%EC%9E%85-%EB%B0%8F-openviewer-%EC%A4%91%EB%B3%B5-%ED%98%B8%EC%B6%9C-%EC%8B%9C-%EC%8A%A4%ED%81%AC%EB%A1%A4-%EC%98%81%EA%B5%AC-%EC%9E%A0%EA%B8%88) |
 | `TC-BD-01` | Boundary | 본문 사진 1장 이하일 때 좌우 내비게이션 버튼 `.disabled` 비활성화 | `AC-04` | `PASS` | - |
@@ -68,10 +68,13 @@
   - **회귀 테스트 결과**: `node tests/core_viewer.test.js` (`5/5 PASS`), `npm test` (`PASS`), `node tests/immersion_e2e.test.js` (`15/15 PASS`), `npm run build` (`PASS`), `node --check` (`PASS`)
 
 ### [DEFECT-03] 줌 상태 이미지 밖 드래그 종료 시 백드롭 클릭 오인 뷰어 닫힘
-- **현재 상태**: 🟡 OPEN
-- **심각도 & 위치**: 🟠 P1 High | [`src/ui/zoom_pan.js#L86-L97`](../../../src/ui/zoom_pan.js#L86-L97), [`src/controller/viewer_controller.js#L330-L336`](../../../src/controller/viewer_controller.js#L330-L336)
-- **원인 및 실증**: `scale > 1.0` 상태에서 `mainImgEl` 위 `mousedown` 후 이미지 밖(`#disagall-img-wrapper`/`#disagall-stage`)에서 `mouseup`하면 공통 조상에 `click`이 발생해 `bindOverlayBackdrop()`이 뷰어를 닫음(`Deterministic Trace Verified`).
-- **최소 수정 설계**: 드래그 시작/이동 시 직후 1회 백드롭 `click` 무시 플래그(`suppressNextBackdropClick`) 적용.
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **심각도 & 위치**: 🟠 P1 High | [`src/state.js#L40-L51`](../../../src/state.js#L40-L51), [`src/ui/zoom_pan.js#L5-L136`](../../../src/ui/zoom_pan.js#L5-L136), [`src/controller/viewer_controller.js#L334-L341`](../../../src/controller/viewer_controller.js#L334-L341)
+- **원인 및 실증**: `scale > 1.0` 상태에서 `mainImgEl` 위 `mousedown` 후 이미지 밖(`#disagall-img-wrapper`/`#disagall-stage`/`#disagall-viewer-overlay`)에서 `mouseup`하면 공통 조상에 `click`이 발생해 `bindOverlayBackdrop()`이 뷰어를 닫음(`Red` 테스트 재현: `overlay.classList.contains('active') === false`).
+- **해결 내역**:
+  - **수정 파일**: [`src/state.js`](../../../src/state.js#L40-L51), [`src/ui/zoom_pan.js`](../../../src/ui/zoom_pan.js#L5-L136), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js#L21-L341), [`tests/core_viewer.test.js`](../../../tests/core_viewer.test.js#L653-L820)
+  - **원인 및 조치**: Devil's Advocate 교차 검증(우클릭 `button: 2` 간섭 및 드래그 중 `navigate()` `resetZoom()` 반례 포함)을 반영하여, `state.zoom`에 `suppressNextBackdropClick`/`suppressClickTimer`/`pendingDragRelease`를 추가하고 `onWindowMouseUp(e)`(좌클릭 `button === 0` 가드)에서 1회 백드롭 클릭 억제 및 `setTimeout(..., 0)` 폴백 만료 타이머를 등록함. `bindOverlayBackdrop()` 최상단 `consumeSuppressedBackdropClick()`으로 드래그 직후 오인 닫힘만 차단하고 `resetZoom(true)`/`closeViewer()`로 타이머·리스너 수명주기를 정리한 뒤 `npm run build`로 `content.js`/`disagall_viewer.user.js`를 동기화함.
+  - **회귀 테스트 결과**: `node tests/core_viewer.test.js` (`6/6 PASS`), `npm test` (`PASS`), `node tests/immersion_e2e.test.js` (`15/15 PASS`), `npm run build` (`PASS`), `node --check` (`PASS`)
 
 ### [DEFECT-04] `bindContextMenuTracker()` 지연 로딩 이미지 URL 저장으로 우클릭 대상 인덱스 매칭 실패
 - **현재 상태**: 🟡 OPEN
