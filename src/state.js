@@ -25,6 +25,7 @@ export const state = {
   },
 
   toastTimer: null,
+  noPhotoNoticeTimer: null,
 
   // Immersion & UI Auto-Hide
   idleTimer: null,

@@ -195,11 +195,62 @@ export function showViewerToast(message, duration = CONFIG.TOAST_DURATION) {
   }, duration);
 }
 
-export function showNoPhotoNotice(onNavigatePost) {
-  let noticeEl = document.getElementById('disagall-no-photo-notice');
-  if (noticeEl) noticeEl.remove();
+const NON_TEXT_INPUT_TYPES = new Set([
+  'range',
+  'checkbox',
+  'radio',
+  'button',
+  'submit',
+  'reset',
+  'color',
+  'file',
+  'hidden',
+]);
 
-  noticeEl = document.createElement('div');
+let activeNoticeCleanup = null;
+
+export function isEditableTarget(target) {
+  if (!target) return false;
+  const tag = typeof target.tagName === 'string' ? target.tagName.toUpperCase() : '';
+  if (tag === 'INPUT') {
+    const inputType = typeof target.type === 'string' ? target.type.toLowerCase() : 'text';
+    return !NON_TEXT_INPUT_TYPES.has(inputType);
+  }
+  return tag === 'TEXTAREA' || tag === 'SELECT' || Boolean(target.isContentEditable);
+}
+
+export function isExternalModalOpen() {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') {
+    return false;
+  }
+  const openModal = document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
+  if (!openModal) return false;
+  const { overlayEl } = state.elements;
+  return !overlayEl || (typeof overlayEl.contains === 'function' && !overlayEl.contains(openModal));
+}
+
+export function dismissNoPhotoNotice() {
+  if (activeNoticeCleanup) {
+    const cleanup = activeNoticeCleanup;
+    activeNoticeCleanup = null;
+    cleanup();
+  }
+  if (state.noPhotoNoticeTimer !== null) {
+    clearTimeout(state.noPhotoNoticeTimer);
+    state.noPhotoNoticeTimer = null;
+  }
+  if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+    const existingEl = document.getElementById('disagall-no-photo-notice');
+    if (existingEl && typeof existingEl.remove === 'function') {
+      existingEl.remove();
+    }
+  }
+}
+
+export function showNoPhotoNotice(onNavigatePost) {
+  dismissNoPhotoNotice();
+
+  const noticeEl = document.createElement('div');
   noticeEl.id = 'disagall-no-photo-notice';
   noticeEl.className = 'disagall-no-photo-notice';
   noticeEl.innerHTML = `
@@ -216,34 +267,73 @@ export function showNoPhotoNotice(onNavigatePost) {
 
   document.body.appendChild(noticeEl);
 
+  let isDismissed = false;
+
+  const dismissNotice = () => {
+    if (isDismissed) return;
+    isDismissed = true;
+    if (activeNoticeCleanup === dismissNotice) {
+      activeNoticeCleanup = null;
+    }
+    if (state.noPhotoNoticeTimer !== null) {
+      clearTimeout(state.noPhotoNoticeTimer);
+      state.noPhotoNoticeTimer = null;
+    }
+    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      window.removeEventListener('keydown', handleNoticeKey);
+    }
+    if (noticeEl && typeof noticeEl.remove === 'function') {
+      noticeEl.remove();
+    }
+  };
+
+  function handleNoticeKey(e) {
+    if (!e || e.repeat) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const { overlayEl } = state.elements;
+    if (overlayEl && overlayEl.classList && overlayEl.classList.contains('active')) return;
+    const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+    if (isEditableTarget(e.target) || isEditableTarget(activeEl)) return;
+    if (isExternalModalOpen()) return;
+
+    if (['ArrowUp', 'w', 'W'].includes(e.key) || e.code === 'KeyW') {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      if (typeof e.stopPropagation === 'function') e.stopPropagation();
+      dismissNotice();
+      onNavigatePost('up');
+    } else if (['ArrowDown', 's', 'S'].includes(e.key) || e.code === 'KeyS') {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      if (typeof e.stopPropagation === 'function') e.stopPropagation();
+      dismissNotice();
+      onNavigatePost('down');
+    } else if (e.key === 'Escape') {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      if (typeof e.stopPropagation === 'function') e.stopPropagation();
+      dismissNotice();
+    }
+  }
+
+  activeNoticeCleanup = dismissNotice;
+
   const prevBtn = noticeEl.querySelector('#disagall-notice-prev');
   const nextBtn = noticeEl.querySelector('#disagall-notice-next');
   const closeBtn = noticeEl.querySelector('#disagall-notice-close');
 
-  if (prevBtn) prevBtn.addEventListener('click', () => onNavigatePost('up'));
-  if (nextBtn) nextBtn.addEventListener('click', () => onNavigatePost('down'));
-  if (closeBtn) closeBtn.addEventListener('click', () => noticeEl.remove());
-
-  const handleNoticeKey = (e) => {
-    if (['ArrowUp', 'w', 'W'].includes(e.key)) {
-      e.preventDefault();
-      window.removeEventListener('keydown', handleNoticeKey);
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      dismissNotice();
       onNavigatePost('up');
-    } else if (['ArrowDown', 's', 'S'].includes(e.key)) {
-      e.preventDefault();
-      window.removeEventListener('keydown', handleNoticeKey);
+    });
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      dismissNotice();
       onNavigatePost('down');
-    } else if (e.key === 'Escape') {
-      noticeEl.remove();
-      window.removeEventListener('keydown', handleNoticeKey);
-    }
-  };
+    });
+  }
+  if (closeBtn) closeBtn.addEventListener('click', dismissNotice);
+
   window.addEventListener('keydown', handleNoticeKey);
 
-  setTimeout(() => {
-    if (noticeEl && noticeEl.parentNode) {
-      noticeEl.remove();
-      window.removeEventListener('keydown', handleNoticeKey);
-    }
-  }, CONFIG.NO_PHOTO_NOTICE_DURATION);
+  state.noPhotoNoticeTimer = setTimeout(dismissNotice, CONFIG.NO_PHOTO_NOTICE_DURATION);
 }

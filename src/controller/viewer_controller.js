@@ -13,7 +13,10 @@ import {
   cacheOverlayElements,
   applyFittingAndPadding,
   showViewerToast,
-  showNoPhotoNotice
+  showNoPhotoNotice,
+  dismissNoPhotoNotice,
+  isEditableTarget,
+  isExternalModalOpen
 } from '../ui/overlay.js';
 import { resetZoom, setupZoomEvents } from '../ui/zoom_pan.js';
 import { triggerPostRecommend, updateRecommendButtonUi } from './recommend_controller.js';
@@ -204,38 +207,6 @@ export const CODE_ACTIONS = {
   'KeyF': () => toggleFullscreen()
 };
 
-const NON_TEXT_INPUT_TYPES = new Set([
-  'range',
-  'checkbox',
-  'radio',
-  'button',
-  'submit',
-  'reset',
-  'color',
-  'file',
-  'hidden',
-]);
-
-function isEditableTarget(target) {
-  if (!target) return false;
-  const tag = typeof target.tagName === 'string' ? target.tagName.toUpperCase() : '';
-  if (tag === 'INPUT') {
-    const inputType = typeof target.type === 'string' ? target.type.toLowerCase() : 'text';
-    return !NON_TEXT_INPUT_TYPES.has(inputType);
-  }
-  return tag === 'TEXTAREA' || tag === 'SELECT' || Boolean(target.isContentEditable);
-}
-
-function isExternalModalOpen() {
-  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') {
-    return false;
-  }
-  const openModal = document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
-  if (!openModal) return false;
-  const { overlayEl } = state.elements;
-  return !overlayEl || (typeof overlayEl.contains === 'function' && !overlayEl.contains(openModal));
-}
-
 export function handleKeyDown(e) {
   if (!isOverlayActive()) return;
   if (!e || e.repeat) return;
@@ -375,6 +346,7 @@ export function openViewer(targetSrc, isAuto = false) {
     return;
   }
 
+  dismissNoPhotoNotice();
   createOverlay();
 
   const targetIndex = findTargetImageIndex(targetSrc);
@@ -399,6 +371,7 @@ export function openViewer(targetSrc, isAuto = false) {
 }
 
 export function closeViewer() {
+  dismissNoPhotoNotice();
   clearIdleTimer();
   flushPaddingSave();
   resetImmersionGuards();
