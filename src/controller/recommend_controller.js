@@ -4,6 +4,7 @@ import { state } from '../state.js';
 import {
   getPostRecommendCount,
   getNativeRecommendButton,
+  isRecommendButtonDisabled,
   isUserLoggedIn,
   isGalleryCodeEnforced,
   dispatchRecommendClick
@@ -13,6 +14,23 @@ import { showViewerToast } from '../ui/overlay.js';
 let lastRecommendTime = 0;
 let isRecommending = false;
 let hasVotedCurrentPost = false;
+
+function isOverlayActiveNow() {
+  const { overlayEl } = state.elements;
+  return Boolean(overlayEl && overlayEl.classList && overlayEl.classList.contains('active'));
+}
+
+export function clearRecommendTimers() {
+  if (Array.isArray(state.recommendTimers)) {
+    state.recommendTimers.forEach((timerId) => clearTimeout(timerId));
+    state.recommendTimers = [];
+  }
+  if (state.recommendUnlockTimer !== null) {
+    clearTimeout(state.recommendUnlockTimer);
+    state.recommendUnlockTimer = null;
+  }
+  isRecommending = false;
+}
 
 export function updateRecommendButtonUi() {
   const { recommendBtnEl } = state.elements;
@@ -54,7 +72,7 @@ export function triggerPostRecommend() {
   }
 
   const isAlreadyVoted = hasVotedCurrentPost ||
-                         btn.disabled ||
+                         isRecommendButtonDisabled(btn) ||
                          (recommendBtnEl && recommendBtnEl.classList.contains('voted'));
 
   if (isAlreadyVoted) {
@@ -66,11 +84,17 @@ export function triggerPostRecommend() {
   const isCodeEnforced = isGalleryCodeEnforced();
   const beforeCount = getPostRecommendCount();
 
-  lastRecommendTime = now;
   isRecommending = true;
+  let shouldUnlockAsync = false;
 
   try {
-    dispatchRecommendClick(btn);
+    const dispatched = dispatchRecommendClick(btn);
+    if (!dispatched) {
+      showViewerToast('추천 실행에 실패했습니다.');
+      return false;
+    }
+
+    lastRecommendTime = now;
 
     if (!isLoggedIn && isCodeEnforced) {
       showViewerToast('개추 시도 중... (비회원 코드 제한 가능 🔒)');
@@ -78,7 +102,13 @@ export function triggerPostRecommend() {
       showViewerToast('개념글 추천을 눌렀습니다! 👍');
     }
 
-    setTimeout(() => {
+    if (Array.isArray(state.recommendTimers)) {
+      state.recommendTimers.forEach((timerId) => clearTimeout(timerId));
+    }
+    state.recommendTimers = [];
+
+    const midTimer = setTimeout(() => {
+      if (!isOverlayActiveNow()) return;
       const midCount = getPostRecommendCount();
       updateRecommendButtonUi();
 
@@ -89,7 +119,8 @@ export function triggerPostRecommend() {
       }
     }, CONFIG.RECOMMEND_SYNC_DELAYS[0]);
 
-    setTimeout(() => {
+    const afterTimer = setTimeout(() => {
+      if (!isOverlayActiveNow()) return;
       const afterCount = getPostRecommendCount();
       updateRecommendButtonUi();
 
@@ -109,13 +140,23 @@ export function triggerPostRecommend() {
       }
     }, CONFIG.RECOMMEND_SYNC_DELAYS[1]);
 
+    state.recommendTimers.push(midTimer, afterTimer);
+    shouldUnlockAsync = true;
     return true;
   } catch (e) {
     showViewerToast('추천 실행 중 오류가 발생했습니다.');
     return false;
   } finally {
-    setTimeout(() => {
+    if (shouldUnlockAsync) {
+      if (state.recommendUnlockTimer !== null) {
+        clearTimeout(state.recommendUnlockTimer);
+      }
+      state.recommendUnlockTimer = setTimeout(() => {
+        isRecommending = false;
+        state.recommendUnlockTimer = null;
+      }, 500);
+    } else {
       isRecommending = false;
-    }, 500);
+    }
   }
 }

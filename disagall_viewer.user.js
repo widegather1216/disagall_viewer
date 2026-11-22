@@ -57,6 +57,8 @@
     },
     toastTimer: null,
     noPhotoNoticeTimer: null,
+    recommendTimers: [],
+    recommendUnlockTimer: null,
     // Immersion & UI Auto-Hide
     idleTimer: null,
     autoHideUi: true,
@@ -731,26 +733,80 @@
   }
 
   // src/parser/recommend_parser.js
-  var RECOMMEND_BUTTON_SELECTORS = [
-    "button.btn_recom_up",
+  var RECOMMEND_BUTTON_PRIORITY_SELECTORS = [
     ".btn_recommend_box button.btn_recom_up",
-    ".btn_recommend_box button",
+    "button.btn_recom_up",
+    "a.btn_recom_up",
+    "div.btn_recom_up",
     ".btn_recom_up",
+    ".btn_recommend_up",
+    "button.btn-recom",
     ".btn-recom",
+    ".btn_recom",
     ".btn_recommend",
     'button[data-action="recommend"]',
     'button[data-type="recommend"]',
-    'button[onclick*="recom"]',
-    'a[onclick*="recom"]',
-    "button.recom_btn",
-    'button[id*="recommend"]',
-    "button[data-no]",
-    "a.btn_recom_up",
-    "div.btn_recom_up"
-  ].join(", ");
+    "button.recom_btn"
+  ];
+  var RECOMMEND_BUTTON_SELECTORS = RECOMMEND_BUTTON_PRIORITY_SELECTORS.join(", ");
+  var RECOMMEND_COUNT_PRIORITY_SELECTORS = [
+    '[id^="recommend_view_up_"]',
+    ".up_num_box .up_num",
+    ".btn_recommend_box .up_num",
+    ".recom_num",
+    ".btn-recom .recom-num"
+  ];
+  function isExcludedRecommendElement(el) {
+    if (!el) return true;
+    if (typeof el.closest === "function") {
+      if (el.closest("#disagall-viewer-overlay") || el.closest("#disagall-no-photo-notice") || el.closest("#disagall-quick-launcher")) {
+        return true;
+      }
+    }
+    let cur = el;
+    while (cur) {
+      if (typeof cur.id === "string" && cur.id.startsWith("disagall-")) {
+        return true;
+      }
+      cur = cur.parentElement;
+    }
+    return false;
+  }
+  function isRecommendButtonDisabled(btn) {
+    if (!btn) return true;
+    if (btn.disabled === true) return true;
+    if (typeof btn.getAttribute === "function") {
+      const disabledAttr = btn.getAttribute("disabled");
+      if (disabledAttr !== null && disabledAttr !== void 0) return true;
+      if (btn.getAttribute("aria-disabled") === "true") return true;
+    }
+    if (typeof btn.closest === "function" && btn.closest("fieldset[disabled]")) {
+      return true;
+    }
+    return false;
+  }
+  function findFirstValidMatch(root, selectors) {
+    if (!root) return null;
+    const hasQueryAll = typeof root.querySelectorAll === "function";
+    const hasQueryOne = typeof root.querySelector === "function";
+    if (!hasQueryAll && !hasQueryOne) return null;
+    for (const selector of selectors) {
+      if (hasQueryAll) {
+        const candidates = root.querySelectorAll(selector);
+        if (candidates) {
+          for (const el of candidates) {
+            if (!isExcludedRecommendElement(el)) return el;
+          }
+        }
+      } else {
+        const el = root.querySelector(selector);
+        if (el && !isExcludedRecommendElement(el)) return el;
+      }
+    }
+    return null;
+  }
   function getPostRecommendCount(root = typeof document !== "undefined" ? document : null) {
-    if (!root || !root.querySelector) return null;
-    const countEl = root.querySelector('[id^="recommend_view_up_"], .up_num_box .up_num, .btn_recommend_box .up_num, .recom_num');
+    const countEl = findFirstValidMatch(root, RECOMMEND_COUNT_PRIORITY_SELECTORS);
     if (countEl) {
       const text = (countEl.textContent || "").trim();
       const num = parseInt(text.replace(/[^0-9]/g, ""), 10);
@@ -759,8 +815,7 @@
     return null;
   }
   function getNativeRecommendButton(root = typeof document !== "undefined" ? document : null) {
-    if (!root || !root.querySelector) return null;
-    return root.querySelector(RECOMMEND_BUTTON_SELECTORS);
+    return findFirstValidMatch(root, RECOMMEND_BUTTON_PRIORITY_SELECTORS);
   }
   function isUserLoggedIn(root = typeof document !== "undefined" ? document : null) {
     if (!root) return false;
@@ -788,13 +843,18 @@
     return !!root.querySelector?.('#kcaptcha, [id*="kcaptcha"], .captcha_box');
   }
   function dispatchRecommendClick(btn) {
-    if (!btn) return false;
+    if (!btn || isExcludedRecommendElement(btn) || btn.isConnected === false || isRecommendButtonDisabled(btn)) {
+      return false;
+    }
     if (typeof btn.click === "function") {
       try {
         btn.click();
         return true;
       } catch (e) {
       }
+    }
+    if (typeof btn.dispatchEvent !== "function") {
+      return false;
     }
     try {
       const mouseEvt = new MouseEvent("click", {
@@ -803,7 +863,7 @@
         view: typeof window !== "undefined" ? window : null,
         buttons: 1
       });
-      return btn.dispatchEvent(mouseEvt);
+      return Boolean(btn.dispatchEvent(mouseEvt));
     } catch (err) {
       return false;
     }
@@ -813,6 +873,21 @@
   var lastRecommendTime = 0;
   var isRecommending = false;
   var hasVotedCurrentPost = false;
+  function isOverlayActiveNow() {
+    const { overlayEl } = state.elements;
+    return Boolean(overlayEl && overlayEl.classList && overlayEl.classList.contains("active"));
+  }
+  function clearRecommendTimers() {
+    if (Array.isArray(state.recommendTimers)) {
+      state.recommendTimers.forEach((timerId) => clearTimeout(timerId));
+      state.recommendTimers = [];
+    }
+    if (state.recommendUnlockTimer !== null) {
+      clearTimeout(state.recommendUnlockTimer);
+      state.recommendUnlockTimer = null;
+    }
+    isRecommending = false;
+  }
   function updateRecommendButtonUi() {
     const { recommendBtnEl } = state.elements;
     if (!recommendBtnEl) return;
@@ -843,7 +918,7 @@
       showViewerToast("\uBCF8\uBB38\uC758 \uCD94\uCC9C \uBC84\uD2BC\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
       return false;
     }
-    const isAlreadyVoted = hasVotedCurrentPost || btn.disabled || recommendBtnEl && recommendBtnEl.classList.contains("voted");
+    const isAlreadyVoted = hasVotedCurrentPost || isRecommendButtonDisabled(btn) || recommendBtnEl && recommendBtnEl.classList.contains("voted");
     if (isAlreadyVoted) {
       showViewerToast("\uC774\uBBF8 \uAC1C\uB150\uAE00 \uCD94\uCC9C\uC744 \uC644\uB8CC\uD55C \uAC8C\uC2DC\uAE00\uC785\uB2C8\uB2E4. \u{1F44D}");
       return true;
@@ -851,16 +926,26 @@
     const isLoggedIn = isUserLoggedIn();
     const isCodeEnforced = isGalleryCodeEnforced();
     const beforeCount = getPostRecommendCount();
-    lastRecommendTime = now;
     isRecommending = true;
+    let shouldUnlockAsync = false;
     try {
-      dispatchRecommendClick(btn);
+      const dispatched = dispatchRecommendClick(btn);
+      if (!dispatched) {
+        showViewerToast("\uCD94\uCC9C \uC2E4\uD589\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+        return false;
+      }
+      lastRecommendTime = now;
       if (!isLoggedIn && isCodeEnforced) {
         showViewerToast("\uAC1C\uCD94 \uC2DC\uB3C4 \uC911... (\uBE44\uD68C\uC6D0 \uCF54\uB4DC \uC81C\uD55C \uAC00\uB2A5 \u{1F512})");
       } else {
         showViewerToast("\uAC1C\uB150\uAE00 \uCD94\uCC9C\uC744 \uB20C\uB800\uC2B5\uB2C8\uB2E4! \u{1F44D}");
       }
-      setTimeout(() => {
+      if (Array.isArray(state.recommendTimers)) {
+        state.recommendTimers.forEach((timerId) => clearTimeout(timerId));
+      }
+      state.recommendTimers = [];
+      const midTimer = setTimeout(() => {
+        if (!isOverlayActiveNow()) return;
         const midCount = getPostRecommendCount();
         updateRecommendButtonUi();
         if (midCount !== null && beforeCount !== null && midCount > beforeCount) {
@@ -869,7 +954,8 @@
           showViewerToast("\uAC1C\uB150\uAE00 \uCD94\uCC9C\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4! \u{1F44D}");
         }
       }, CONFIG.RECOMMEND_SYNC_DELAYS[0]);
-      setTimeout(() => {
+      const afterTimer = setTimeout(() => {
+        if (!isOverlayActiveNow()) return;
         const afterCount = getPostRecommendCount();
         updateRecommendButtonUi();
         if (afterCount !== null && beforeCount !== null) {
@@ -887,14 +973,24 @@
           }
         }
       }, CONFIG.RECOMMEND_SYNC_DELAYS[1]);
+      state.recommendTimers.push(midTimer, afterTimer);
+      shouldUnlockAsync = true;
       return true;
     } catch (e) {
       showViewerToast("\uCD94\uCC9C \uC2E4\uD589 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.");
       return false;
     } finally {
-      setTimeout(() => {
+      if (shouldUnlockAsync) {
+        if (state.recommendUnlockTimer !== null) {
+          clearTimeout(state.recommendUnlockTimer);
+        }
+        state.recommendUnlockTimer = setTimeout(() => {
+          isRecommending = false;
+          state.recommendUnlockTimer = null;
+        }, 500);
+      } else {
         isRecommending = false;
-      }, 500);
+      }
     }
   }
 
@@ -1527,6 +1623,7 @@
   }
   function closeViewer() {
     dismissNoPhotoNotice();
+    clearRecommendTimers();
     clearIdleTimer();
     flushPaddingSave();
     resetImmersionGuards();

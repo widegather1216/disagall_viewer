@@ -19,7 +19,7 @@ import {
   isExternalModalOpen
 } from '../ui/overlay.js';
 import { resetZoom, setupZoomEvents } from '../ui/zoom_pan.js';
-import { triggerPostRecommend, updateRecommendButtonUi } from './recommend_controller.js';
+import { triggerPostRecommend, updateRecommendButtonUi, clearRecommendTimers } from './recommend_controller.js';
 import {
   isOverlayActive,
   clearIdleTimer,
@@ -372,6 +372,7 @@ export function openViewer(targetSrc, isAuto = false) {
 
 export function closeViewer() {
   dismissNoPhotoNotice();
+  clearRecommendTimers();
   clearIdleTimer();
   flushPaddingSave();
   resetImmersionGuards();
