@@ -539,6 +539,8 @@ function bindHeaderHoverEvents(overlayEl) {
   });
   headerEl.addEventListener('mouseleave', () => {
     isHeaderHovered = false;
+    // Ignore synthetic mouseleave triggered when hiding UI sets pointer-events: none
+    if (!isOverlayActive() || isAnyUiHiddenClass(overlayEl)) return;
     resetIdleTimer();
   });
 }

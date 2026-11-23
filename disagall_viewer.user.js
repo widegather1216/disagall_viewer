@@ -1487,6 +1487,7 @@
     });
     headerEl.addEventListener("mouseleave", () => {
       isHeaderHovered = false;
+      if (!isOverlayActive() || isAnyUiHiddenClass(overlayEl)) return;
       resetIdleTimer();
     });
   }
