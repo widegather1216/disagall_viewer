@@ -1,7 +1,7 @@
 # Verification & Defect Log - Post Navigation
 
-- **검증 상태**: `🩹 Debugging` (`1건 OPEN DEFECT` — `DEFECT-01~03` 해결 완료, `DEFECT-04`·`REFACTOR-05` 잔여)
-- **미해결 티켓**: `🚨 DEFECT: 1건` | `🧐 REFACTOR: 1건`
+- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` — `DEFECT-01~04` 해결 완료, `REFACTOR-05` 1건 OPEN)
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
 
 ---
 
@@ -29,10 +29,13 @@
   - **회귀 테스트 결과**: `node tests/post_navigation.test.js` (9/9 PASS, 실제 `src/parser/post_navigator.js` 및 `dc_sample.html` 연동 검증 포함), `npm test` (5개 스위트 전량 PASS), `node tests/immersion_e2e.test.js` (15/15 PASS), `npm run build` (`PASS`), `node --check` (`PASS`)
 
 ### [DEFECT-04] `navigatePost()` 미취소 `setTimeout` 및 `startAutoOpenPolling()` 고아 `setInterval` 충돌
-- **현재 상태**: 🟡 OPEN
-- **심각도 & 위치**: 🟠 P1 High | [`src/controller/viewer_controller.js#L154-L163`](../../../src/controller/viewer_controller.js#L154-L163), [`#L366-L432`](../../../src/controller/viewer_controller.js#L366-L432)
-- **원인 및 실증**: `navigatePost()`가 `disagall_auto_open='1'` 기록 후 미추적 `setTimeout(..., 150)`을 예약해 150ms 내 `closeViewer()` 호출 후에도 페이지가 강제 이동함. 또한 `startAutoOpenPolling()`의 지역 `pollTimer`가 수동 `openViewer()`/`closeViewer()` 시 중단되지 않아 닫힌 뷰어를 재오픈하거나 활성 뷰어 인덱스를 `0`으로 리셋함(`Deterministic Trace Verified`).
-- **최소 수정 설계**: `postNavTimer` 및 `autoOpenPollTimer`를 모듈/state 스코프에 등록하고 `openViewer()`/`closeViewer()` 시 즉시 해제·`disagall_auto_open` 정리.
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **심각도 & 위치**: 🟠 P1 High | [`src/controller/viewer_controller.js#L183-L239`](../../../src/controller/viewer_controller.js#L183-L239), [`#L440-L610`](../../../src/controller/viewer_controller.js#L440-L610), [`src/state.js#L27-L30`](../../../src/state.js#L27-L30), [`src/ui/overlay.js#L185-L216`](../../../src/ui/overlay.js#L185-L216)
+- **원인 및 실증**: `navigatePost()`가 `disagall_auto_open='1'` 기록 후 미추적 `setTimeout(..., 150)`을 예약해 150ms 내 `closeViewer()`/재호출/`openViewer()` 시에도 유령 이동·이중 이동 경합이 발생하며, `startAutoOpenPolling()`의 지역 `pollTimer`가 수동 `openViewer()`/`closeViewer()`/`checkAutoOpen()` 중복 시 중단되지 않아 닫힌 뷰어를 재오픈하거나 활성 뷰어 인덱스를 `0`으로 리셋하고 고아 `showNoPhotoNotice`를 마운트함(`tests/post_navigation.test.js` Test 10 Red 재현 확인).
+- **해결 내역**:
+  - **수정 파일**: [`src/state.js`](../../../src/state.js#L27-L30), [`src/ui/overlay.js`](../../../src/ui/overlay.js#L185-L216), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js#L65-L71), [`tests/post_navigation.test.js`](../../../tests/post_navigation.test.js#L988-L1520)
+  - **원인 및 조치**: Competing Hypotheses(Tracer A/B) 및 Devil's Advocate 검증을 반영해 `state.postNavTimer`·`state.autoOpenPollTimer` 및 `postNavSeq`·`autoOpenPollSeq` 세대 토큰을 도입하고 `cancelPendingPostNavigation()`·`clearAutoOpenPollTimer()`를 구현. `cancelPendingPostNavigation()`은 실제 미발화 `state.postNavTimer !== null` 취소 시에만 `disagall_auto_open`을 제거해 이미 출발한 이동·조기 로드를 보존하고, `openViewer()`에서는 `state.postImages.length > 0` 확정 직후 호출해 0장 `alert` 실패 시 기존 폴링/이동을 보호함. `navigatePost()` 진입 시 선행 예약을 Last-Wins로 취소(경계 에러 포함)하고, `closeViewer()`·`initViewerBase()`의 `pagehide` 리스너로 잔여 타이머 및 `dismissViewerToast()`(널 가드 및 `toastSeq` 포함)를 일괄 정리했으며 동기 타이머 모킹(TDZ/`fired`·`stopped`)을 방어하고 `npm run build`로 번들을 동기화함.
+  - **회귀 테스트 결과**: `node tests/post_navigation.test.js` (10/10 PASS), `npm test` (5개 스위트 전량 PASS), `node tests/immersion_e2e.test.js` (15/15 PASS), `npm run build` (`PASS`), `node --check` (`PASS`)
 
 ---
 

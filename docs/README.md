@@ -5,10 +5,10 @@
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
 - **Active 도메인**: 전 도메인 (`core-viewer` `🟢 Sign-Off`, `post-navigation`, `post-recommend` `🟢 Sign-Off`, `viewer-immersion` `🟢 Sign-Off`, `modular-bundler-migration`)
-- **현재 단계 (Stage)**: `🩹 Debugging` (`잔여 결함 2건 OPEN` — P0 0건 / P1+ 2건 + REFACTOR 1건; `core-viewer/DEFECT-01~04`, `post-navigation/DEFECT-02~03`, `post-recommend/DEFECT-03`, `viewer-immersion/DEFECT-01~03` 해결 완료)
-- **직전 완료 작업**: `systematic-debugger`로 `post-navigation/DEFECT-03` (`post_navigator.js` 하단 경계 `'bottom'` 반환 교정·`공지`/`AD`/`설문` `innerHTML` 우회 제거 및 선행 필터링·`javascript:`/`data:`/`vbscript:` URL 이중 차단) 해결 — `tests/post_navigation.test.js`(9/9)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build`·`node --check` PASS
+- **현재 단계 (Stage)**: `🩹 Debugging` (`잔여 결함 1건 OPEN` — P0 0건 / P1+ 1건 + REFACTOR 1건; `core-viewer/DEFECT-01~04`, `post-navigation/DEFECT-01~04`, `post-recommend/DEFECT-01~03`, `viewer-immersion/DEFECT-01~03` 해결 완료)
+- **직전 완료 작업**: `systematic-debugger`로 `post-navigation/DEFECT-04` (`state.postNavTimer`·`state.autoOpenPollTimer` 및 세대 토큰 등록, `navigatePost()`/`openViewer()`/`closeViewer()`/`pagehide` 수명주기 정리, `dismissViewerToast()`) 해결 — `tests/post_navigation.test.js`(10/10)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build`·`node --check` PASS
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `post-navigation` 도메인의 `DEFECT-04` 티켓 해결해줘 (또는 `modular-bundler-migration/DEFECT-01`)
+  > `modular-bundler-migration` 도메인의 `DEFECT-01` 티켓 해결해줘 (또는 `post-navigation/REFACTOR-05`)
 
 ---
 
@@ -18,7 +18,7 @@
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 기술 스택/동시성 제약 확립 |
 | [`core-viewer`](./features/core-viewer/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 0` | `DEFECT-01~04` 전건 해결 완료 (`bindContextMenuTracker` 지연 로딩 우클릭 매칭 보완, 최종 Sign-Off) |
-| [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `-` | `1 / 1` | `DEFECT-02~03` 해결 완료, `DEFECT-04` 잔여 (이동/폴링 타이머 충돌) |
+| [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `-` | `0 / 1` | `DEFECT-01~04` 전건 해결 완료 (이동/폴링 타이머 수명주기·`pagehide` 정리), `REFACTOR-05`(Nitpick) 잔여 |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `DEFECT-03` 해결 완료 (우선순위 셀렉터·뷰어 배제·디스패치 실패/타이머 정리) |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `1/3 (33%)` | `1 / 0` | `DEFECT-01` 등록 (Safari v1.0.0 번들 미동기화 및 `#disagall-quick-launcher` CSS 누락) |
 | [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■■■■■] 8/8` | `15/15 (100%)` | `0 / 0` | `DEFECT-01~03 전건 해결 완료 (단일 스토리지 동기화 통합·비동기 초기화 레이스 방어, 최종 Sign-Off)` |
@@ -29,6 +29,9 @@
 ---
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
+
+- **`[2026-11-23]` `[atomic-commit-crafter]` [`post-navigation`]**: `40ec587` (`fix(post-navigation)` `DEFECT-04`), `f55f8b3` (`test(post-navigation)` Test 10 회귀 테스트) 및 위키/관제탑 동기화 커밋 완료.
+- **`[2026-11-23]` `[systematic-debugger]` [`post-navigation`]**: `DEFECT-04` 해결 — `state.postNavTimer`·`state.autoOpenPollTimer`·세대 토큰 등록, `cancelPendingPostNavigation()`/`clearAutoOpenPollTimer()`(`openViewer()` `length > 0` 확정 후·`closeViewer()`·`navigatePost()`·`pagehide` 정리 및 조건부 `disagall_auto_open` 삭제), `dismissViewerToast()` 적용 (`tests/post_navigation.test.js` 10/10·`npm test`·`immersion_e2e.test.js` 15/15·`npm run build`·`node --check` PASS).
 
 - **`[2026-11-23]` `[atomic-commit-crafter]` [`post-navigation`]**: `22a5e6d` (`fix(post-navigation)` `DEFECT-03`), `a52567b` (`test(post-navigation)` Test 9 회귀 테스트) 및 위키/관제탑 동기화 커밋 완료.
 - **`[2026-11-23]` `[systematic-debugger]` [`post-navigation`]**: `DEFECT-03` 해결 — `post_navigator.js` 하단 경계 `'bottom'` 반환 교정, `공지`/`AD`/`설문` 선행 필터링(모바일 포함)·`innerHTML.includes` 제거, `isSafeNavigationHref()` 제어문자·대소문자 정규화 및 `navigatePost()` 이중 차단 적용 (`tests/post_navigation.test.js` 9/9·`npm test`·`immersion_e2e.test.js` 15/15·`npm run build`·`node --check` PASS).
