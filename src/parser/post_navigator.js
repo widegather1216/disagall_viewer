@@ -15,32 +15,85 @@ export function extractPostNo(url, origin = (typeof window !== 'undefined' ? win
   return null;
 }
 
+const ALLOWED_NAV_SCHEMES = new Set(['http', 'https', 'file']);
+const EXCLUDED_CLASS_TOKENS = ['notice', 'ad', 'adv', 'ads', 'adsense', 'survey'];
+const EXCLUDED_MARKER_SELECTOR = '.sp-notice, .sp-ad, .sp-survey, .icon_notice, .icon_ad, .icon_survey';
+const EXCLUDED_NUM_TEXTS = new Set(['-', '공지', '설문']);
+const EXCLUDED_SUBJECT_TEXTS = new Set(['공지', 'AD', '설문']);
+
+export function isSafeNavigationHref(rawHref) {
+  if (typeof rawHref !== 'string') return false;
+  const trimmed = rawHref.trim();
+  if (!trimmed || trimmed === '#') return false;
+  // Strip ASCII control characters and whitespace to defeat scheme obfuscation (e.g. " JavaScript:", "java\tscript:")
+  const normalized = trimmed.replace(/[\u0000-\u0020]+/g, '');
+  const schemeMatch = normalized.match(/^([a-z][a-z0-9+.-]*):/i);
+  if (schemeMatch) {
+    return ALLOWED_NAV_SCHEMES.has(schemeMatch[1].toLowerCase());
+  }
+  return true;
+}
+
+function isSafePostLink(link) {
+  if (!link || !link.href) return false;
+  const rawAttr = typeof link.getAttribute === 'function' ? link.getAttribute('href') : null;
+  if (rawAttr !== null && rawAttr !== undefined && !isSafeNavigationHref(rawAttr)) {
+    return false;
+  }
+  return isSafeNavigationHref(link.href);
+}
+
+function hasClassToken(el, token) {
+  if (!el) return false;
+  if (el.classList && typeof el.classList.contains === 'function' && el.classList.contains(token)) {
+    return true;
+  }
+  if (typeof el.className === 'string') {
+    return el.className.split(/[\s>]+/).includes(token);
+  }
+  return false;
+}
+
+function isExcludedPostElement(el, numText = '', subjectText = '') {
+  if (!el) return true;
+  if (typeof el.className === 'string' && el.className.toLowerCase().includes('notice')) {
+    return true;
+  }
+  if (EXCLUDED_CLASS_TOKENS.some((token) => hasClassToken(el, token))) {
+    return true;
+  }
+  if (el.querySelector && el.querySelector(EXCLUDED_MARKER_SELECTOR)) {
+    return true;
+  }
+  if (EXCLUDED_NUM_TEXTS.has(numText) || EXCLUDED_SUBJECT_TEXTS.has(subjectText)) {
+    return true;
+  }
+  return false;
+}
+
 export function isDesktopPostRowValid(tr, currentPostNo) {
   if (!tr) return false;
   const titLink = tr.querySelector?.('.gall_tit a:not(.reply_numbox)') || tr.querySelector?.('a');
-  if (!titLink || !titLink.href) return false;
-  const hrefAttr = (titLink.getAttribute && titLink.getAttribute('href')) || titLink.href || '';
-  if (hrefAttr.startsWith('javascript:')) return false;
-
-  const isCurrentPost = (tr.classList && tr.classList.contains('crt')) ||
-                        (tr.className && tr.className.includes('crt')) ||
-                        !!(tr.querySelector && tr.querySelector('.crt_icon')) ||
-                        (currentPostNo && (
-                          (tr.innerHTML && tr.innerHTML.includes(currentPostNo)) ||
-                          extractPostNo(titLink.href) === currentPostNo
-                        ));
-
-  if (isCurrentPost) return true;
+  if (!isSafePostLink(titLink)) return false;
 
   const numEl = tr.querySelector?.('.gall_num');
   const subjectEl = tr.querySelector?.('.gall_subject');
   const numText = numEl ? numEl.textContent.trim() : '';
   const subjectText = subjectEl ? subjectEl.textContent.trim() : '';
 
-  if (numText === '-' || !numText || isNaN(Number(numText))) return false;
-  if (subjectText === '공지' || subjectText === 'AD' || subjectText === '설문') return false;
-  if (numText === '공지' || numText === '설문') return false;
-  if (tr.classList && tr.classList.contains('notice')) return false;
+  if (isExcludedPostElement(tr, numText, subjectText)) return false;
+
+  const isCurrentPost = hasClassToken(tr, 'crt') ||
+                        (typeof tr.className === 'string' && tr.className.includes('crt')) ||
+                        !!(tr.querySelector && tr.querySelector('.crt_icon')) ||
+                        (currentPostNo && (
+                          (tr.dataset && tr.dataset.no === currentPostNo) ||
+                          extractPostNo(titLink.href) === currentPostNo
+                        ));
+
+  if (isCurrentPost) return true;
+
+  if (!numText || isNaN(Number(numText))) return false;
 
   return true;
 }
@@ -48,10 +101,15 @@ export function isDesktopPostRowValid(tr, currentPostNo) {
 export function isMobilePostItemValid(li) {
   if (!li) return false;
   const link = li.querySelector?.('a');
-  if (!link || !link.href) return false;
-  const hrefAttr = (link.getAttribute && link.getAttribute('href')) || link.href || '';
-  if (hrefAttr.startsWith('javascript:')) return false;
-  if ((li.classList && li.classList.contains('notice')) || (li.querySelector && li.querySelector('.sp-notice'))) return false;
+  if (!isSafePostLink(link)) return false;
+
+  const numEl = li.querySelector?.('.gall_num');
+  const subjectEl = li.querySelector?.('.gall_subject, .subject-txt');
+  const numText = numEl ? numEl.textContent.trim() : '';
+  const subjectText = subjectEl ? subjectEl.textContent.trim() : '';
+
+  if (isExcludedPostElement(li, numText, subjectText)) return false;
+
   return true;
 }
 
@@ -67,11 +125,13 @@ export function getValidPostRows(currentPostNo, root = (typeof document !== 'und
 
 export function findCurrentPostRowIndex(validRows, currentPostNo) {
   return validRows.findIndex(row => {
-    if ((row.classList && row.classList.contains('crt')) || (row.className && row.className.includes('crt')) || !!row.querySelector?.('.crt_icon')) {
+    if (hasClassToken(row, 'crt') || (typeof row.className === 'string' && row.className.includes('crt')) || !!row.querySelector?.('.crt_icon')) {
       return true;
     }
 
     if (currentPostNo) {
+      if (row.dataset && row.dataset.no === currentPostNo) return true;
+
       const numEl = row.querySelector?.('.gall_num');
       if (numEl && numEl.textContent.trim() === currentPostNo) return true;
 
@@ -114,9 +174,14 @@ export function hasPhotoAttachment(row) {
   return false;
 }
 
-export function getAdjacentPostUrl(direction, preferPhotos = true, currentUrl = (typeof window !== 'undefined' ? window.location?.href : '')) {
+export function getAdjacentPostUrl(
+  direction,
+  preferPhotos = true,
+  currentUrl = (typeof window !== 'undefined' ? window.location?.href : ''),
+  root = (typeof document !== 'undefined' ? document : null)
+) {
   const currentPostNo = extractPostNo(currentUrl);
-  const validRows = getValidPostRows(currentPostNo);
+  const validRows = getValidPostRows(currentPostNo, root);
 
   if (validRows.length === 0) {
     return null;
@@ -148,11 +213,10 @@ export function getAdjacentPostUrl(direction, preferPhotos = true, currentUrl = 
     }
   }
 
-  if (targetIdx < 0) {
-    return { error: 'top', message: '목록의 가장 최신 글입니다.' };
-  }
-  if (targetIdx >= validRows.length) {
-    return { error: 'bottom', message: '목록의 마지막 글입니다.' };
+  if (targetIdx < 0 || targetIdx >= validRows.length) {
+    return direction === 'up'
+      ? { error: 'top', message: '목록의 가장 최신 글입니다.' }
+      : { error: 'bottom', message: '목록의 마지막 글입니다.' };
   }
 
   const targetRow = validRows[targetIdx];
@@ -160,7 +224,7 @@ export function getAdjacentPostUrl(direction, preferPhotos = true, currentUrl = 
   const targetTitle = targetLink ? (targetLink.textContent || '').trim().replace(/\s+/g, ' ') : '';
 
   return {
-    url: targetLink ? targetLink.href : null,
+    url: targetLink && isSafePostLink(targetLink) ? targetLink.href : null,
     title: targetTitle,
     hasPhoto: hasPhotoAttachment(targetRow)
   };

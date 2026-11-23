@@ -8,7 +8,7 @@ import {
   POST_BODY_CONTAINER_SELECTORS,
   isPostBodyImage
 } from '../parser/image_parser.js';
-import { getAdjacentPostUrl } from '../parser/post_navigator.js';
+import { getAdjacentPostUrl, isSafeNavigationHref } from '../parser/post_navigator.js';
 import {
   buildOverlayHtml,
   cacheOverlayElements,
@@ -186,7 +186,7 @@ export function navigatePost(direction) {
     showViewerToast(result.message);
     return;
   }
-  if (!result.url) return;
+  if (!result.url || !isSafeNavigationHref(result.url)) return;
 
   const label = direction === 'up' ? '위쪽 최신 글' : '아래쪽 이전 글';
   const photoHint = result.hasPhoto ? ' 📷' : '';

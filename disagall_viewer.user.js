@@ -223,31 +223,79 @@
     }
     return null;
   }
+  var ALLOWED_NAV_SCHEMES = /* @__PURE__ */ new Set(["http", "https", "file"]);
+  var EXCLUDED_CLASS_TOKENS = ["notice", "ad", "adv", "ads", "adsense", "survey"];
+  var EXCLUDED_MARKER_SELECTOR = ".sp-notice, .sp-ad, .sp-survey, .icon_notice, .icon_ad, .icon_survey";
+  var EXCLUDED_NUM_TEXTS = /* @__PURE__ */ new Set(["-", "\uACF5\uC9C0", "\uC124\uBB38"]);
+  var EXCLUDED_SUBJECT_TEXTS = /* @__PURE__ */ new Set(["\uACF5\uC9C0", "AD", "\uC124\uBB38"]);
+  function isSafeNavigationHref(rawHref) {
+    if (typeof rawHref !== "string") return false;
+    const trimmed = rawHref.trim();
+    if (!trimmed || trimmed === "#") return false;
+    const normalized = trimmed.replace(/[\u0000-\u0020]+/g, "");
+    const schemeMatch = normalized.match(/^([a-z][a-z0-9+.-]*):/i);
+    if (schemeMatch) {
+      return ALLOWED_NAV_SCHEMES.has(schemeMatch[1].toLowerCase());
+    }
+    return true;
+  }
+  function isSafePostLink(link) {
+    if (!link || !link.href) return false;
+    const rawAttr = typeof link.getAttribute === "function" ? link.getAttribute("href") : null;
+    if (rawAttr !== null && rawAttr !== void 0 && !isSafeNavigationHref(rawAttr)) {
+      return false;
+    }
+    return isSafeNavigationHref(link.href);
+  }
+  function hasClassToken(el, token) {
+    if (!el) return false;
+    if (el.classList && typeof el.classList.contains === "function" && el.classList.contains(token)) {
+      return true;
+    }
+    if (typeof el.className === "string") {
+      return el.className.split(/[\s>]+/).includes(token);
+    }
+    return false;
+  }
+  function isExcludedPostElement(el, numText = "", subjectText = "") {
+    if (!el) return true;
+    if (typeof el.className === "string" && el.className.toLowerCase().includes("notice")) {
+      return true;
+    }
+    if (EXCLUDED_CLASS_TOKENS.some((token) => hasClassToken(el, token))) {
+      return true;
+    }
+    if (el.querySelector && el.querySelector(EXCLUDED_MARKER_SELECTOR)) {
+      return true;
+    }
+    if (EXCLUDED_NUM_TEXTS.has(numText) || EXCLUDED_SUBJECT_TEXTS.has(subjectText)) {
+      return true;
+    }
+    return false;
+  }
   function isDesktopPostRowValid(tr, currentPostNo) {
     if (!tr) return false;
     const titLink = tr.querySelector?.(".gall_tit a:not(.reply_numbox)") || tr.querySelector?.("a");
-    if (!titLink || !titLink.href) return false;
-    const hrefAttr = titLink.getAttribute && titLink.getAttribute("href") || titLink.href || "";
-    if (hrefAttr.startsWith("javascript:")) return false;
-    const isCurrentPost = tr.classList && tr.classList.contains("crt") || tr.className && tr.className.includes("crt") || !!(tr.querySelector && tr.querySelector(".crt_icon")) || currentPostNo && (tr.innerHTML && tr.innerHTML.includes(currentPostNo) || extractPostNo(titLink.href) === currentPostNo);
-    if (isCurrentPost) return true;
+    if (!isSafePostLink(titLink)) return false;
     const numEl = tr.querySelector?.(".gall_num");
     const subjectEl = tr.querySelector?.(".gall_subject");
     const numText = numEl ? numEl.textContent.trim() : "";
     const subjectText = subjectEl ? subjectEl.textContent.trim() : "";
-    if (numText === "-" || !numText || isNaN(Number(numText))) return false;
-    if (subjectText === "\uACF5\uC9C0" || subjectText === "AD" || subjectText === "\uC124\uBB38") return false;
-    if (numText === "\uACF5\uC9C0" || numText === "\uC124\uBB38") return false;
-    if (tr.classList && tr.classList.contains("notice")) return false;
+    if (isExcludedPostElement(tr, numText, subjectText)) return false;
+    const isCurrentPost = hasClassToken(tr, "crt") || typeof tr.className === "string" && tr.className.includes("crt") || !!(tr.querySelector && tr.querySelector(".crt_icon")) || currentPostNo && (tr.dataset && tr.dataset.no === currentPostNo || extractPostNo(titLink.href) === currentPostNo);
+    if (isCurrentPost) return true;
+    if (!numText || isNaN(Number(numText))) return false;
     return true;
   }
   function isMobilePostItemValid(li) {
     if (!li) return false;
     const link = li.querySelector?.("a");
-    if (!link || !link.href) return false;
-    const hrefAttr = link.getAttribute && link.getAttribute("href") || link.href || "";
-    if (hrefAttr.startsWith("javascript:")) return false;
-    if (li.classList && li.classList.contains("notice") || li.querySelector && li.querySelector(".sp-notice")) return false;
+    if (!isSafePostLink(link)) return false;
+    const numEl = li.querySelector?.(".gall_num");
+    const subjectEl = li.querySelector?.(".gall_subject, .subject-txt");
+    const numText = numEl ? numEl.textContent.trim() : "";
+    const subjectText = subjectEl ? subjectEl.textContent.trim() : "";
+    if (isExcludedPostElement(li, numText, subjectText)) return false;
     return true;
   }
   function getValidPostRows(currentPostNo, root = typeof document !== "undefined" ? document : null) {
@@ -261,10 +309,11 @@
   }
   function findCurrentPostRowIndex(validRows, currentPostNo) {
     return validRows.findIndex((row) => {
-      if (row.classList && row.classList.contains("crt") || row.className && row.className.includes("crt") || !!row.querySelector?.(".crt_icon")) {
+      if (hasClassToken(row, "crt") || typeof row.className === "string" && row.className.includes("crt") || !!row.querySelector?.(".crt_icon")) {
         return true;
       }
       if (currentPostNo) {
+        if (row.dataset && row.dataset.no === currentPostNo) return true;
         const numEl = row.querySelector?.(".gall_num");
         if (numEl && numEl.textContent.trim() === currentPostNo) return true;
         const titLink = row.querySelector?.(".gall_tit a:not(.reply_numbox)") || row.querySelector?.("a");
@@ -295,9 +344,9 @@
     }
     return false;
   }
-  function getAdjacentPostUrl(direction, preferPhotos = true, currentUrl = typeof window !== "undefined" ? window.location?.href : "") {
+  function getAdjacentPostUrl(direction, preferPhotos = true, currentUrl = typeof window !== "undefined" ? window.location?.href : "", root = typeof document !== "undefined" ? document : null) {
     const currentPostNo = extractPostNo(currentUrl);
-    const validRows = getValidPostRows(currentPostNo);
+    const validRows = getValidPostRows(currentPostNo, root);
     if (validRows.length === 0) {
       return null;
     }
@@ -323,17 +372,14 @@
         targetIdx = fallbackIdx;
       }
     }
-    if (targetIdx < 0) {
-      return { error: "top", message: "\uBAA9\uB85D\uC758 \uAC00\uC7A5 \uCD5C\uC2E0 \uAE00\uC785\uB2C8\uB2E4." };
-    }
-    if (targetIdx >= validRows.length) {
-      return { error: "bottom", message: "\uBAA9\uB85D\uC758 \uB9C8\uC9C0\uB9C9 \uAE00\uC785\uB2C8\uB2E4." };
+    if (targetIdx < 0 || targetIdx >= validRows.length) {
+      return direction === "up" ? { error: "top", message: "\uBAA9\uB85D\uC758 \uAC00\uC7A5 \uCD5C\uC2E0 \uAE00\uC785\uB2C8\uB2E4." } : { error: "bottom", message: "\uBAA9\uB85D\uC758 \uB9C8\uC9C0\uB9C9 \uAE00\uC785\uB2C8\uB2E4." };
     }
     const targetRow = validRows[targetIdx];
     const targetLink = targetRow.querySelector?.(".gall_tit a:not(.reply_numbox)") || targetRow.querySelector?.("a");
     const targetTitle = targetLink ? (targetLink.textContent || "").trim().replace(/\s+/g, " ") : "";
     return {
-      url: targetLink ? targetLink.href : null,
+      url: targetLink && isSafePostLink(targetLink) ? targetLink.href : null,
       title: targetTitle,
       hasPhoto: hasPhotoAttachment(targetRow)
     };
@@ -1717,7 +1763,7 @@
       showViewerToast(result.message);
       return;
     }
-    if (!result.url) return;
+    if (!result.url || !isSafeNavigationHref(result.url)) return;
     const label = direction === "up" ? "\uC704\uCABD \uCD5C\uC2E0 \uAE00" : "\uC544\uB798\uCABD \uC774\uC804 \uAE00";
     const photoHint = result.hasPhoto ? " \u{1F4F7}" : "";
     const titleHint = result.title ? ` (${result.title.length > 12 ? result.title.slice(0, 12) + "..." : result.title})` : "";
