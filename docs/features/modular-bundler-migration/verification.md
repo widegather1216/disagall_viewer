@@ -1,8 +1,8 @@
 # 🧪 [modular-bundler-migration] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`1건 OPEN DEFECT` — `deep-bug-hunter` 실증 등록)
-- **인수 조건 통과율**: `3 / 3 (Safari 패키징 및 Userscript 런처 스타일 누락 1건 발견)`
-- **미해결 티켓**: `🚨 DEFECT: 1건` | `🧐 REFACTOR: 0건`
+- **검증 상태**: `🟢 Sign-Off` (`0건 OPEN DEFECT` — `DEFECT-01` 해결 완료)
+- **인수 조건 통과율**: `3 / 3 (100%)` · 테스트 매트릭스 `5 / 5 PASS`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -27,9 +27,9 @@
 
 | ID | 구분 | 시나리오 요약 | 관련 AC | 검증 결과 (`⏳` / `PASS` / `FAIL`) | 비고 (티켓 링크) |
 | :--- | :---: | :--- | :--- :---: | :---: | :--- |
-| `TC-HP-01` | Happy | `npm run build` 실행 시 content.js 및 disagall_viewer.user.js 동시 생성 | `AC-01` | `FAIL` | [`DEFECT-01`](#defect-01-safari-%ED%99%95%EC%9E%A5-%EB%B2%88%EB%93%A4-v100-%EC%9E%A5%EA%B8%B0-%EB%AF%B8%EB%8F%99%EA%B8%B0%ED%99%94-%EB%B0%8F-userscript-%EB%9F%B0%EC%B2%98-css-%EB%88%84%EB%9D%BD) (Safari 리소스 동기화 및 `#disagall-quick-launcher` CSS 누락) |
+| `TC-HP-01` | Happy | `npm run build` 실행 시 content.js 및 disagall_viewer.user.js 동시 생성 | `AC-01` | `PASS (Fixed in DEFECT-01)` | [`DEFECT-01`](#defect-01-safari-%ED%99%95%EC%9E%A5-%EB%B2%88%EB%93%A4-v100-%EC%9E%A5%EA%B8%B0-%EB%AF%B8%EB%8F%99%EA%B8%B0%ED%99%94-%EB%B0%8F-userscript-%EB%9F%B0%EC%B2%98-css-%EB%88%84%EB%9D%BD) (Safari 리소스 동기화 및 `#disagall-quick-launcher` CSS 복구) |
 | `TC-HP-02` | Happy | `npm test` 실행 시 3개 단위 테스트 스위트 전원 통과 | `AC-02` | `PASS` | - |
-| `TC-HP-03` | Happy | `npm run pack` 실행 시 무결한 배포 ZIP 생성 | `AC-03` | `FAIL` | [`DEFECT-01`](#defect-01-safari-%ED%99%95%EC%9E%A5-%EB%B2%88%EB%93%A4-v100-%EC%9E%A5%EA%B8%B0-%EB%AF%B8%EB%8F%99%EA%B8%B0%ED%99%94-%EB%B0%8F-userscript-%EB%9F%B0%EC%B2%98-css-%EB%88%84%EB%9D%BD) (`disagall_viewer.zip` 미갱신 및 Safari 미동기화) |
+| `TC-HP-03` | Happy | `npm run pack` 실행 시 무결한 배포 ZIP 생성 | `AC-03` | `PASS (Fixed in DEFECT-01)` | [`DEFECT-01`](#defect-01-safari-%ED%99%95%EC%9E%A5-%EB%B2%88%EB%93%A4-v100-%EC%9E%A5%EA%B8%B0-%EB%AF%B8%EB%8F%99%EA%B8%B0%ED%99%94-%EB%B0%8F-userscript-%EB%9F%B0%EC%B2%98-css-%EB%88%84%EB%9D%BD) (`disagall_viewer.zip` 재생성 및 Safari 리소스 동기화 완료) |
 | `TC-BD-01` | Boundary | `content.css` 비어있거나 특수문자 포함 시 인라인 JSON 문자열 처리 | `AC-01` | `PASS` | - |
 | `TC-NG-01` | Negative | 모듈 문법 에러 발생 시 esbuild 에러 출력 및 비정상 종료(exit code 1) | `AC-01` | `PASS` | - |
 
@@ -38,10 +38,13 @@
 ## 🚨 3. 결함 리포트 (Defect Logs)
 
 ### [DEFECT-01] Safari 확장 번들 v1.0.0 장기 미동기화 및 Userscript 런처 CSS 누락
-- **현재 상태**: 🟡 OPEN
-- **심각도 & 위치**: 🟠 P1 High | [`build.js`](../../../build.js), [`package.json`](../../../package.json), [`src/userscript.js#L36-L47`](../../../src/userscript.js#L36-L47), [`content.css`](../../../content.css), `safari_extension/.../Resources/`
-- **원인 및 실증**: `safari_extension/.../Resources/`가 v1.0.0(`content.js` 45,952B vs 루트 63,396B, `popup.js` 911B vs 10,044B)에 정지해 몰입/전체화면·최신 파서가 전면 누락되었으며 `build.js`/`package.json`에 동기화 단계가 없음. 또한 `userscript.js`가 삽입하는 `#disagall-quick-launcher` 스타일 규칙이 `content.css`에 부재함(`Deterministic Trace Verified`).
-- **최소 수정 설계**: `content.css`에 `#disagall-quick-launcher` 스타일 추가 및 `build.js`에 Safari `Resources/` 에셋 동기화 단계 통합.
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **심각도 & 위치**: 🟠 P1 High | [`build.js`](../../../build.js#L22-L87), [`content.css`](../../../content.css#L552-L581), [`src/userscript.js#L21-L39`](../../../src/userscript.js#L21-L39), `safari_extension/DisagallViewerSafari/DisagallViewerSafari Extension/Resources/`
+- **원인 및 실증**: 모듈화 이전(`46774e1`) 인라인 유저스크립트 스타일에 있던 `#disagall-quick-launcher` 규칙이 `content.css` 분리 과정에서 누락되어 `disagall_viewer.user.js`의 런처 버튼 스타일이 실종되었으며, `build.js`가 루트 산출물(`content.js`, `disagall_viewer.user.js`)만 생성하고 `safari_extension/.../Resources/` 및 `disagall_viewer.zip`을 동기화하지 않아 Safari 확장 번들이 v1.0.0 상태에 정지해 있었음(`tests/module_import.test.js` Test 4 Red 재현 확인).
+- **해결 내역**:
+  - **수정 파일**: [`content.css`](../../../content.css#L552-L581), [`build.js`](../../../build.js#L22-L87), [`tests/module_import.test.js`](../../../tests/module_import.test.js#L1-L70) (+ 빌드/패키징 산출물 `content.js`, `disagall_viewer.user.js`, `disagall_viewer.zip`, `safari_extension/.../Resources/` 9종 동기화)
+  - **원인 및 조치**: `content.css`에 `#disagall-quick-launcher` 및 `#disagall-quick-launcher:hover` 고정 플로팅 버튼 스타일(`-webkit-backdrop-filter` 포함)을 복구해 `build.js`의 `__INJECTED_CSS__` 인라인 주입에 반영함. 또한 `build.js`에 `EXTENSION_ASSETS` 9종(`manifest.json`, `background.js`, `content.js`, `content.css`, `popup.html`, `popup.js`, `icon16.png`, `icon48.png`, `icon128.png`)을 `safari_extension/DisagallViewerSafari/DisagallViewerSafari Extension/Resources/`로 자동 복사하는 `syncSafariResources()` 단계를 통합하고 `npm run pack`으로 `disagall_viewer.zip`을 최신화함.
+  - **회귀 테스트 결과**: `node tests/module_import.test.js` (`4/4 PASS`), `npm test` (5개 스위트 전량 `PASS`), `node tests/immersion_e2e.test.js` (`15/15 PASS`), `npm run build` (`PASS`), `npm run pack` (`PASS`), `node --check` (`PASS`)
 
 ---
 
