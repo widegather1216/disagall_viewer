@@ -182,17 +182,37 @@ export function applyFittingAndPadding() {
   }
 }
 
+let toastSeq = 0;
+
+export function dismissViewerToast() {
+  toastSeq += 1;
+  if (state.toastTimer !== null) {
+    clearTimeout(state.toastTimer);
+    state.toastTimer = null;
+  }
+  const { toastEl } = state.elements;
+  if (toastEl && toastEl.classList) {
+    toastEl.classList.remove('show');
+  }
+}
+
 export function showViewerToast(message, duration = CONFIG.TOAST_DURATION) {
   const { toastEl } = state.elements;
   if (!toastEl) return;
-  if (state.toastTimer) clearTimeout(state.toastTimer);
+  if (state.toastTimer !== null) clearTimeout(state.toastTimer);
 
+  const seq = ++toastSeq;
+  let fired = false;
   toastEl.textContent = message;
   toastEl.classList.add('show');
 
-  state.toastTimer = setTimeout(() => {
-    if (toastEl) toastEl.classList.remove('show');
+  const timerId = setTimeout(() => {
+    fired = true;
+    if (seq !== toastSeq) return;
+    state.toastTimer = null;
+    if (toastEl && toastEl.classList) toastEl.classList.remove('show');
   }, duration);
+  state.toastTimer = fired ? null : timerId;
 }
 
 const NON_TEXT_INPUT_TYPES = new Set([

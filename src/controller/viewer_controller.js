@@ -14,6 +14,7 @@ import {
   cacheOverlayElements,
   applyFittingAndPadding,
   showViewerToast,
+  dismissViewerToast,
   showNoPhotoNotice,
   dismissNoPhotoNotice,
   isEditableTarget,
@@ -65,6 +66,9 @@ const PADDING_SAVE_DEBOUNCE_MS = 250;
 let paddingSaveTimer = null;
 let imageLoadSeq = 0;
 let renderedLoadSeq = -1;
+let postNavSeq = 0;
+let autoOpenPollSeq = 0;
+let boundPageHideWin = null;
 const boundMainImgEls = new WeakSet();
 
 function resolveLazyOriginalUrl(img) {
@@ -176,7 +180,31 @@ export function navigate(direction) {
   showImage(state.currentIndex + direction);
 }
 
+export function cancelPendingPostNavigation() {
+  postNavSeq += 1;
+  if (state.postNavTimer === null) return false;
+  clearTimeout(state.postNavTimer);
+  state.postNavTimer = null;
+  try {
+    if (typeof sessionStorage !== 'undefined' && typeof sessionStorage.removeItem === 'function') {
+      sessionStorage.removeItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
+    }
+  } catch (e) {
+    // Non-fatal: sessionStorage access may be blocked under browser privacy or sandbox policies
+  }
+  return true;
+}
+
+export function clearAutoOpenPollTimer() {
+  autoOpenPollSeq += 1;
+  if (state.autoOpenPollTimer === null) return false;
+  clearInterval(state.autoOpenPollTimer);
+  state.autoOpenPollTimer = null;
+  return true;
+}
+
 export function navigatePost(direction) {
+  cancelPendingPostNavigation();
   const result = getAdjacentPostUrl(direction);
   if (!result) {
     showViewerToast('이동할 수 있는 게시글 목록을 찾을 수 없습니다.');
@@ -199,9 +227,15 @@ export function navigatePost(direction) {
     // Non-fatal: sessionStorage may be blocked under browser privacy or sandbox policies
   }
 
-  setTimeout(() => {
+  const token = postNavSeq;
+  let fired = false;
+  const timerId = setTimeout(() => {
+    fired = true;
+    if (token !== postNavSeq) return;
+    state.postNavTimer = null;
     window.location.href = result.url;
   }, CONFIG.POST_NAV_DELAY);
+  state.postNavTimer = fired ? null : timerId;
 }
 
 export const KEY_ACTIONS = {
@@ -414,6 +448,8 @@ export function openViewer(targetSrc, isAuto = false) {
     return;
   }
 
+  cancelPendingPostNavigation();
+  clearAutoOpenPollTimer();
   dismissNoPhotoNotice();
   createOverlay();
 
@@ -444,7 +480,10 @@ export function openViewer(targetSrc, isAuto = false) {
 export function closeViewer() {
   imageLoadSeq += 1;
   renderedLoadSeq = -1;
+  cancelPendingPostNavigation();
+  clearAutoOpenPollTimer();
   dismissNoPhotoNotice();
+  dismissViewerToast();
   clearRecommendTimers();
   clearIdleTimer();
   flushPaddingSave();
@@ -463,23 +502,38 @@ export function closeViewer() {
 }
 
 function startAutoOpenPolling() {
+  clearAutoOpenPollTimer();
   let attempts = 0;
   const maxAttempts = CONFIG.AUTO_OPEN_MAX_ATTEMPTS;
-  const pollTimer = setInterval(() => {
+  const token = autoOpenPollSeq;
+  let stopped = false;
+  let pollTimer = null;
+
+  pollTimer = setInterval(() => {
+    if (token !== autoOpenPollSeq) {
+      if (pollTimer !== null) clearInterval(pollTimer);
+      return;
+    }
     attempts++;
     forcePreloadPostImages();
     collectPostImages();
 
     if (state.postImages.length > 0) {
-      clearInterval(pollTimer);
+      stopped = true;
+      if (pollTimer !== null) clearInterval(pollTimer);
+      clearAutoOpenPollTimer();
       openViewer(null, true);
       return;
     }
     if (attempts >= maxAttempts) {
-      clearInterval(pollTimer);
+      stopped = true;
+      if (pollTimer !== null) clearInterval(pollTimer);
+      clearAutoOpenPollTimer();
       showNoPhotoNotice((dir) => navigatePost(dir));
     }
   }, CONFIG.AUTO_OPEN_POLL_INTERVAL);
+
+  state.autoOpenPollTimer = stopped ? null : pollTimer;
 }
 
 export function checkAutoOpen() {
@@ -534,10 +588,23 @@ function bindAutoOpenTrigger() {
   checkAutoOpen();
 }
 
+function handlePageHideCleanup() {
+  cancelPendingPostNavigation();
+  clearAutoOpenPollTimer();
+}
+
+function bindPageHideCleanup() {
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+  if (boundPageHideWin === window) return;
+  boundPageHideWin = window;
+  window.addEventListener('pagehide', handlePageHideCleanup);
+}
+
 export function initViewerBase() {
   initImmersionSettings();
   bindContextMenuTracker();
   bindResizeHandler();
   bindTestOpenListener();
+  bindPageHideCleanup();
   bindAutoOpenTrigger();
 }

@@ -26,6 +26,8 @@ export const state = {
 
   toastTimer: null,
   noPhotoNoticeTimer: null,
+  postNavTimer: null,
+  autoOpenPollTimer: null,
   recommendTimers: [],
   recommendUnlockTimer: null,
 

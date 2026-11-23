@@ -57,6 +57,8 @@
     },
     toastTimer: null,
     noPhotoNoticeTimer: null,
+    postNavTimer: null,
+    autoOpenPollTimer: null,
     recommendTimers: [],
     recommendUnlockTimer: null,
     // Immersion & UI Auto-Hide
@@ -549,15 +551,33 @@
       mainImgEl.classList.remove("portrait");
     }
   }
+  var toastSeq = 0;
+  function dismissViewerToast() {
+    toastSeq += 1;
+    if (state.toastTimer !== null) {
+      clearTimeout(state.toastTimer);
+      state.toastTimer = null;
+    }
+    const { toastEl } = state.elements;
+    if (toastEl && toastEl.classList) {
+      toastEl.classList.remove("show");
+    }
+  }
   function showViewerToast(message, duration = CONFIG.TOAST_DURATION) {
     const { toastEl } = state.elements;
     if (!toastEl) return;
-    if (state.toastTimer) clearTimeout(state.toastTimer);
+    if (state.toastTimer !== null) clearTimeout(state.toastTimer);
+    const seq = ++toastSeq;
+    let fired = false;
     toastEl.textContent = message;
     toastEl.classList.add("show");
-    state.toastTimer = setTimeout(() => {
-      if (toastEl) toastEl.classList.remove("show");
+    const timerId = setTimeout(() => {
+      fired = true;
+      if (seq !== toastSeq) return;
+      state.toastTimer = null;
+      if (toastEl && toastEl.classList) toastEl.classList.remove("show");
     }, duration);
+    state.toastTimer = fired ? null : timerId;
   }
   var NON_TEXT_INPUT_TYPES = /* @__PURE__ */ new Set([
     "range",
@@ -1657,6 +1677,9 @@
   var paddingSaveTimer = null;
   var imageLoadSeq = 0;
   var renderedLoadSeq = -1;
+  var postNavSeq = 0;
+  var autoOpenPollSeq = 0;
+  var boundPageHideWin = null;
   var boundMainImgEls = /* @__PURE__ */ new WeakSet();
   function resolveLazyOriginalUrl(img) {
     const attrUrl = img.getAttribute("data-original") || img.getAttribute("data-src") || img.getAttribute("data-url");
@@ -1753,7 +1776,28 @@
   function navigate(direction) {
     showImage(state.currentIndex + direction);
   }
+  function cancelPendingPostNavigation() {
+    postNavSeq += 1;
+    if (state.postNavTimer === null) return false;
+    clearTimeout(state.postNavTimer);
+    state.postNavTimer = null;
+    try {
+      if (typeof sessionStorage !== "undefined" && typeof sessionStorage.removeItem === "function") {
+        sessionStorage.removeItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
+      }
+    } catch (e) {
+    }
+    return true;
+  }
+  function clearAutoOpenPollTimer() {
+    autoOpenPollSeq += 1;
+    if (state.autoOpenPollTimer === null) return false;
+    clearInterval(state.autoOpenPollTimer);
+    state.autoOpenPollTimer = null;
+    return true;
+  }
   function navigatePost(direction) {
+    cancelPendingPostNavigation();
     const result = getAdjacentPostUrl(direction);
     if (!result) {
       showViewerToast("\uC774\uB3D9\uD560 \uC218 \uC788\uB294 \uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
@@ -1772,9 +1816,15 @@
       sessionStorage.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, "1");
     } catch (e) {
     }
-    setTimeout(() => {
+    const token = postNavSeq;
+    let fired = false;
+    const timerId = setTimeout(() => {
+      fired = true;
+      if (token !== postNavSeq) return;
+      state.postNavTimer = null;
       window.location.href = result.url;
     }, CONFIG.POST_NAV_DELAY);
+    state.postNavTimer = fired ? null : timerId;
   }
   var KEY_ACTIONS = {
     "Escape": () => {
@@ -1961,6 +2011,8 @@
       }
       return;
     }
+    cancelPendingPostNavigation();
+    clearAutoOpenPollTimer();
     dismissNoPhotoNotice();
     createOverlay();
     const targetIndex = findTargetImageIndex(targetSrc);
@@ -1988,7 +2040,10 @@
   function closeViewer() {
     imageLoadSeq += 1;
     renderedLoadSeq = -1;
+    cancelPendingPostNavigation();
+    clearAutoOpenPollTimer();
     dismissNoPhotoNotice();
+    dismissViewerToast();
     clearRecommendTimers();
     clearIdleTimer();
     flushPaddingSave();
@@ -2004,22 +2059,35 @@
     exitFullscreenSafely();
   }
   function startAutoOpenPolling() {
+    clearAutoOpenPollTimer();
     let attempts = 0;
     const maxAttempts = CONFIG.AUTO_OPEN_MAX_ATTEMPTS;
-    const pollTimer = setInterval(() => {
+    const token = autoOpenPollSeq;
+    let stopped = false;
+    let pollTimer = null;
+    pollTimer = setInterval(() => {
+      if (token !== autoOpenPollSeq) {
+        if (pollTimer !== null) clearInterval(pollTimer);
+        return;
+      }
       attempts++;
       forcePreloadPostImages();
       collectPostImages();
       if (state.postImages.length > 0) {
-        clearInterval(pollTimer);
+        stopped = true;
+        if (pollTimer !== null) clearInterval(pollTimer);
+        clearAutoOpenPollTimer();
         openViewer(null, true);
         return;
       }
       if (attempts >= maxAttempts) {
-        clearInterval(pollTimer);
+        stopped = true;
+        if (pollTimer !== null) clearInterval(pollTimer);
+        clearAutoOpenPollTimer();
         showNoPhotoNotice((dir) => navigatePost(dir));
       }
     }, CONFIG.AUTO_OPEN_POLL_INTERVAL);
+    state.autoOpenPollTimer = stopped ? null : pollTimer;
   }
   function checkAutoOpen() {
     try {
@@ -2067,11 +2135,22 @@
     }
     checkAutoOpen();
   }
+  function handlePageHideCleanup() {
+    cancelPendingPostNavigation();
+    clearAutoOpenPollTimer();
+  }
+  function bindPageHideCleanup() {
+    if (typeof window === "undefined" || typeof window.addEventListener !== "function") return;
+    if (boundPageHideWin === window) return;
+    boundPageHideWin = window;
+    window.addEventListener("pagehide", handlePageHideCleanup);
+  }
   function initViewerBase() {
     initImmersionSettings();
     bindContextMenuTracker();
     bindResizeHandler();
     bindTestOpenListener();
+    bindPageHideCleanup();
     bindAutoOpenTrigger();
   }
 
