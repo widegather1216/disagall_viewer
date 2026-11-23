@@ -5,10 +5,10 @@
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
 - **Active 도메인**: 전 도메인 (`core-viewer` `🟢 Sign-Off`, `post-navigation`, `post-recommend` `🟢 Sign-Off`, `viewer-immersion` `🟢 Sign-Off`, `modular-bundler-migration`)
-- **현재 단계 (Stage)**: `🩹 Debugging` (`잔여 결함 3건 OPEN` — P0 0건 / P1+ 3건 + REFACTOR 1건; `core-viewer/DEFECT-01~04`, `post-navigation/DEFECT-02`, `post-recommend/DEFECT-03`, `viewer-immersion/DEFECT-01~03` 해결 완료)
-- **직전 완료 작업**: `systematic-debugger`로 `viewer-immersion/DEFECT-03` (`defaultPadding` 실시간 `onChanged` 동기화·비동기 `storage.sync.get` 초기화 레이스·자기 에코/역순 덮어쓰기 방어) 해결 및 `🟢 Sign-Off` 전환 — `tests/immersion.test.js`(29/29)·`npm test`·`immersion_e2e.test.js`(15/15+`TC-BD-05b`)·`npm run build`·`node --check` PASS
+- **현재 단계 (Stage)**: `🩹 Debugging` (`잔여 결함 2건 OPEN` — P0 0건 / P1+ 2건 + REFACTOR 1건; `core-viewer/DEFECT-01~04`, `post-navigation/DEFECT-02~03`, `post-recommend/DEFECT-03`, `viewer-immersion/DEFECT-01~03` 해결 완료)
+- **직전 완료 작업**: `systematic-debugger`로 `post-navigation/DEFECT-03` (`post_navigator.js` 하단 경계 `'bottom'` 반환 교정·`공지`/`AD`/`설문` `innerHTML` 우회 제거 및 선행 필터링·`javascript:`/`data:`/`vbscript:` URL 이중 차단) 해결 — `tests/post_navigation.test.js`(9/9)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build`·`node --check` PASS
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `post-navigation` 도메인의 `DEFECT-03` 티켓 해결해줘 (또는 `modular-bundler-migration/DEFECT-01`)
+  > `post-navigation` 도메인의 `DEFECT-04` 티켓 해결해줘 (또는 `modular-bundler-migration/DEFECT-01`)
 
 ---
 
@@ -18,7 +18,7 @@
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 기술 스택/동시성 제약 확립 |
 | [`core-viewer`](./features/core-viewer/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 0` | `DEFECT-01~04` 전건 해결 완료 (`bindContextMenuTracker` 지연 로딩 우클릭 매칭 보완, 최종 Sign-Off) |
-| [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `-` | `2 / 1` | `DEFECT-02` 해결 완료, `DEFECT-03~04` 잔여 (`'bottom'` dead code, 이동/폴링 타이머 충돌) |
+| [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `-` | `1 / 1` | `DEFECT-02~03` 해결 완료, `DEFECT-04` 잔여 (이동/폴링 타이머 충돌) |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `DEFECT-03` 해결 완료 (우선순위 셀렉터·뷰어 배제·디스패치 실패/타이머 정리) |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `1/3 (33%)` | `1 / 0` | `DEFECT-01` 등록 (Safari v1.0.0 번들 미동기화 및 `#disagall-quick-launcher` CSS 누락) |
 | [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■■■■■] 8/8` | `15/15 (100%)` | `0 / 0` | `DEFECT-01~03 전건 해결 완료 (단일 스토리지 동기화 통합·비동기 초기화 레이스 방어, 최종 Sign-Off)` |
@@ -30,6 +30,8 @@
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
 
+- **`[2026-11-23]` `[atomic-commit-crafter]` [`post-navigation`]**: `22a5e6d` (`fix(post-navigation)` `DEFECT-03`), `a52567b` (`test(post-navigation)` Test 9 회귀 테스트) 및 위키/관제탑 동기화 커밋 완료.
+- **`[2026-11-23]` `[systematic-debugger]` [`post-navigation`]**: `DEFECT-03` 해결 — `post_navigator.js` 하단 경계 `'bottom'` 반환 교정, `공지`/`AD`/`설문` 선행 필터링(모바일 포함)·`innerHTML.includes` 제거, `isSafeNavigationHref()` 제어문자·대소문자 정규화 및 `navigatePost()` 이중 차단 적용 (`tests/post_navigation.test.js` 9/9·`npm test`·`immersion_e2e.test.js` 15/15·`npm run build`·`node --check` PASS).
 - **`[2026-11-23]` `[atomic-commit-crafter]` [`viewer-immersion`]**: `317de54` (`fix(immersion)` `DEFECT-03`), `cd985b0` (`test(immersion)` Test 29/E2E) 및 `🟢 Sign-Off` 위키/관제탑 동기화 커밋 완료.
 - **`[2026-11-23]` `[systematic-debugger]` [`viewer-immersion`]**: `DEFECT-03` 해결 및 `🟢 Sign-Off` 전환 — `immersion_controller.js` 3키(`defaultPadding`/`autoHideUi`/`autoFullscreen`) 단일 스토리지 초기화·`onChanged` 실시간 동기화(`0~100` 클램핑, 삭제 무시, 자기 에코/로컬 편집/역순 덮어쓰기/비동기 지연 `autoFullscreen` 가드) 통합, `extension.js`/`userscript.js` 중복 제거 및 `spec.md`·`ADR-07` 동기화 (`tests/immersion.test.js` 29/29·`npm test`·`immersion_e2e.test.js` 15/15+`TC-BD-05b`·`npm run build`·`node --check` PASS).
 - **`[2026-11-23]` `[atomic-commit-crafter]` [`viewer-immersion`]**: `b4bf989` (`fix(immersion)` `DEFECT-02`), `3fc9aa6` (`test(immersion)` Test 28/E2E) 및 위키/관제탑 동기화 커밋 완료.

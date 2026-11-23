@@ -1,7 +1,7 @@
 # Verification & Defect Log - Post Navigation
 
-- **검증 상태**: `🩹 Debugging` (`2건 OPEN DEFECT` — `DEFECT-01~02` 해결 완료, `DEFECT-03~04`·`REFACTOR-05` 잔여)
-- **미해결 티켓**: `🚨 DEFECT: 2건` | `🧐 REFACTOR: 1건`
+- **검증 상태**: `🩹 Debugging` (`1건 OPEN DEFECT` — `DEFECT-01~03` 해결 완료, `DEFECT-04`·`REFACTOR-05` 잔여)
+- **미해결 티켓**: `🚨 DEFECT: 1건` | `🧐 REFACTOR: 1건`
 
 ---
 
@@ -20,10 +20,13 @@
   - **회귀 테스트 결과**: `node tests/post_navigation.test.js` (8/8 PASS), `npm test` (5개 스위트 전량 PASS), `node tests/immersion_e2e.test.js` (15/15 PASS), `npm run build` (`PASS`), `node --check` (`PASS`)
 
 ### [DEFECT-03] `post_navigator.js` 하단 경계 `'bottom'` 도달 불가, 공지/AD `innerHTML` 우회 및 `javascript:` 통과
-- **현재 상태**: 🟡 OPEN
-- **심각도 & 위치**: 🟠 P1 High | [`src/parser/post_navigator.js#L22-L56`](../../../src/parser/post_navigator.js#L22-L56), [`#L130-L156`](../../../src/parser/post_navigator.js#L130-L156), [`src/controller/viewer_controller.js#L160-L162`](../../../src/controller/viewer_controller.js#L160-L162)
-- **원인 및 실증**: `targetIdx = -1` 초기값으로 마지막 행에서 `direction === 'down'` 시 `#L151`에서 `'top'`(`가장 최신 글입니다.`)을 반환해 `'bottom'`(`#L154`)이 dead code임. 또한 `isDesktopPostRowValid()`가 `AD`/`공지`/`설문` 필터 전에 `tr.innerHTML.includes(currentPostNo)`를 평가해 공지/AD 행이 통과하며, `hrefAttr.startsWith('javascript:')`가 `.trim().toLowerCase()`를 누락해 `" JavaScript:alert(1)"`이 통과함(`Empirical Probe Reproduced`).
-- **최소 수정 설계**: `targetIdx === -1` 시 `direction` 기반 `'top'`/`'bottom'` 분기, `innerHTML.includes` 제거 및 `AD`/`공지`/`설문` 선행 필터링(모바일 포함), `javascript:` 정규화 차단.
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **심각도 & 위치**: 🟠 P1 High | [`src/parser/post_navigator.js#L18-L230`](../../../src/parser/post_navigator.js#L18-L230), [`src/controller/viewer_controller.js#L189`](../../../src/controller/viewer_controller.js#L189)
+- **원인 및 실증**: `targetIdx = -1` 초기값으로 마지막 행에서 `direction === 'down'` 시 `'top'`(`가장 최신 글입니다.`)을 반환해 `'bottom'`이 dead code였으며, `isDesktopPostRowValid()`가 `AD`/`공지`/`설문` 필터 전에 `tr.innerHTML.includes(currentPostNo)`를 평가해 공지/AD 행이 통과하고, `hrefAttr.startsWith('javascript:')`가 `.trim().toLowerCase()`를 누락해 `" JavaScript:alert(1)"`이 통과함(`tests/post_navigation.test.js` Test 9 Red 재현 확인).
+- **해결 내역**:
+  - **수정 파일**: [`src/parser/post_navigator.js`](../../../src/parser/post_navigator.js#L18-L230), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js#L11-L189), [`tests/post_navigation.test.js`](../../../tests/post_navigation.test.js#L624-L988)
+  - **원인 및 조치**: `getAdjacentPostUrl()`의 경계 분기(`targetIdx < 0 || targetIdx >= validRows.length`)를 `direction === 'up'` 기반 `'top'`/`'bottom'` 반환으로 교정. `isSafeNavigationHref()`/`isSafePostLink()`를 도입해 제어문자/공백 제거 후 `http`/`https`/`file`/상대경로 외 `javascript:`/`data:`/`vbscript:` 스킴과 `#`/빈 주소를 데스크톱·모바일 파서와 `navigatePost()` 양쪽에서 이중 차단. `isExcludedPostElement()`로 `공지`/`AD`/`설문` 및 `.sp-notice`/`.icon_ad`/`.icon_survey` 선행 필터링(모바일 포함) 적용 및 `tr.innerHTML.includes(currentPostNo)` 제거(`dataset.no`/`extractPostNo` 기반 식별 유지).
+  - **회귀 테스트 결과**: `node tests/post_navigation.test.js` (9/9 PASS, 실제 `src/parser/post_navigator.js` 및 `dc_sample.html` 연동 검증 포함), `npm test` (5개 스위트 전량 PASS), `node tests/immersion_e2e.test.js` (15/15 PASS), `npm run build` (`PASS`), `node --check` (`PASS`)
 
 ### [DEFECT-04] `navigatePost()` 미취소 `setTimeout` 및 `startAutoOpenPolling()` 고아 `setInterval` 충돌
 - **현재 상태**: 🟡 OPEN
