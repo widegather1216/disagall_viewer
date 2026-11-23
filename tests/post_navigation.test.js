@@ -621,7 +621,373 @@ async function runDefect02Tests() {
   }
 }
 
-runDefect02Tests()
+// Test 9: DEFECT-03 bottom boundary, AD/notice/survey innerHTML bypass, and javascript: URL sanitization (real src/ modules)
+async function runDefect03Tests() {
+  const {
+    extractPostNo: realExtractPostNo,
+    isSafeNavigationHref,
+    isDesktopPostRowValid,
+    isMobilePostItemValid,
+    getValidPostRows,
+    findCurrentPostRowIndex,
+    getAdjacentPostUrl,
+  } = await import('../src/parser/post_navigator.js');
+  const { navigatePost } = await import('../src/controller/viewer_controller.js');
+  const { CONFIG } = await import('../src/config.js');
+
+  function makeClassList(classNameStr = '') {
+    const tokens = new Set(classNameStr.split(/\s+/).filter(Boolean));
+    return {
+      contains: (c) => tokens.has(c),
+      add: (c) => tokens.add(c),
+      remove: (c) => tokens.delete(c),
+    };
+  }
+
+  function makeDesktopRow({
+    className = 'ub-content',
+    numText = '',
+    subjectText = '사진',
+    href = '/mgallery/board/view/?id=digitalpicture&no=100',
+    rawHref = href,
+    title = '게시글',
+    hasCrtIcon = false,
+    hasPicIcon = true,
+    extraSelectorMatches = [],
+    innerHTML = '',
+    dataset = {},
+  }) {
+    const titLink = {
+      href,
+      textContent: title,
+      getAttribute: (name) => (name === 'href' ? rawHref : null),
+    };
+    const numEl = { textContent: numText };
+    const subjectEl = { textContent: subjectText };
+    const selectorSet = new Set(extraSelectorMatches);
+    if (hasCrtIcon) selectorSet.add('.crt_icon');
+    if (hasPicIcon) selectorSet.add('.icon_pic');
+
+    return {
+      className,
+      classList: makeClassList(className),
+      innerHTML,
+      dataset,
+      querySelector(sel) {
+        if (sel.includes('.gall_tit a')) return titLink;
+        if (sel === 'a') return titLink;
+        if (sel === '.gall_num') return numEl;
+        if (sel === '.gall_subject') return subjectEl;
+        for (const token of selectorSet) {
+          if (sel.includes(token)) return { className: token.replace(/^\./, '') };
+        }
+        return null;
+      },
+    };
+  }
+
+  function makeMobileItem({
+    className = '',
+    href = 'https://m.dcinside.com/board/digitalpicture/100',
+    rawHref = href,
+    title = '모바일 글',
+    subjectText = '',
+    extraSelectorMatches = [],
+  }) {
+    const link = {
+      href,
+      textContent: title,
+      getAttribute: (name) => (name === 'href' ? rawHref : null),
+    };
+    const selectorSet = new Set(extraSelectorMatches);
+    return {
+      className,
+      classList: makeClassList(className),
+      querySelector(sel) {
+        if (sel === 'a' || sel.includes('a:not')) return link;
+        if (subjectText && sel.includes('.gall_subject')) return { textContent: subjectText };
+        for (const token of selectorSet) {
+          if (sel.includes(token)) return { className: token.replace(/^\./, '') };
+        }
+        return null;
+      },
+    };
+  }
+
+  const origWindow = global.window;
+  const origDocument = global.document;
+  const origSessionStorage = global.sessionStorage;
+  const origSetTimeout = global.setTimeout;
+
+  try {
+    // 9.1 Bottom boundary must return error: 'bottom' (not 'top')
+    const boundaryRows = [
+      makeDesktopRow({ numText: '202', href: '/mgallery/board/view/?id=pic&no=202', title: '최신 글', hasPicIcon: true }),
+      makeDesktopRow({
+        className: 'ub-content crt>',
+        numText: '',
+        href: '/mgallery/board/view/?id=pic&no=201',
+        title: '마지막 현재 글',
+        hasCrtIcon: true,
+        hasPicIcon: true,
+      }),
+      // Trailing AD row after last valid row must be filtered out
+      makeDesktopRow({ numText: '-', subjectText: 'AD', href: 'https://coupang.com/ad', title: '광고' }),
+    ];
+
+    global.document = {
+      querySelectorAll(sel) {
+        if (sel.includes('table.gall_list')) return boundaryRows;
+        return [];
+      },
+      getElementById: () => null,
+    };
+    global.window = {
+      location: {
+        origin: 'https://gall.dcinside.com',
+        href: 'https://gall.dcinside.com/mgallery/board/view/?id=pic&no=201',
+      },
+    };
+
+    const bottomPreferPhoto = getAdjacentPostUrl('down', true);
+    assert.strictEqual(bottomPreferPhoto?.error, 'bottom', 'DEFECT-03: Last row down (preferPhotos=true) must return bottom error');
+    assert.strictEqual(bottomPreferPhoto?.message, '목록의 마지막 글입니다.');
+
+    const bottomNoPhoto = getAdjacentPostUrl('down', false);
+    assert.strictEqual(bottomNoPhoto?.error, 'bottom', 'DEFECT-03: Last row down (preferPhotos=false) must return bottom error');
+
+    // Top boundary check on first row
+    const singleOrTopRows = [
+      makeDesktopRow({
+        className: 'ub-content crt>',
+        numText: '',
+        href: '/mgallery/board/view/?id=pic&no=300',
+        title: '단일/첫 글',
+        hasCrtIcon: true,
+      }),
+    ];
+    global.document.querySelectorAll = (sel) => (sel.includes('table.gall_list') ? singleOrTopRows : []);
+    global.window.location.href = 'https://gall.dcinside.com/mgallery/board/view/?id=pic&no=300';
+    assert.strictEqual(getAdjacentPostUrl('up', true)?.error, 'top', 'First row up must return top error');
+    assert.strictEqual(getAdjacentPostUrl('down', true)?.error, 'bottom', 'Single row down must return bottom error');
+
+    // 9.2 AD / Notice / Survey must NOT bypass via innerHTML.includes(currentPostNo)
+    const currentPostNo = '25';
+    const adWith25InHtml = makeDesktopRow({
+      numText: '-',
+      subjectText: 'AD',
+      href: 'https://ad.example.com/click?id=999',
+      title: '광고',
+      innerHTML: '<td class="gall_num" style="height:25px;">-</td><td class="gall_subject"><b>AD</b></td>',
+    });
+    const noticeWith25InHtml = makeDesktopRow({
+      className: 'ub-content notice',
+      numText: '공지',
+      subjectText: '공지',
+      href: '/mgallery/board/view/?id=pic&no=250',
+      title: '필독 공지 25',
+      innerHTML: '<td>공지 25</td>',
+    });
+    const surveyWith25InHtml = makeDesktopRow({
+      numText: '-',
+      subjectText: '설문',
+      href: 'https://event.dcinside.com/survey/25',
+      title: '설문조사',
+      innerHTML: '<td>설문 25</td>',
+    });
+    const siblingWith25InTitle = makeDesktopRow({
+      numText: '26',
+      subjectText: '일반',
+      href: '/mgallery/board/view/?id=pic&no=26',
+      title: '25살 기념 사진',
+      innerHTML: '<td class="gall_num">26</td><td>25살 기념 사진</td>',
+    });
+    const realCurrentRow = makeDesktopRow({
+      className: 'ub-content crt>',
+      numText: '',
+      subjectText: '사진',
+      href: '/mgallery/board/view/?id=pic&no=25',
+      title: '진짜 현재 글',
+      hasCrtIcon: true,
+      innerHTML: '<td class="gall_num"><span class="crt_icon"></span></td>',
+    });
+
+    assert.strictEqual(isDesktopPostRowValid(adWith25InHtml, currentPostNo), false, 'DEFECT-03: AD row containing currentPostNo in innerHTML must be excluded');
+    assert.strictEqual(isDesktopPostRowValid(noticeWith25InHtml, currentPostNo), false, 'DEFECT-03: Notice row containing currentPostNo in innerHTML must be excluded');
+    assert.strictEqual(isDesktopPostRowValid(surveyWith25InHtml, currentPostNo), false, 'DEFECT-03: Survey row containing currentPostNo in innerHTML must be excluded');
+    assert.strictEqual(isDesktopPostRowValid(siblingWith25InTitle, currentPostNo), true, 'Sibling post 26 must remain valid');
+    assert.strictEqual(isDesktopPostRowValid(realCurrentRow, currentPostNo), true, 'Real current post row with empty numText must remain valid');
+
+    const validRows = [siblingWith25InTitle, realCurrentRow];
+    assert.strictEqual(findCurrentPostRowIndex(validRows, currentPostNo), 1, 'findCurrentPostRowIndex must find index 1, not sibling 26');
+
+    // Mobile AD / Notice / Survey pre-filtering
+    const mobileNotice = makeMobileItem({ className: 'notice', href: 'https://m.dcinside.com/board/pic/1' });
+    const mobileNoticeIcon = makeMobileItem({ extraSelectorMatches: ['.sp-notice'], href: 'https://m.dcinside.com/board/pic/2' });
+    const mobileAd = makeMobileItem({ className: 'ad', href: 'https://ad.example.com' });
+    const mobileAdIcon = makeMobileItem({ extraSelectorMatches: ['.icon_ad'], href: 'https://ad.example.com' });
+    const mobileSurvey = makeMobileItem({ subjectText: '설문', href: 'https://event.dcinside.com/survey' });
+    const mobileNormal = makeMobileItem({ className: 'gall-detail-head', href: 'https://m.dcinside.com/board/pic/200' });
+
+    assert.strictEqual(isMobilePostItemValid(mobileNotice), false, 'Mobile notice class must be excluded');
+    assert.strictEqual(isMobilePostItemValid(mobileNoticeIcon), false, 'Mobile .sp-notice must be excluded');
+    assert.strictEqual(isMobilePostItemValid(mobileAd), false, 'DEFECT-03: Mobile ad class must be excluded');
+    assert.strictEqual(isMobilePostItemValid(mobileAdIcon), false, 'DEFECT-03: Mobile .icon_ad must be excluded');
+    assert.strictEqual(isMobilePostItemValid(mobileSurvey), false, 'DEFECT-03: Mobile survey must be excluded');
+    assert.strictEqual(isMobilePostItemValid(mobileNormal), true, 'Mobile normal post with "head" class must remain valid');
+
+    // 9.3 Normalized javascript:/data:/vbscript: URL blocking (Desktop, Mobile, and navigatePost)
+    const unsafePayloads = [
+      ' JavaScript:alert(1)',
+      '\tjavascript:void(0)',
+      'java\nscript:alert(1)',
+      'javascript:;',
+      'DATA:text/html,<script>alert(1)</script>',
+      'vbscript:msgbox(1)',
+      '#',
+      '   ',
+    ];
+    for (const payload of unsafePayloads) {
+      const badDesktop = makeDesktopRow({ numText: '500', href: payload, rawHref: payload });
+      const badMobile = makeMobileItem({ href: payload, rawHref: payload });
+      assert.strictEqual(
+        isDesktopPostRowValid(badDesktop, currentPostNo),
+        false,
+        `DEFECT-03: Desktop must block unsafe href: ${JSON.stringify(payload)}`
+      );
+      assert.strictEqual(
+        isMobilePostItemValid(badMobile),
+        false,
+        `DEFECT-03: Mobile must block unsafe href: ${JSON.stringify(payload)}`
+      );
+    }
+
+    // Defense-in-depth: navigatePost must never assign window.location.href or set sessionStorage for unsafe URL
+    let assignedHref = null;
+    let storedAutoOpen = null;
+    const navMockRows = [
+      makeDesktopRow({ className: 'ub-content crt>', numText: '', href: '/mgallery/board/view/?id=pic&no=10', hasCrtIcon: true }),
+      makeDesktopRow({ numText: '9', href: ' JavaScript:alert(1)', rawHref: ' JavaScript:alert(1)', title: '악성 링크' }),
+    ];
+    global.document.querySelectorAll = (sel) => (sel.includes('table.gall_list') ? navMockRows : []);
+    global.window = {
+      location: {
+        origin: 'https://gall.dcinside.com',
+        get href() { return 'https://gall.dcinside.com/mgallery/board/view/?id=pic&no=10'; },
+        set href(val) { assignedHref = val; },
+      },
+    };
+    global.sessionStorage = {
+      setItem(k, v) { if (k === CONFIG.STORAGE_KEY_AUTO_OPEN) storedAutoOpen = v; },
+      getItem() { return null; },
+      removeItem() {},
+    };
+    global.setTimeout = (fn) => { fn(); return 1; };
+
+    navigatePost('down');
+    assert.strictEqual(assignedHref, null, 'DEFECT-03: navigatePost must not navigate to javascript: URL');
+    assert.strictEqual(storedAutoOpen, null, 'DEFECT-03: navigatePost must not set auto_open for blocked URL');
+    assert.strictEqual(realExtractPostNo('https://gall.dcinside.com/mgallery/board/view/?id=pic&no=10'), '10');
+
+    // Positive path & helper checks
+    assert.strictEqual(isSafeNavigationHref('https://gall.dcinside.com/mgallery/board/view/?id=pic&no=9'), true);
+    assert.strictEqual(isSafeNavigationHref('/mgallery/board/view/?id=pic&no=9'), true);
+    assert.strictEqual(isSafeNavigationHref(' JavaScript:alert(1)'), false);
+
+    const emptyNonCurrentRow = makeDesktopRow({ numText: '', href: '/mgallery/board/view/?id=pic&no=99' });
+    assert.strictEqual(isDesktopPostRowValid(emptyNonCurrentRow, currentPostNo), false, 'Empty numText non-current row must be excluded');
+    const datasetCurrentRow = makeDesktopRow({ numText: '', href: '/mgallery/board/view/?id=pic&no=25', dataset: { no: '25' } });
+    assert.strictEqual(isDesktopPostRowValid(datasetCurrentRow, currentPostNo), true, 'dataset.no matching currentPostNo must remain valid');
+
+    navMockRows.push(makeDesktopRow({ numText: '8', href: '/mgallery/board/view/?id=pic&no=8', title: '정상 다음 글' }));
+    navigatePost('down');
+    assert.strictEqual(storedAutoOpen, '1', 'navigatePost must set auto_open for safe adjacent URL');
+    assert.strictEqual(assignedHref, '/mgallery/board/view/?id=pic&no=8', 'navigatePost must navigate to safe adjacent URL');
+
+    // 9.4 Real src/parser/post_navigator.js integration against dc_sample.html
+    if (fs.existsSync('dc_sample.html')) {
+      const sampleHtml = fs.readFileSync('dc_sample.html', 'utf-8');
+      const trMatches = [...sampleHtml.matchAll(/<tr\s+class="ub-content\s*([^"]*)"[\s\S]*?<\/tr>/g)];
+      const sampleDomRows = trMatches.map((m) => {
+        const trHtml = m[0];
+        const trClass = `ub-content ${m[1]}`.trim();
+        const numMatch = trHtml.match(/<td\s+class="gall_num"[^>]*>([\s\S]*?)<\/td>/);
+        const numText = numMatch ? numMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+        const subMatch = trHtml.match(/<td\s+class="gall_subject"[^>]*>([\s\S]*?)<\/td>/);
+        const subjectText = subMatch ? subMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+        const linkMatch = trHtml.match(/<td\s+class="gall_tit[^"]*"[^>]*>[\s\S]*?<a\s+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
+        const rawHref = linkMatch ? linkMatch[1] : '';
+        const title = linkMatch ? linkMatch[2].replace(/<[^>]+>/g, '').trim() : '';
+        const hasCrtIcon = trHtml.includes('crt_icon');
+        const hasPic = trHtml.includes('icon_pic') || trHtml.includes('icon_recomimg') || subjectText.includes('사진');
+        const hasAdIcon = trHtml.includes('icon_ad');
+
+        return makeDesktopRow({
+          className: trClass,
+          numText,
+          subjectText,
+          href: rawHref,
+          rawHref,
+          title,
+          hasCrtIcon,
+          hasPicIcon: hasPic,
+          extraSelectorMatches: hasAdIcon ? ['.icon_ad'] : [],
+          innerHTML: trHtml,
+        });
+      });
+
+      const sampleUrl = 'https://gall.dcinside.com/mgallery/board/view/?id=digitalpicture&no=1968506';
+      global.document.querySelectorAll = (sel) => (sel.includes('table.gall_list') ? sampleDomRows : []);
+      global.window.location = { origin: 'https://gall.dcinside.com', href: sampleUrl };
+
+      const sampleValid = getValidPostRows('1968506', global.document);
+      assert.strictEqual(sampleValid.length, 50, 'Real post_navigator must retain 50 valid rows from dc_sample.html (excluding 설문/AD)');
+      assert.strictEqual(findCurrentPostRowIndex(sampleValid, '1968506'), 18);
+      assert.strictEqual(getAdjacentPostUrl('up', true, sampleUrl).url, '/mgallery/board/view/?id=digitalpicture&no=1968509&search_head=10&page=1');
+      assert.strictEqual(getAdjacentPostUrl('down', true, sampleUrl).url, '/mgallery/board/view/?id=digitalpicture&no=1968505&search_head=10&page=1');
+
+      // Last row in dc_sample.html (1968384) navigating down must hit 'bottom'
+      const lastUrl = 'https://gall.dcinside.com/mgallery/board/view/?id=digitalpicture&no=1968384';
+      const lastRows = sampleDomRows.map((r, idx) => {
+        if (idx === sampleDomRows.length - 1) {
+          return makeDesktopRow({
+            className: 'ub-content crt>',
+            numText: '',
+            subjectText: '사진',
+            href: '/mgallery/board/view/?id=digitalpicture&no=1968384',
+            hasCrtIcon: true,
+            hasPicIcon: true,
+          });
+        }
+        // Clear crt marker from the original current post row (1968506)
+        return r.className.includes('crt')
+          ? makeDesktopRow({
+              className: 'ub-content',
+              numText: '1968506',
+              subjectText: '사진',
+              href: '/mgallery/board/view/?id=digitalpicture&no=1968506',
+              hasCrtIcon: false,
+              hasPicIcon: true,
+            })
+          : r;
+      });
+      global.document.querySelectorAll = (sel) => (sel.includes('table.gall_list') ? lastRows : []);
+      global.window.location = { origin: 'https://gall.dcinside.com', href: lastUrl };
+      assert.strictEqual(getAdjacentPostUrl('down', true, lastUrl)?.error, 'bottom');
+    }
+
+    console.log('✅ Test 9: DEFECT-03 bottom boundary, AD/notice/survey pre-filter & javascript: guard passed');
+  } finally {
+    global.window = origWindow;
+    global.document = origDocument;
+    global.sessionStorage = origSessionStorage;
+    global.setTimeout = origSetTimeout;
+  }
+}
+
+Promise.resolve()
+  .then(() => runDefect02Tests())
+  .then(() => runDefect03Tests())
   .then(() => {
     console.log('\n🎉 ALL UNIT & INTEGRATION TESTS PASSED SUCCESSFULLY! 🎉');
   })
