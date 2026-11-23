@@ -498,12 +498,23 @@ async function run() {
     const env = createDomEnvironment({ autoHideUi: true, defaultPadding: 24 });
     loadContentBundle(env, timers);
 
-    // Simulate popup.js interacting with shared chrome.storage.sync
+    // Simulate popup.js interacting with shared chrome.storage.sync (autoHideUi + padding-slider)
     const popup = require('../popup.js');
     let toggleChecked = true;
     const toggleListeners = [];
+    const sliderListeners = {};
+    const mockPopupSlider = {
+      value: '24',
+      addEventListener: (ev, fn) => {
+        if (!sliderListeners[ev]) sliderListeners[ev] = [];
+        sliderListeners[ev].push(fn);
+      },
+    };
+    const mockPopupSliderVal = { textContent: '24px' };
     const mockPopupDoc = {
       getElementById(id) {
+        if (id === 'padding-slider') return mockPopupSlider;
+        if (id === 'padding-val') return mockPopupSliderVal;
         if (id === 'auto-hide-ui-toggle') {
           return {
             checked: toggleChecked,
@@ -515,9 +526,29 @@ async function run() {
     };
     popup.initPopup(mockPopupDoc, env.chrome.storage.sync);
 
-    // Open viewer initially (autoHideUi=true)
+    // Open viewer initially (autoHideUi=true, defaultPadding=24)
     env.win.postMessage({ action: 'disagall_test_open' }, '*');
     const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const header = overlay.querySelector('.disagall-header');
+    const footer = overlay.querySelector('.disagall-footer');
+    const mainImg = env.doc.getElementById('disagall-main-img');
+    const viewerSlider = env.doc.getElementById('disagall-slider');
+    const viewerSliderVal = env.doc.getElementById('disagall-slider-val');
+    header.offsetHeight = 52;
+    footer.offsetHeight = 38;
+    mainImg.naturalWidth = 1000;
+    mainImg.naturalHeight = 2000;
+    env.win.dispatchEvent({ type: 'resize' });
+    timers.advanceBy(20);
+    assert.strictEqual(mainImg.style.maxHeight, '662px', 'TC-HP-04: Initial 24px padding fits 662px');
+
+    // User changes padding in popup -> live onChanged updates viewer slider and refits image (800-52-38-120 = 590px)
+    mockPopupSlider.value = '60';
+    (sliderListeners.change || []).forEach((fn) => fn({ target: { value: '60' } }));
+    assert.strictEqual(env.syncStore.defaultPadding, 60, 'TC-HP-04: Popup slider change must persist defaultPadding=60');
+    assert.strictEqual(Number(viewerSlider.value), 60, 'TC-HP-04 (DEFECT-03): Live onChanged must update viewer slider value');
+    assert.strictEqual(viewerSliderVal.textContent, '60px', 'TC-HP-04 (DEFECT-03): Live onChanged must update viewer slider label');
+    assert.strictEqual(mainImg.style.maxHeight, '590px', 'TC-HP-04 (DEFECT-03): Live onChanged must refit active viewer image to 60px padding');
 
     // User unchecks immersion toggle in popup
     toggleChecked = false;
@@ -534,7 +565,7 @@ async function run() {
     assert.strictEqual(env.syncStore.autoHideUi, true, 'TC-HP-04: Popup toggle must persist autoHideUi=true');
     timers.advanceBy(2500);
     assert.strictEqual(overlay.classList.contains('disagall-idle'), true, 'TC-HP-04: Re-enabling autoHideUi must resume 2500ms auto-hide');
-    console.log('✅ TC-HP-04 PASS: Popup toggle, chrome.storage.sync persistence & live content.js sync verified');
+    console.log('✅ TC-HP-04 PASS: Popup toggle & padding live sync, chrome.storage.sync persistence & content.js refit verified');
   }
 
   // --- TC-BD-01: Padding slider drag & header hover defer auto-hide; resumes 2500ms after release/leave ---
@@ -983,7 +1014,53 @@ async function run() {
     assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true, 'TC-BD-05: Fallback must hide UI');
     assert.strictEqual(mainImg.style.maxHeight, '800px', 'TC-BD-05: Fallback must apply 0px padding full-bleed');
     assert(toast.textContent.includes('전체화면'), 'TC-BD-05: Fallback must display guidance toast');
-    console.log('✅ TC-BD-05 PASS: Popup autoFullscreen sync & blocked-gesture viewport-fill fallback verified');
+  }
+
+  // --- TC-BD-05b (DEFECT-03): Async delayed chrome.storage.sync.get resolving AFTER openViewer() ---
+  {
+    const timers = createFakeTimerEnv();
+    const env = createDomEnvironment({ autoHideUi: true, autoFullscreen: true, defaultPadding: 44 });
+    const pendingAsyncGets = [];
+    const origGet = env.chrome.storage.sync.get;
+    env.chrome.storage.sync.get = (keys, cb) => {
+      pendingAsyncGets.push(() => origGet(keys, cb));
+    };
+    loadContentBundle(env, timers);
+
+    // Open viewer BEFORE async storage.sync.get resolves
+    env.win.postMessage({ action: 'disagall_test_open' }, '*');
+    const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const header = overlay.querySelector('.disagall-header');
+    const footer = overlay.querySelector('.disagall-footer');
+    const mainImg = env.doc.getElementById('disagall-main-img');
+    const slider = env.doc.getElementById('disagall-slider');
+    const sliderVal = env.doc.getElementById('disagall-slider-val');
+    header.offsetHeight = 52;
+    footer.offsetHeight = 38;
+    mainImg.naturalWidth = 1000;
+    mainImg.naturalHeight = 2000;
+    env.win.dispatchEvent({ type: 'resize' });
+    timers.advanceBy(20);
+    assert.strictEqual(mainImg.style.maxHeight, '662px', 'TC-BD-05b: Before async get, viewer uses default 24px');
+
+    // Resolve delayed storage.sync.get -> hydrates 44px padding & retroactively enters autoFullscreen
+    assert.strictEqual(pendingAsyncGets.length, 1, 'TC-BD-05b: Single unified storage.sync.get must be issued');
+    pendingAsyncGets.shift()();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.strictEqual(Number(slider.value), 44, 'TC-BD-05b: Delayed get must sync slider value to 44');
+    assert.strictEqual(sliderVal.textContent, '44px', 'TC-BD-05b: Delayed get must sync slider label to 44px');
+    assert.strictEqual(env.doc.fullscreenElement, overlay, 'TC-BD-05b: Delayed get must retroactively enter autoFullscreen');
+    assert.strictEqual(mainImg.style.maxHeight, '800px', 'TC-BD-05b: Fullscreen applies 0px temporary padding');
+
+    // Exit fullscreen -> restores delayed 44px padding (800 - 52 - 38 - 88 = 622px)
+    env.win.dispatchEvent({ type: 'keydown', key: 'Escape' });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(env.doc.fullscreenElement, null);
+    assert.strictEqual(mainImg.style.maxHeight, '622px', 'TC-BD-05b: Exiting fullscreen must restore delayed 44px padding');
+    console.log('✅ TC-BD-05 PASS: Popup autoFullscreen sync, blocked-gesture fallback & async init race verified');
   }
 
   // --- TC-NG-03: Fullscreen enter/exit & closeViewer must never overwrite saved user padding ---

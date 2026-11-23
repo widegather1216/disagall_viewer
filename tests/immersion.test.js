@@ -900,6 +900,7 @@ async function run() {
     'toggleUiManual',
     'exitFullscreenSafely',
     'toggleFullscreen',
+    'applyPaddingSetting',
     'applyAutoHideUiSetting',
     'initImmersionSettings',
   ];
@@ -1645,7 +1646,7 @@ async function run() {
       headerNode.dispatchEvent('mouseleave');
       assert.strictEqual(overlayNode.classList.contains('disagall-idle'), true, 'Header mouseleave must not cancel .disagall-idle');
 
-      // 28.4 Normal mouseleave while UI is visible must still schedule idle timer
+  // 28.4 Normal mouseleave while UI is visible must still schedule idle timer
       overlayNode.dispatchEvent('mousemove');
       assert.strictEqual(overlayNode.classList.contains('disagall-idle'), false);
       headerNode.dispatchEvent('mouseenter');
@@ -1656,6 +1657,230 @@ async function run() {
     });
   });
   console.log('✅ Test 28: DEFECT-02 synthetic header mouseleave after UI hide verified');
+
+  // 29. DEFECT-03: defaultPadding live onChanged sync, clamping/delete guards, self-echo & async storage.sync.get races
+  await withFakeTimers(async (timers) => {
+    await withControllerHarness(async ({
+      controller,
+      overlayNode,
+      mainImgNode,
+      sliderNode,
+      sliderValNode,
+      mockDocument,
+    }) => {
+      const origQuerySelectorAll = mockDocument.querySelectorAll;
+      const sampleBodyImg = createMockDomNode('defect03-body-img');
+      sampleBodyImg.tagName = 'IMG';
+      sampleBodyImg.src = 'https://dcimg7.dcinside.co.kr/viewimage.php?id=hit&no=789';
+      sampleBodyImg.currentSrc = sampleBodyImg.src;
+      sampleBodyImg.alt = 'defect03';
+      sampleBodyImg.naturalWidth = 1000;
+      sampleBodyImg.naturalHeight = 2000;
+      const writeDiv = { querySelectorAll: () => [sampleBodyImg] };
+      sampleBodyImg.closest = (sel) => (sel.includes('.write_div') ? writeDiv : null);
+      sampleBodyImg.getAttribute = () => null;
+      mockDocument.querySelectorAll = (sel) => (sel.endsWith('img') ? [sampleBodyImg] : [writeDiv]);
+      const origImage = global.Image;
+      global.Image = class {
+        set src(val) {
+          this._src = val;
+          if (typeof this.onload === 'function') this.onload();
+        }
+        get src() { return this._src; }
+      };
+
+      try {
+        mainImgNode.naturalWidth = 1000;
+        mainImgNode.naturalHeight = 2000;
+
+        let pendingGetCallbacks = [];
+        let onChangedListener = null;
+        global.chrome = {
+          storage: {
+            sync: {
+              get(defaults, cb) {
+                pendingGetCallbacks.push({ defaults, cb });
+              },
+              set() {},
+            },
+            onChanged: {
+              addListener(fn) {
+                onChangedListener = fn;
+              },
+            },
+          },
+        };
+
+        // 29.1 Async init race: openViewer() runs BEFORE storage.sync.get resolves
+        controller.initImmersionSettings();
+        assert.strictEqual(pendingGetCallbacks.length, 1, 'initImmersionSettings must issue single unified storage.sync.get');
+        assert.strictEqual(typeof onChangedListener, 'function', 'initImmersionSettings must register onChanged listener');
+
+        controller.openViewer();
+        assert.strictEqual(state.currentPadding, 24);
+        assert.strictEqual(mainImgNode.style.maxHeight, '662px', 'Initial fit before async get uses default 24px');
+
+        // Delayed initial get resolves with defaultPadding=44, autoHideUi=false, autoFullscreen=true
+        const req1 = pendingGetCallbacks.shift();
+        req1.cb({ ...req1.defaults, defaultPadding: 44, autoHideUi: false, autoFullscreen: true });
+        await Promise.resolve();
+        await Promise.resolve();
+
+        assert.strictEqual(state.currentPadding, 44, 'DEFECT-03: Delayed get must sync state.currentPadding=44');
+        assert.strictEqual(Number(sliderNode.value), 44, 'DEFECT-03: Delayed get must sync sliderEl.value=44');
+        assert.strictEqual(sliderValNode.textContent, '44px', 'DEFECT-03: Delayed get must sync sliderValEl=44px');
+        assert.strictEqual(state.autoHideUi, false, 'DEFECT-03: Delayed get must sync autoHideUi=false');
+        assert.strictEqual(timers.count, 0, 'DEFECT-03: Delayed autoHideUi=false must clear idle timer');
+        assert.strictEqual(state.autoFullscreen, true, 'DEFECT-03: Delayed get must sync autoFullscreen=true');
+        assert.strictEqual(state.isFullscreenMode, true, 'DEFECT-03: Delayed get must retroactively enter autoFullscreen on open viewer');
+        assert.strictEqual(mockDocument.fullscreenElement, overlayNode);
+        assert.strictEqual(mainImgNode.style.maxHeight, '800px', 'Fullscreen applies temp 0px padding');
+
+        // Exit fullscreen -> must restore delayed defaultPadding=44 (800-52-38-88 = 622px)
+        controller.handleKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() {} });
+        await Promise.resolve();
+        await Promise.resolve();
+        assert.strictEqual(state.isFullscreenMode, false);
+        assert.strictEqual(mainImgNode.style.maxHeight, '622px', 'Exiting fullscreen must reflect delayed 44px padding');
+
+        // 29.2 Live onChanged defaultPadding sync (unzoomed active viewer) + clamping + ignore undefined
+        onChangedListener({ defaultPadding: { newValue: 60 } }, 'sync');
+        assert.strictEqual(state.currentPadding, 60, 'DEFECT-03: onChanged must update state.currentPadding=60');
+        assert.strictEqual(Number(sliderNode.value), 60);
+        assert.strictEqual(sliderValNode.textContent, '60px');
+        assert.strictEqual(mainImgNode.style.maxHeight, '590px', 'DEFECT-03: onChanged must refit active image to 60px padding');
+
+        onChangedListener({ defaultPadding: { newValue: 150 } }, 'sync');
+        assert.strictEqual(state.currentPadding, 100, 'defaultPadding > 100 must clamp to 100');
+        onChangedListener({ defaultPadding: { newValue: -15 } }, 'sync');
+        assert.strictEqual(state.currentPadding, 0, 'defaultPadding < 0 must clamp to 0');
+        onChangedListener({ defaultPadding: { newValue: undefined } }, 'sync');
+        assert.strictEqual(state.currentPadding, 0, 'Deleted defaultPadding (undefined) must be ignored');
+        onChangedListener({ defaultPadding: { newValue: Number.NaN } }, 'sync');
+        assert.strictEqual(state.currentPadding, 0, 'NaN defaultPadding must be ignored');
+
+        // Reset to 24px via onChanged, then test zoom > 1.0 lock & fullscreen lock
+        onChangedListener({ defaultPadding: { newValue: 24 } }, 'sync');
+        assert.strictEqual(mainImgNode.style.maxHeight, '662px');
+        state.zoom.scale = 2.0;
+        onChangedListener({ defaultPadding: { newValue: 40 } }, 'sync');
+        assert.strictEqual(state.currentPadding, 40);
+        assert.strictEqual(sliderValNode.textContent, '40px');
+        assert.strictEqual(mainImgNode.style.maxHeight, '662px', 'Zoomed image must keep base maxHeight during onChanged padding sync');
+        state.zoom.scale = 1.0;
+
+        // Self-echo / active slider drag protection
+        sliderNode.dispatchEvent('mousedown');
+        sliderNode.dispatchEvent('input', { target: { value: '72' } });
+        onChangedListener({ defaultPadding: { newValue: 24 } }, 'sync');
+        assert.strictEqual(state.currentPadding, 72, 'Active slider drag/pending save must ignore stale onChanged echo');
+        assert.strictEqual(sliderValNode.textContent, '72px');
+        sliderNode.dispatchEvent('mouseup');
+        timers.clearAll();
+        controller.closeViewer();
+
+        // 29.3 Inactive viewer onChanged updates state & cached slider without error
+        onChangedListener({ defaultPadding: { newValue: 30 } }, 'sync');
+        assert.strictEqual(state.currentPadding, 30);
+        assert.strictEqual(Number(sliderNode.value), 30);
+        assert.strictEqual(sliderValNode.textContent, '30px');
+
+        // 29.4 Delayed get after closeViewer must NOT trigger fullscreen on closed viewer
+        state.autoFullscreen = false;
+        controller.initImmersionSettings();
+        controller.openViewer();
+        controller.closeViewer();
+        const req2 = pendingGetCallbacks.shift();
+        req2.cb({ ...req2.defaults, defaultPadding: 50, autoFullscreen: true });
+        await Promise.resolve();
+        await Promise.resolve();
+        assert.strictEqual(state.isFullscreenMode, false, 'Delayed get after closeViewer must NOT enter fullscreen');
+        assert.strictEqual(mockDocument.fullscreenElement, null);
+        assert.strictEqual(state.currentPadding, 50);
+
+        // 29.5 Local slider edit & manual F toggle before delayed get resolves must NOT be overwritten
+        state.autoFullscreen = false;
+        controller.initImmersionSettings();
+        controller.openViewer();
+        sliderNode.dispatchEvent('input', { target: { value: '80' } });
+        controller.handleKeyDown({ key: 'f', preventDefault() {}, stopPropagation() {} });
+        await Promise.resolve();
+        await Promise.resolve();
+        assert.strictEqual(state.isFullscreenMode, true);
+
+        const req3 = pendingGetCallbacks.shift();
+        req3.cb({ ...req3.defaults, defaultPadding: 10, autoFullscreen: false });
+        await Promise.resolve();
+        await Promise.resolve();
+        assert.strictEqual(state.currentPadding, 80, 'Delayed get must NOT overwrite local slider edit 80');
+        assert.strictEqual(state.isFullscreenMode, true, 'Delayed autoFullscreen=false must NOT cancel manual F fullscreen');
+        timers.clearAll();
+        controller.closeViewer();
+
+        // 29.6 Out-of-order: onChanged arrives BEFORE delayed get, and onChanged autoFullscreen=true does NOT force-enter open viewer
+        state.autoFullscreen = false;
+        state.autoHideUi = true;
+        controller.initImmersionSettings();
+        controller.openViewer();
+        onChangedListener({
+          defaultPadding: { newValue: 56 },
+          autoHideUi: { newValue: false },
+          autoFullscreen: { newValue: true },
+        }, 'sync');
+        assert.strictEqual(state.currentPadding, 56);
+        assert.strictEqual(state.autoHideUi, false);
+        assert.strictEqual(state.autoFullscreen, true);
+        assert.strictEqual(state.isFullscreenMode, false, 'onChanged autoFullscreen=true on already-open viewer applies from next open');
+
+        const req4 = pendingGetCallbacks.shift();
+        req4.cb({ ...req4.defaults, defaultPadding: 20, autoHideUi: true, autoFullscreen: false });
+        await Promise.resolve();
+        await Promise.resolve();
+        assert.strictEqual(state.currentPadding, 56, 'Stale delayed get must NOT overwrite earlier onChanged padding');
+        assert.strictEqual(state.autoHideUi, false, 'Stale delayed get must NOT overwrite earlier onChanged autoHideUi');
+        assert.strictEqual(state.autoFullscreen, true, 'Stale delayed get must NOT overwrite earlier onChanged autoFullscreen');
+        assert.strictEqual(state.isFullscreenMode, false);
+        controller.closeViewer();
+
+        // 29.7 Delayed autoHideUi=true after 2500ms idle hide must NOT unexpectedly wake hidden UI
+        state.autoHideUi = true;
+        controller.initImmersionSettings();
+        controller.openViewer();
+        timers.runNext();
+        assert.strictEqual(overlayNode.classList.contains('disagall-idle'), true);
+        const req5 = pendingGetCallbacks.shift();
+        req5.cb({ ...req5.defaults, defaultPadding: 56, autoHideUi: true, autoFullscreen: false });
+        assert.strictEqual(overlayNode.classList.contains('disagall-idle'), true, 'Delayed autoHideUi=true must NOT wake already-idle UI');
+        controller.closeViewer();
+
+        // 29.8 Sequential change(60) -> change(80) async superseded self-echo onChanged(60) must NOT roll back 80
+        controller.openViewer();
+        sliderNode.dispatchEvent('change', { target: { value: '60' } });
+        sliderNode.dispatchEvent('change', { target: { value: '80' } });
+        assert.strictEqual(state.currentPadding, 80);
+        onChangedListener({ defaultPadding: { newValue: 60 } }, 'sync');
+        assert.strictEqual(state.currentPadding, 80, 'Superseded async echo 60 must NOT roll back 80');
+        assert.strictEqual(sliderValNode.textContent, '80px');
+        controller.closeViewer();
+
+        // 29.9 GM_getValue NaN / out-of-range safety
+        const savedChrome = global.chrome;
+        global.chrome = undefined;
+        state.currentPadding = 24;
+        global.GM_getValue = (key, def) => (key === 'defaultPadding' ? Number.NaN : def);
+        controller.initImmersionSettings();
+        assert.strictEqual(state.currentPadding, 24, 'GM_getValue NaN must not corrupt state.currentPadding');
+        global.GM_getValue = (key, def) => (key === 'defaultPadding' ? 140 : def);
+        controller.initImmersionSettings();
+        assert.strictEqual(state.currentPadding, 100, 'GM_getValue > 100 must clamp to 100');
+        global.chrome = savedChrome;
+      } finally {
+        mockDocument.querySelectorAll = origQuerySelectorAll;
+        global.Image = origImage;
+      }
+    });
+  });
+  console.log('✅ Test 29: DEFECT-03 defaultPadding live sync, guards & async storage race defense verified');
 
   console.log('\n🎉 ALL VIEWER IMMERSION UNIT TESTS PASSED! 🎉');
 }
