@@ -1,5 +1,24 @@
 // Unit test verifying direct imports from src/ modules
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..');
+const SAFARI_RESOURCES_DIR = path.join(
+  ROOT,
+  'safari_extension/DisagallViewerSafari/DisagallViewerSafari Extension/Resources'
+);
+const EXTENSION_ASSETS = [
+  'manifest.json',
+  'background.js',
+  'content.js',
+  'content.css',
+  'popup.html',
+  'popup.js',
+  'icon16.png',
+  'icon48.png',
+  'icon128.png',
+];
 
 async function run() {
   console.log('🧪 Starting Modular src/ Import & Unit Tests...');
@@ -24,6 +43,33 @@ async function run() {
   const recommendParser = await import('../src/parser/recommend_parser.js');
   assert(recommendParser.RECOMMEND_BUTTON_SELECTORS.includes('button.btn_recom_up'));
   console.log('✅ recommend_parser module functions verified');
+
+  // 4. DEFECT-01: Quick-launcher CSS & Safari Extension Resources bundle parity
+  const contentCss = fs.readFileSync(path.join(ROOT, 'content.css'), 'utf8');
+  assert(
+    /#disagall-quick-launcher\s*\{[\s\S]*?position:\s*fixed;/.test(contentCss),
+    'content.css must define #disagall-quick-launcher with fixed positioning'
+  );
+  assert(
+    /#disagall-quick-launcher:hover\s*\{/.test(contentCss),
+    'content.css must define #disagall-quick-launcher:hover styles'
+  );
+
+  const userscript = fs.readFileSync(path.join(ROOT, 'disagall_viewer.user.js'), 'utf8');
+  assert(
+    userscript.includes('#disagall-quick-launcher {') || userscript.includes('#disagall-quick-launcher{'),
+    'disagall_viewer.user.js must include injected #disagall-quick-launcher CSS'
+  );
+
+  for (const asset of EXTENSION_ASSETS) {
+    const rootAsset = fs.readFileSync(path.join(ROOT, asset));
+    const safariAsset = fs.readFileSync(path.join(SAFARI_RESOURCES_DIR, asset));
+    assert(
+      rootAsset.equals(safariAsset),
+      `Safari Extension Resources/${asset} must be synced identically with root ${asset}`
+    );
+  }
+  console.log('✅ DEFECT-01 quick-launcher CSS and Safari Extension Resources parity verified');
 
   console.log('🎉 ALL MODULAR IMPORT TESTS PASSED SUCCESSFULLY! 🎉');
 }
