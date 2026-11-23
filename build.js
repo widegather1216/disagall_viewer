@@ -19,6 +19,37 @@ const USERSCRIPT_BANNER = `// ==UserScript==
 // ==/UserScript==
 `;
 
+const EXTENSION_ASSETS = [
+  'manifest.json',
+  'background.js',
+  'content.js',
+  'content.css',
+  'popup.html',
+  'popup.js',
+  'icon16.png',
+  'icon48.png',
+  'icon128.png',
+];
+
+function syncSafariResources(rootDir) {
+  const safariResourcesDir = path.join(
+    rootDir,
+    'safari_extension',
+    'DisagallViewerSafari',
+    'DisagallViewerSafari Extension',
+    'Resources'
+  );
+  if (!fs.existsSync(safariResourcesDir)) return;
+
+  for (const asset of EXTENSION_ASSETS) {
+    const srcPath = path.join(rootDir, asset);
+    if (fs.existsSync(srcPath)) {
+      fs.copyFileSync(srcPath, path.join(safariResourcesDir, asset));
+    }
+  }
+  console.log('✅ Synced Safari Extension Resources:', safariResourcesDir);
+}
+
 async function build() {
   const rootDir = __dirname;
   const cssPath = path.join(rootDir, 'content.css');
@@ -55,6 +86,9 @@ async function build() {
   const userOutput = userResult.outputFiles[0].text;
   fs.writeFileSync(path.join(rootDir, 'disagall_viewer.user.js'), USERSCRIPT_BANNER + '\n' + userOutput, 'utf8');
   console.log('✅ Generated Userscript: disagall_viewer.user.js');
+
+  // 3. Sync Chrome extension assets into Safari Web Extension Resources
+  syncSafariResources(rootDir);
 
   console.log('🎉 Build completed successfully!');
 }

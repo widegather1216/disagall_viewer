@@ -30,6 +30,9 @@
 
 /* Header Controls Bar */
 .disagall-header {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   padding: 12px 24px;
   display: flex;
@@ -38,6 +41,9 @@
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);
   z-index: 10;
   box-sizing: border-box;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.15s ease;
 }
 
 .disagall-header-left {
@@ -199,6 +205,18 @@
   transform: scale(1.18) rotate(-6deg);
 }
 
+.disagall-btn-fullscreen {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
+}
+
+.disagall-btn-fullscreen.active {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(96, 165, 250, 0.65);
+  color: #ffffff;
+}
+
 .disagall-btn-close {
   background: rgba(239, 68, 68, 0.2);
   border-color: rgba(239, 68, 68, 0.35);
@@ -217,13 +235,15 @@
 .disagall-stage {
   flex: 1;
   width: 100%;
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
   position: relative;
   overflow: hidden;
   box-sizing: border-box;
-  /* Dynamic padding set via JS based on slider & aspect ratio */
+  transition: padding-top 0.25s ease, padding-bottom 0.25s ease;
+  /* Dynamic padding set via JS based on UI visibility, slider & aspect ratio */
 }
 
 .disagall-img-wrapper {
@@ -274,7 +294,9 @@
   align-items: center;
   cursor: pointer;
   z-index: 20;
-  transition: all 0.2s ease;
+  opacity: 1;
+  pointer-events: auto;
+  transition: background 0.2s ease, border-color 0.2s ease, width 0.2s ease, opacity 0.15s ease;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -320,6 +342,9 @@
 
 /* Footer & Hints */
 .disagall-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
   width: 100%;
   padding: 10px 24px;
   display: flex;
@@ -328,11 +353,16 @@
   background: linear-gradient(0deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);
   z-index: 10;
   box-sizing: border-box;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.15s ease;
 }
 
 .disagall-keyhints {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 16px;
   font-size: 12px;
   color: #94a3b8;
 }
@@ -494,5 +524,59 @@
 
 .disagall-notice-btn.close:hover {
   color: #ffffff;
+}
+
+/* Immersion Mode (Idle Auto-Hide & Manual Toggle) */
+#disagall-viewer-overlay.disagall-idle,
+#disagall-viewer-overlay.disagall-ui-hidden {
+  cursor: none;
+}
+
+/* Override inline cursor on image/controls while hidden, preserving grabbing cursor during zoom pan drag */
+#disagall-viewer-overlay.disagall-idle *:not([style*="grabbing"]),
+#disagall-viewer-overlay.disagall-ui-hidden *:not([style*="grabbing"]) {
+  cursor: none !important;
+}
+
+#disagall-viewer-overlay.disagall-idle .disagall-header,
+#disagall-viewer-overlay.disagall-ui-hidden .disagall-header,
+#disagall-viewer-overlay.disagall-idle .disagall-footer,
+#disagall-viewer-overlay.disagall-ui-hidden .disagall-footer,
+#disagall-viewer-overlay.disagall-idle .disagall-nav-btn,
+#disagall-viewer-overlay.disagall-ui-hidden .disagall-nav-btn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* Floating Quick Launcher Button for Userscript / Safari */
+#disagall-quick-launcher {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999990;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 30px;
+  padding: 10px 18px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+#disagall-quick-launcher:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 12px 32px rgba(37, 99, 235, 0.6);
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
 }
 
