@@ -1022,7 +1022,10 @@
   // src/controller/immersion_controller.js
   var isHeaderHovered = false;
   var isSliderInteracting = false;
-  var hasBoundStorageSync = false;
+  var isPaddingSavePending = false;
+  var paddingWriteSeq = 0;
+  var pendingSelfPaddingWrites = [];
+  var boundStorageOnChanged = null;
   var boundFullscreenDoc = null;
   var fullscreenTransitionSeq = 0;
   var inFlightRequestSeq = 0;
@@ -1030,6 +1033,14 @@
   var asyncPendingRequestCount = 0;
   var osFullscreenWanted = false;
   var hasObservedOsFullscreen = false;
+  var hasUserToggledFullscreenInSession = false;
+  var initialSettingsLoadSeq = 0;
+  var hasLocalPaddingEditSinceLoad = false;
+  var hasOnChangedSync = {
+    padding: false,
+    autoHideUi: false,
+    autoFullscreen: false
+  };
   function isOverlayActive() {
     const { overlayEl } = state.elements;
     return Boolean(overlayEl && overlayEl.classList.contains("active"));
@@ -1042,6 +1053,23 @@
   function resetImmersionGuards() {
     isHeaderHovered = false;
     isSliderInteracting = false;
+    isPaddingSavePending = false;
+    pendingSelfPaddingWrites = [];
+  }
+  function setPaddingSavePending(pending) {
+    isPaddingSavePending = Boolean(pending);
+  }
+  function markLocalPaddingModified() {
+    hasLocalPaddingEditSinceLoad = true;
+  }
+  function recordSelfPaddingWrite(padding) {
+    const normalized = normalizePaddingValue(padding);
+    if (normalized === null) return;
+    paddingWriteSeq += 1;
+    pendingSelfPaddingWrites.push({ seq: paddingWriteSeq, value: normalized });
+    if (pendingSelfPaddingWrites.length > 8) {
+      pendingSelfPaddingWrites.shift();
+    }
   }
   function isHeaderCursorHovering() {
     const { overlayEl } = state.elements;
@@ -1174,6 +1202,7 @@
     inFlightExitSeq = 0;
     osFullscreenWanted = false;
     hasObservedOsFullscreen = false;
+    hasUserToggledFullscreenInSession = false;
     state.isFullscreenMode = false;
     const { overlayEl } = state.elements;
     if (overlayEl) {
@@ -1357,6 +1386,7 @@
   }
   function toggleFullscreen() {
     if (!isOverlayActive()) return false;
+    hasUserToggledFullscreenInSession = true;
     if (getFullscreenElement()) {
       return exitFullscreenSafely();
     }
@@ -1387,6 +1417,22 @@
       }
     });
   }
+  function normalizePaddingValue(rawValue) {
+    if (typeof rawValue !== "number" || !Number.isFinite(rawValue)) return null;
+    return Math.min(100, Math.max(0, Math.round(rawValue)));
+  }
+  function applyPaddingSetting(padding, { refit = true } = {}) {
+    const normalized = normalizePaddingValue(padding);
+    if (normalized === null) return false;
+    state.currentPadding = normalized;
+    const { sliderEl, sliderValEl } = state.elements;
+    if (sliderEl) sliderEl.value = normalized;
+    if (sliderValEl) sliderValEl.textContent = `${normalized}px`;
+    if (refit && isOverlayActive() && !state.isFullscreenMode) {
+      syncFittingIfUnzoomed();
+    }
+    return true;
+  }
   function applyAutoFullscreenSetting(enabled) {
     state.autoFullscreen = Boolean(enabled);
     if (!state.autoFullscreen) {
@@ -1399,6 +1445,7 @@
     }
   }
   function applyAutoHideUiSetting(enabled) {
+    const prevAutoHide = state.autoHideUi;
     state.autoHideUi = Boolean(enabled);
     if (!isOverlayActive()) return;
     const { overlayEl } = state.elements;
@@ -1409,60 +1456,99 @@
       }
       return;
     }
-    if (!state.isUiHidden) {
+    const alreadyRunningOrHidden = Boolean(state.idleTimer) || state.isUiHidden || overlayEl.classList.contains("disagall-idle") || overlayEl.classList.contains("disagall-ui-hidden");
+    if (!state.isUiHidden && (!prevAutoHide || !alreadyRunningOrHidden)) {
       resetIdleTimer();
     }
   }
-  function loadInitialAutoHideSetting() {
+  function applyInitialSettingsResult(result) {
+    if (!result) return;
+    if (!hasOnChangedSync.padding && !hasLocalPaddingEditSinceLoad && !isSliderInteracting && !isPaddingSavePending) {
+      applyPaddingSetting(result[CONFIG.STORAGE_KEY_PADDING]);
+    }
+    const savedAutoHide = result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
+    if (!hasOnChangedSync.autoHideUi && typeof savedAutoHide === "boolean") {
+      applyAutoHideUiSetting(savedAutoHide);
+    }
+    const savedAutoFullscreen = result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN];
+    if (!hasOnChangedSync.autoFullscreen && typeof savedAutoFullscreen === "boolean") {
+      state.autoFullscreen = savedAutoFullscreen;
+      if (savedAutoFullscreen && isOverlayActive() && !state.isFullscreenMode && !isOverlayFullscreenElement() && !hasUserToggledFullscreenInSession) {
+        enterAutoFullscreenOnOpen();
+      }
+    }
+  }
+  function loadInitialSettings() {
+    const seq = ++initialSettingsLoadSeq;
+    hasLocalPaddingEditSinceLoad = false;
+    hasOnChangedSync = {
+      padding: false,
+      autoHideUi: false,
+      autoFullscreen: false
+    };
     const hasChromeSync = typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.get === "function";
     if (hasChromeSync) {
       chrome.storage.sync.get(
         {
+          [CONFIG.STORAGE_KEY_PADDING]: CONFIG.DEFAULT_PADDING,
           [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: true,
           [CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]: false
         },
         (result) => {
-          if (!result) return;
-          if (typeof result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI] === "boolean") {
-            applyAutoHideUiSetting(result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI]);
-          }
-          if (typeof result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN] === "boolean") {
-            applyAutoFullscreenSetting(result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]);
-          }
+          if (!result || seq !== initialSettingsLoadSeq) return;
+          applyInitialSettingsResult(result);
         }
       );
       return;
     }
     if (typeof GM_getValue === "function") {
-      const savedAutoHide = GM_getValue(CONFIG.STORAGE_KEY_AUTO_HIDE_UI, true);
-      if (typeof savedAutoHide === "boolean") {
-        applyAutoHideUiSetting(savedAutoHide);
-      }
-      const savedAutoFullscreen = GM_getValue(CONFIG.STORAGE_KEY_AUTO_FULLSCREEN, false);
-      if (typeof savedAutoFullscreen === "boolean") {
-        applyAutoFullscreenSetting(savedAutoFullscreen);
-      }
+      applyInitialSettingsResult({
+        [CONFIG.STORAGE_KEY_PADDING]: GM_getValue(CONFIG.STORAGE_KEY_PADDING, CONFIG.DEFAULT_PADDING),
+        [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: GM_getValue(CONFIG.STORAGE_KEY_AUTO_HIDE_UI, true),
+        [CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]: GM_getValue(CONFIG.STORAGE_KEY_AUTO_FULLSCREEN, false)
+      });
     }
   }
-  function bindAutoHideStorageListener() {
-    const canBindListener = !hasBoundStorageSync && typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.addListener === "function";
-    if (!canBindListener) return;
-    hasBoundStorageSync = true;
-    chrome.storage.onChanged.addListener((changes, areaName) => {
+  function consumeSupersededSelfPaddingEcho(normalizedValue) {
+    const matchIdx = pendingSelfPaddingWrites.findIndex((entry) => entry.value === normalizedValue);
+    if (matchIdx === -1) return false;
+    const matched = pendingSelfPaddingWrites[matchIdx];
+    pendingSelfPaddingWrites = pendingSelfPaddingWrites.filter((entry) => entry.seq > matched.seq);
+    return matched.seq < paddingWriteSeq;
+  }
+  function handleSyncPaddingChange(paddingChange) {
+    if (!paddingChange) return;
+    const normalized = normalizePaddingValue(paddingChange.newValue);
+    if (normalized === null) return;
+    if (isSliderInteracting || isPaddingSavePending) return;
+    if (consumeSupersededSelfPaddingEcho(normalized)) return;
+    hasOnChangedSync.padding = true;
+    applyPaddingSetting(normalized);
+  }
+  function bindImmersionStorageListener() {
+    const storageEvents = typeof chrome !== "undefined" && chrome.storage ? chrome.storage.onChanged : null;
+    if (!storageEvents || boundStorageOnChanged === storageEvents || typeof storageEvents.addListener !== "function") {
+      return;
+    }
+    boundStorageOnChanged = storageEvents;
+    storageEvents.addListener((changes, areaName) => {
       if (areaName !== "sync" || !changes) return;
+      handleSyncPaddingChange(changes[CONFIG.STORAGE_KEY_PADDING]);
       const autoHideChange = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
       if (autoHideChange && typeof autoHideChange.newValue === "boolean") {
+        hasOnChangedSync.autoHideUi = true;
         applyAutoHideUiSetting(autoHideChange.newValue);
       }
       const autoFullscreenChange = changes[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN];
       if (autoFullscreenChange && typeof autoFullscreenChange.newValue === "boolean") {
+        hasOnChangedSync.autoFullscreen = true;
         applyAutoFullscreenSetting(autoFullscreenChange.newValue);
       }
     });
   }
   function initImmersionSettings() {
-    loadInitialAutoHideSetting();
-    bindAutoHideStorageListener();
+    loadInitialSettings();
+    bindImmersionStorageListener();
     bindFullscreenChangeListener();
   }
   function bindHeaderHoverEvents(overlayEl) {
@@ -1689,15 +1775,23 @@
     }
   }
   function persistPaddingSetting() {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.set === "function") {
-      chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: state.currentPadding });
-      return;
-    }
-    if (typeof GM_setValue === "function") {
-      GM_setValue(CONFIG.STORAGE_KEY_PADDING, state.currentPadding);
+    const valueToSave = state.currentPadding;
+    recordSelfPaddingWrite(valueToSave);
+    setPaddingSavePending(true);
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.set === "function") {
+        chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: valueToSave });
+        return;
+      }
+      if (typeof GM_setValue === "function") {
+        GM_setValue(CONFIG.STORAGE_KEY_PADDING, valueToSave);
+      }
+    } finally {
+      setPaddingSavePending(false);
     }
   }
   function clearPaddingSaveTimer() {
+    setPaddingSavePending(false);
     if (!paddingSaveTimer) return false;
     clearTimeout(paddingSaveTimer);
     paddingSaveTimer = null;
@@ -1705,8 +1799,10 @@
   }
   function schedulePaddingSave() {
     clearPaddingSaveTimer();
+    setPaddingSavePending(true);
     paddingSaveTimer = setTimeout(() => {
       paddingSaveTimer = null;
+      setPaddingSavePending(false);
       persistPaddingSetting();
     }, PADDING_SAVE_DEBOUNCE_MS);
   }
@@ -1733,18 +1829,28 @@
     bindStopPropagationClick(prevBtnEl, () => navigate(-1));
     bindStopPropagationClick(nextBtnEl, () => navigate(1));
   }
+  function applySliderPaddingInput(rawValue, sliderValEl) {
+    const nextPadding = parseInt(rawValue, 10);
+    if (Number.isNaN(nextPadding)) return null;
+    state.currentPadding = Math.min(100, Math.max(0, nextPadding));
+    if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
+    markLocalPaddingModified();
+    applyFittingAndPadding();
+    return state.currentPadding;
+  }
   function bindPaddingSlider(sliderEl, sliderValEl) {
     if (!sliderEl) return;
     sliderEl.addEventListener("input", (e) => {
-      const nextPadding = parseInt(e.target.value, 10);
-      if (Number.isNaN(nextPadding)) return;
-      state.currentPadding = nextPadding;
-      if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
-      applyFittingAndPadding();
+      if (applySliderPaddingInput(e.target.value, sliderValEl) === null) return;
       resetIdleTimer();
       schedulePaddingSave();
     });
-    sliderEl.addEventListener("change", () => {
+    sliderEl.addEventListener("change", (e) => {
+      if (e && e.target && e.target.value !== void 0) {
+        applySliderPaddingInput(e.target.value, sliderValEl);
+      } else {
+        markLocalPaddingModified();
+      }
       clearPaddingSaveTimer();
       persistPaddingSetting();
     });
@@ -1913,18 +2019,6 @@
   // src/extension.js
   (function() {
     "use strict";
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync) {
-      chrome.storage.sync.get([CONFIG.STORAGE_KEY_PADDING], (result) => {
-        if (result && typeof result[CONFIG.STORAGE_KEY_PADDING] === "number") {
-          state.currentPadding = result[CONFIG.STORAGE_KEY_PADDING];
-          const { sliderEl, sliderValEl } = state.elements;
-          if (sliderEl) {
-            sliderEl.value = state.currentPadding;
-            if (sliderValEl) sliderValEl.textContent = state.currentPadding + "px";
-          }
-        }
-      });
-    }
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
       chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.action === "open_viewer") {

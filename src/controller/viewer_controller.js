@@ -34,6 +34,10 @@ import {
   toggleFullscreen,
   enterAutoFullscreenOnOpen,
   resetFullscreenState,
+  setPaddingSavePending,
+  markLocalPaddingModified,
+  recordSelfPaddingWrite,
+  applyPaddingSetting,
   applyAutoHideUiSetting,
   applyAutoFullscreenSetting,
   initImmersionSettings,
@@ -51,6 +55,7 @@ export {
   toggleFullscreen,
   enterAutoFullscreenOnOpen,
   resetFullscreenState,
+  applyPaddingSetting,
   applyAutoHideUiSetting,
   applyAutoFullscreenSetting,
   initImmersionSettings
@@ -263,16 +268,24 @@ export function handleKeyDown(e) {
 }
 
 function persistPaddingSetting() {
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.set === 'function') {
-    chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: state.currentPadding });
-    return;
-  }
-  if (typeof GM_setValue === 'function') {
-    GM_setValue(CONFIG.STORAGE_KEY_PADDING, state.currentPadding);
+  const valueToSave = state.currentPadding;
+  recordSelfPaddingWrite(valueToSave);
+  setPaddingSavePending(true);
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.set === 'function') {
+      chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: valueToSave });
+      return;
+    }
+    if (typeof GM_setValue === 'function') {
+      GM_setValue(CONFIG.STORAGE_KEY_PADDING, valueToSave);
+    }
+  } finally {
+    setPaddingSavePending(false);
   }
 }
 
 function clearPaddingSaveTimer() {
+  setPaddingSavePending(false);
   if (!paddingSaveTimer) return false;
   clearTimeout(paddingSaveTimer);
   paddingSaveTimer = null;
@@ -281,8 +294,10 @@ function clearPaddingSaveTimer() {
 
 function schedulePaddingSave() {
   clearPaddingSaveTimer();
+  setPaddingSavePending(true);
   paddingSaveTimer = setTimeout(() => {
     paddingSaveTimer = null;
+    setPaddingSavePending(false);
     persistPaddingSetting();
   }, PADDING_SAVE_DEBOUNCE_MS);
 }
@@ -313,20 +328,31 @@ function bindOverlayButtons() {
   bindStopPropagationClick(nextBtnEl, () => navigate(1));
 }
 
+function applySliderPaddingInput(rawValue, sliderValEl) {
+  const nextPadding = parseInt(rawValue, 10);
+  if (Number.isNaN(nextPadding)) return null;
+  state.currentPadding = Math.min(100, Math.max(0, nextPadding));
+  if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
+  markLocalPaddingModified();
+  applyFittingAndPadding();
+  return state.currentPadding;
+}
+
 function bindPaddingSlider(sliderEl, sliderValEl) {
   if (!sliderEl) return;
 
   sliderEl.addEventListener('input', (e) => {
-    const nextPadding = parseInt(e.target.value, 10);
-    if (Number.isNaN(nextPadding)) return;
-    state.currentPadding = nextPadding;
-    if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
-    applyFittingAndPadding();
+    if (applySliderPaddingInput(e.target.value, sliderValEl) === null) return;
     resetIdleTimer();
     schedulePaddingSave();
   });
 
-  sliderEl.addEventListener('change', () => {
+  sliderEl.addEventListener('change', (e) => {
+    if (e && e.target && e.target.value !== undefined) {
+      applySliderPaddingInput(e.target.value, sliderValEl);
+    } else {
+      markLocalPaddingModified();
+    }
     clearPaddingSaveTimer();
     persistPaddingSetting();
   });

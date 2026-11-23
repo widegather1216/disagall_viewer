@@ -1035,7 +1035,10 @@
   // src/controller/immersion_controller.js
   var isHeaderHovered = false;
   var isSliderInteracting = false;
-  var hasBoundStorageSync = false;
+  var isPaddingSavePending = false;
+  var paddingWriteSeq = 0;
+  var pendingSelfPaddingWrites = [];
+  var boundStorageOnChanged = null;
   var boundFullscreenDoc = null;
   var fullscreenTransitionSeq = 0;
   var inFlightRequestSeq = 0;
@@ -1043,6 +1046,14 @@
   var asyncPendingRequestCount = 0;
   var osFullscreenWanted = false;
   var hasObservedOsFullscreen = false;
+  var hasUserToggledFullscreenInSession = false;
+  var initialSettingsLoadSeq = 0;
+  var hasLocalPaddingEditSinceLoad = false;
+  var hasOnChangedSync = {
+    padding: false,
+    autoHideUi: false,
+    autoFullscreen: false
+  };
   function isOverlayActive() {
     const { overlayEl } = state.elements;
     return Boolean(overlayEl && overlayEl.classList.contains("active"));
@@ -1055,6 +1066,23 @@
   function resetImmersionGuards() {
     isHeaderHovered = false;
     isSliderInteracting = false;
+    isPaddingSavePending = false;
+    pendingSelfPaddingWrites = [];
+  }
+  function setPaddingSavePending(pending) {
+    isPaddingSavePending = Boolean(pending);
+  }
+  function markLocalPaddingModified() {
+    hasLocalPaddingEditSinceLoad = true;
+  }
+  function recordSelfPaddingWrite(padding) {
+    const normalized = normalizePaddingValue(padding);
+    if (normalized === null) return;
+    paddingWriteSeq += 1;
+    pendingSelfPaddingWrites.push({ seq: paddingWriteSeq, value: normalized });
+    if (pendingSelfPaddingWrites.length > 8) {
+      pendingSelfPaddingWrites.shift();
+    }
   }
   function isHeaderCursorHovering() {
     const { overlayEl } = state.elements;
@@ -1187,6 +1215,7 @@
     inFlightExitSeq = 0;
     osFullscreenWanted = false;
     hasObservedOsFullscreen = false;
+    hasUserToggledFullscreenInSession = false;
     state.isFullscreenMode = false;
     const { overlayEl } = state.elements;
     if (overlayEl) {
@@ -1370,6 +1399,7 @@
   }
   function toggleFullscreen() {
     if (!isOverlayActive()) return false;
+    hasUserToggledFullscreenInSession = true;
     if (getFullscreenElement()) {
       return exitFullscreenSafely();
     }
@@ -1400,6 +1430,22 @@
       }
     });
   }
+  function normalizePaddingValue(rawValue) {
+    if (typeof rawValue !== "number" || !Number.isFinite(rawValue)) return null;
+    return Math.min(100, Math.max(0, Math.round(rawValue)));
+  }
+  function applyPaddingSetting(padding, { refit = true } = {}) {
+    const normalized = normalizePaddingValue(padding);
+    if (normalized === null) return false;
+    state.currentPadding = normalized;
+    const { sliderEl, sliderValEl } = state.elements;
+    if (sliderEl) sliderEl.value = normalized;
+    if (sliderValEl) sliderValEl.textContent = `${normalized}px`;
+    if (refit && isOverlayActive() && !state.isFullscreenMode) {
+      syncFittingIfUnzoomed();
+    }
+    return true;
+  }
   function applyAutoFullscreenSetting(enabled) {
     state.autoFullscreen = Boolean(enabled);
     if (!state.autoFullscreen) {
@@ -1412,6 +1458,7 @@
     }
   }
   function applyAutoHideUiSetting(enabled) {
+    const prevAutoHide = state.autoHideUi;
     state.autoHideUi = Boolean(enabled);
     if (!isOverlayActive()) return;
     const { overlayEl } = state.elements;
@@ -1422,60 +1469,99 @@
       }
       return;
     }
-    if (!state.isUiHidden) {
+    const alreadyRunningOrHidden = Boolean(state.idleTimer) || state.isUiHidden || overlayEl.classList.contains("disagall-idle") || overlayEl.classList.contains("disagall-ui-hidden");
+    if (!state.isUiHidden && (!prevAutoHide || !alreadyRunningOrHidden)) {
       resetIdleTimer();
     }
   }
-  function loadInitialAutoHideSetting() {
+  function applyInitialSettingsResult(result) {
+    if (!result) return;
+    if (!hasOnChangedSync.padding && !hasLocalPaddingEditSinceLoad && !isSliderInteracting && !isPaddingSavePending) {
+      applyPaddingSetting(result[CONFIG.STORAGE_KEY_PADDING]);
+    }
+    const savedAutoHide = result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
+    if (!hasOnChangedSync.autoHideUi && typeof savedAutoHide === "boolean") {
+      applyAutoHideUiSetting(savedAutoHide);
+    }
+    const savedAutoFullscreen = result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN];
+    if (!hasOnChangedSync.autoFullscreen && typeof savedAutoFullscreen === "boolean") {
+      state.autoFullscreen = savedAutoFullscreen;
+      if (savedAutoFullscreen && isOverlayActive() && !state.isFullscreenMode && !isOverlayFullscreenElement() && !hasUserToggledFullscreenInSession) {
+        enterAutoFullscreenOnOpen();
+      }
+    }
+  }
+  function loadInitialSettings() {
+    const seq = ++initialSettingsLoadSeq;
+    hasLocalPaddingEditSinceLoad = false;
+    hasOnChangedSync = {
+      padding: false,
+      autoHideUi: false,
+      autoFullscreen: false
+    };
     const hasChromeSync = typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.get === "function";
     if (hasChromeSync) {
       chrome.storage.sync.get(
         {
+          [CONFIG.STORAGE_KEY_PADDING]: CONFIG.DEFAULT_PADDING,
           [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: true,
           [CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]: false
         },
         (result) => {
-          if (!result) return;
-          if (typeof result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI] === "boolean") {
-            applyAutoHideUiSetting(result[CONFIG.STORAGE_KEY_AUTO_HIDE_UI]);
-          }
-          if (typeof result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN] === "boolean") {
-            applyAutoFullscreenSetting(result[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]);
-          }
+          if (!result || seq !== initialSettingsLoadSeq) return;
+          applyInitialSettingsResult(result);
         }
       );
       return;
     }
     if (typeof GM_getValue === "function") {
-      const savedAutoHide = GM_getValue(CONFIG.STORAGE_KEY_AUTO_HIDE_UI, true);
-      if (typeof savedAutoHide === "boolean") {
-        applyAutoHideUiSetting(savedAutoHide);
-      }
-      const savedAutoFullscreen = GM_getValue(CONFIG.STORAGE_KEY_AUTO_FULLSCREEN, false);
-      if (typeof savedAutoFullscreen === "boolean") {
-        applyAutoFullscreenSetting(savedAutoFullscreen);
-      }
+      applyInitialSettingsResult({
+        [CONFIG.STORAGE_KEY_PADDING]: GM_getValue(CONFIG.STORAGE_KEY_PADDING, CONFIG.DEFAULT_PADDING),
+        [CONFIG.STORAGE_KEY_AUTO_HIDE_UI]: GM_getValue(CONFIG.STORAGE_KEY_AUTO_HIDE_UI, true),
+        [CONFIG.STORAGE_KEY_AUTO_FULLSCREEN]: GM_getValue(CONFIG.STORAGE_KEY_AUTO_FULLSCREEN, false)
+      });
     }
   }
-  function bindAutoHideStorageListener() {
-    const canBindListener = !hasBoundStorageSync && typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.addListener === "function";
-    if (!canBindListener) return;
-    hasBoundStorageSync = true;
-    chrome.storage.onChanged.addListener((changes, areaName) => {
+  function consumeSupersededSelfPaddingEcho(normalizedValue) {
+    const matchIdx = pendingSelfPaddingWrites.findIndex((entry) => entry.value === normalizedValue);
+    if (matchIdx === -1) return false;
+    const matched = pendingSelfPaddingWrites[matchIdx];
+    pendingSelfPaddingWrites = pendingSelfPaddingWrites.filter((entry) => entry.seq > matched.seq);
+    return matched.seq < paddingWriteSeq;
+  }
+  function handleSyncPaddingChange(paddingChange) {
+    if (!paddingChange) return;
+    const normalized = normalizePaddingValue(paddingChange.newValue);
+    if (normalized === null) return;
+    if (isSliderInteracting || isPaddingSavePending) return;
+    if (consumeSupersededSelfPaddingEcho(normalized)) return;
+    hasOnChangedSync.padding = true;
+    applyPaddingSetting(normalized);
+  }
+  function bindImmersionStorageListener() {
+    const storageEvents = typeof chrome !== "undefined" && chrome.storage ? chrome.storage.onChanged : null;
+    if (!storageEvents || boundStorageOnChanged === storageEvents || typeof storageEvents.addListener !== "function") {
+      return;
+    }
+    boundStorageOnChanged = storageEvents;
+    storageEvents.addListener((changes, areaName) => {
       if (areaName !== "sync" || !changes) return;
+      handleSyncPaddingChange(changes[CONFIG.STORAGE_KEY_PADDING]);
       const autoHideChange = changes[CONFIG.STORAGE_KEY_AUTO_HIDE_UI];
       if (autoHideChange && typeof autoHideChange.newValue === "boolean") {
+        hasOnChangedSync.autoHideUi = true;
         applyAutoHideUiSetting(autoHideChange.newValue);
       }
       const autoFullscreenChange = changes[CONFIG.STORAGE_KEY_AUTO_FULLSCREEN];
       if (autoFullscreenChange && typeof autoFullscreenChange.newValue === "boolean") {
+        hasOnChangedSync.autoFullscreen = true;
         applyAutoFullscreenSetting(autoFullscreenChange.newValue);
       }
     });
   }
   function initImmersionSettings() {
-    loadInitialAutoHideSetting();
-    bindAutoHideStorageListener();
+    loadInitialSettings();
+    bindImmersionStorageListener();
     bindFullscreenChangeListener();
   }
   function bindHeaderHoverEvents(overlayEl) {
@@ -1702,15 +1788,23 @@
     }
   }
   function persistPaddingSetting() {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.set === "function") {
-      chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: state.currentPadding });
-      return;
-    }
-    if (typeof GM_setValue === "function") {
-      GM_setValue(CONFIG.STORAGE_KEY_PADDING, state.currentPadding);
+    const valueToSave = state.currentPadding;
+    recordSelfPaddingWrite(valueToSave);
+    setPaddingSavePending(true);
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.set === "function") {
+        chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: valueToSave });
+        return;
+      }
+      if (typeof GM_setValue === "function") {
+        GM_setValue(CONFIG.STORAGE_KEY_PADDING, valueToSave);
+      }
+    } finally {
+      setPaddingSavePending(false);
     }
   }
   function clearPaddingSaveTimer() {
+    setPaddingSavePending(false);
     if (!paddingSaveTimer) return false;
     clearTimeout(paddingSaveTimer);
     paddingSaveTimer = null;
@@ -1718,8 +1812,10 @@
   }
   function schedulePaddingSave() {
     clearPaddingSaveTimer();
+    setPaddingSavePending(true);
     paddingSaveTimer = setTimeout(() => {
       paddingSaveTimer = null;
+      setPaddingSavePending(false);
       persistPaddingSetting();
     }, PADDING_SAVE_DEBOUNCE_MS);
   }
@@ -1746,18 +1842,28 @@
     bindStopPropagationClick(prevBtnEl, () => navigate(-1));
     bindStopPropagationClick(nextBtnEl, () => navigate(1));
   }
+  function applySliderPaddingInput(rawValue, sliderValEl) {
+    const nextPadding = parseInt(rawValue, 10);
+    if (Number.isNaN(nextPadding)) return null;
+    state.currentPadding = Math.min(100, Math.max(0, nextPadding));
+    if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
+    markLocalPaddingModified();
+    applyFittingAndPadding();
+    return state.currentPadding;
+  }
   function bindPaddingSlider(sliderEl, sliderValEl) {
     if (!sliderEl) return;
     sliderEl.addEventListener("input", (e) => {
-      const nextPadding = parseInt(e.target.value, 10);
-      if (Number.isNaN(nextPadding)) return;
-      state.currentPadding = nextPadding;
-      if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
-      applyFittingAndPadding();
+      if (applySliderPaddingInput(e.target.value, sliderValEl) === null) return;
       resetIdleTimer();
       schedulePaddingSave();
     });
-    sliderEl.addEventListener("change", () => {
+    sliderEl.addEventListener("change", (e) => {
+      if (e && e.target && e.target.value !== void 0) {
+        applySliderPaddingInput(e.target.value, sliderValEl);
+      } else {
+        markLocalPaddingModified();
+      }
       clearPaddingSaveTimer();
       persistPaddingSetting();
     });
@@ -1933,12 +2039,6 @@
         const style = document.createElement("style");
         style.textContent = '/* Disagall Viewer Overlay Styles */\n#disagall-viewer-overlay {\n  position: fixed;\n  top: 0;\n  left: 0;\n  width: 100vw;\n  height: 100vh;\n  background-color: rgba(8, 9, 12, 0.96);\n  backdrop-filter: blur(16px);\n  -webkit-backdrop-filter: blur(16px);\n  z-index: 99999999;\n  display: flex;\n  flex-direction: column;\n  justify-content: space-between;\n  align-items: center;\n  user-select: none;\n  opacity: 0;\n  visibility: hidden;\n  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s;\n  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;\n  box-sizing: border-box;\n  color: #f0f2f5;\n  overflow: hidden;\n}\n\n#disagall-viewer-overlay.active {\n  opacity: 1;\n  visibility: visible;\n}\n\n/* Header Controls Bar */\n.disagall-header {\n  position: absolute;\n  top: 0;\n  left: 0;\n  width: 100%;\n  padding: 12px 24px;\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);\n  z-index: 10;\n  box-sizing: border-box;\n  opacity: 1;\n  pointer-events: auto;\n  transition: opacity 0.15s ease;\n}\n\n.disagall-header-left {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n}\n\n.disagall-title {\n  font-size: 15px;\n  font-weight: 700;\n  letter-spacing: -0.3px;\n  color: #3b82f6;\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.disagall-counter {\n  font-size: 14px;\n  font-weight: 600;\n  background: rgba(255, 255, 255, 0.12);\n  padding: 4px 10px;\n  border-radius: 20px;\n  color: #e2e8f0;\n}\n\n.disagall-info-badge {\n  font-size: 12px;\n  font-weight: 500;\n  color: #94a3b8;\n  background: rgba(255, 255, 255, 0.06);\n  padding: 3px 8px;\n  border-radius: 6px;\n  border: 1px solid rgba(255, 255, 255, 0.08);\n}\n\n.disagall-header-center {\n  display: flex;\n  align-items: center;\n  gap: 16px;\n  background: rgba(20, 24, 33, 0.85);\n  border: 1px solid rgba(255, 255, 255, 0.1);\n  padding: 6px 16px;\n  border-radius: 30px;\n  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);\n}\n\n.disagall-padding-control {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 13px;\n  color: #cbd5e1;\n}\n\n.disagall-slider-label {\n  font-weight: 500;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n\n.disagall-slider {\n  -webkit-appearance: none;\n  appearance: none;\n  width: 110px;\n  height: 4px;\n  border-radius: 2px;\n  background: #334155;\n  outline: none;\n  cursor: pointer;\n}\n\n.disagall-slider::-webkit-slider-thumb {\n  -webkit-appearance: none;\n  appearance: none;\n  width: 14px;\n  height: 14px;\n  border-radius: 50%;\n  background: #3b82f6;\n  cursor: pointer;\n  transition: transform 0.15s ease, background-color 0.15s ease;\n}\n\n.disagall-slider::-webkit-slider-thumb:hover {\n  transform: scale(1.25);\n  background: #60a5fa;\n}\n\n.disagall-padding-val {\n  min-width: 38px;\n  font-weight: 600;\n  font-size: 12px;\n  color: #60a5fa;\n  text-align: right;\n}\n\n.disagall-header-right {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n\n.disagall-btn {\n  background: rgba(255, 255, 255, 0.08);\n  border: 1px solid rgba(255, 255, 255, 0.12);\n  color: #f1f5f9;\n  border-radius: 8px;\n  padding: 6px 12px;\n  font-size: 13px;\n  font-weight: 500;\n  cursor: pointer;\n  display: flex;\n  align-items: center;\n  gap: 5px;\n  transition: all 0.15s ease;\n}\n\n.disagall-btn:hover {\n  background: rgba(255, 255, 255, 0.18);\n  border-color: rgba(255, 255, 255, 0.25);\n  transform: translateY(-1px);\n}\n\n.disagall-btn-recommend {\n  background: rgba(59, 130, 246, 0.2);\n  border-color: rgba(96, 165, 250, 0.45);\n  color: #93c5fd;\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  font-weight: 600;\n  padding: 6px 13px;\n  transition: all 0.2s ease;\n}\n\n.disagall-btn-recommend:hover {\n  background: rgba(59, 130, 246, 0.38);\n  border-color: rgba(96, 165, 250, 0.75);\n  color: #ffffff;\n  transform: translateY(-1px);\n}\n\n.disagall-btn-recommend:active,\n.disagall-btn-recommend.voted {\n  background: #2563eb;\n  border-color: #3b82f6;\n  color: #ffffff;\n  transform: scale(0.96);\n}\n\n.disagall-btn-recommend svg {\n  flex-shrink: 0;\n  transition: transform 0.2s ease;\n}\n\n.disagall-btn-recommend:hover svg {\n  transform: scale(1.18) rotate(-6deg);\n}\n\n.disagall-btn-fullscreen {\n  background: rgba(255, 255, 255, 0.08);\n  border-color: rgba(255, 255, 255, 0.14);\n  color: #e2e8f0;\n}\n\n.disagall-btn-fullscreen.active {\n  background: rgba(59, 130, 246, 0.3);\n  border-color: rgba(96, 165, 250, 0.65);\n  color: #ffffff;\n}\n\n.disagall-btn-close {\n  background: rgba(239, 68, 68, 0.2);\n  border-color: rgba(239, 68, 68, 0.35);\n  color: #fca5a5;\n  font-size: 16px;\n  font-weight: bold;\n  padding: 6px 14px;\n}\n\n.disagall-btn-close:hover {\n  background: rgba(239, 68, 68, 0.4);\n  color: #ffffff;\n}\n\n/* Stage & Main Photo Area */\n.disagall-stage {\n  flex: 1;\n  width: 100%;\n  height: 100%;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  position: relative;\n  overflow: hidden;\n  box-sizing: border-box;\n  transition: padding-top 0.25s ease, padding-bottom 0.25s ease;\n  /* Dynamic padding set via JS based on UI visibility, slider & aspect ratio */\n}\n\n.disagall-img-wrapper {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  width: 100%;\n  height: 100%;\n  position: relative;\n  transition: all 0.2s ease-out;\n}\n\n.disagall-img {\n  display: block;\n  object-fit: contain;\n  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);\n  border-radius: 2px;\n  transition: max-width 0.15s ease, max-height 0.15s ease, opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);\n  will-change: transform, max-width, max-height;\n}\n\n/* Orientation Specific Fitting Helper Classes */\n.disagall-img.portrait {\n  /* Vertical photo: strictly fit height, horizontal padding automatic */\n  height: 100%;\n  width: auto;\n}\n\n.disagall-img.landscape {\n  /* Horizontal photo: strictly fit width, vertical padding automatic */\n  width: 100%;\n  height: auto;\n}\n\n/* Navigation Arrow Buttons */\n.disagall-nav-btn {\n  position: absolute;\n  top: 50%;\n  transform: translateY(-50%);\n  width: 54px;\n  height: 90px;\n  background: rgba(15, 17, 23, 0.4);\n  border: 1px solid rgba(255, 255, 255, 0.08);\n  color: #ffffff;\n  display: flex;\n  flex-direction: column;\n  justify-content: center;\n  align-items: center;\n  cursor: pointer;\n  z-index: 20;\n  opacity: 1;\n  pointer-events: auto;\n  transition: background 0.2s ease, border-color 0.2s ease, width 0.2s ease, opacity 0.15s ease;\n  backdrop-filter: blur(8px);\n  -webkit-backdrop-filter: blur(8px);\n}\n\n.disagall-nav-btn-prev {\n  left: 0;\n  border-top-right-radius: 12px;\n  border-bottom-right-radius: 12px;\n  border-left: none;\n}\n\n.disagall-nav-btn-next {\n  right: 0;\n  border-top-left-radius: 12px;\n  border-bottom-left-radius: 12px;\n  border-right: none;\n}\n\n.disagall-nav-btn:hover {\n  background: rgba(30, 41, 59, 0.85);\n  border-color: rgba(59, 130, 246, 0.4);\n  width: 64px;\n}\n\n.disagall-nav-btn svg {\n  width: 24px;\n  height: 24px;\n  fill: currentColor;\n}\n\n.disagall-nav-hint {\n  font-size: 10px;\n  font-weight: 600;\n  color: #94a3b8;\n  margin-top: 4px;\n}\n\n.disagall-nav-btn.disabled {\n  opacity: 0.25;\n  cursor: not-allowed;\n  pointer-events: none;\n}\n\n/* Footer & Hints */\n.disagall-footer {\n  position: absolute;\n  bottom: 0;\n  left: 0;\n  width: 100%;\n  padding: 10px 24px;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 100%);\n  z-index: 10;\n  box-sizing: border-box;\n  opacity: 1;\n  pointer-events: auto;\n  transition: opacity 0.15s ease;\n}\n\n.disagall-keyhints {\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: center;\n  gap: 8px 16px;\n  font-size: 12px;\n  color: #94a3b8;\n}\n\n.disagall-keyhint {\n  display: flex;\n  align-items: center;\n  gap: 5px;\n}\n\n.disagall-kbd {\n  background: rgba(255, 255, 255, 0.12);\n  border: 1px solid rgba(255, 255, 255, 0.18);\n  border-radius: 4px;\n  padding: 2px 6px;\n  font-size: 11px;\n  font-weight: 600;\n  color: #f1f5f9;\n  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);\n}\n\n/* Loader Animation */\n.disagall-loader {\n  position: absolute;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 12px;\n  color: #60a5fa;\n  font-size: 14px;\n  font-weight: 500;\n  z-index: 15;\n}\n\n.disagall-spinner {\n  width: 40px;\n  height: 40px;\n  border: 3px solid rgba(59, 130, 246, 0.2);\n  border-top-color: #3b82f6;\n  border-radius: 50%;\n  animation: disagall-spin 0.8s linear infinite;\n}\n\n@keyframes disagall-spin {\n  to { transform: rotate(360deg); }\n}\n\n/* Toast Notification */\n.disagall-toast {\n  position: absolute;\n  top: 72px;\n  left: 50%;\n  transform: translateX(-50%) translateY(-10px);\n  background: rgba(15, 23, 42, 0.92);\n  border: 1px solid rgba(255, 255, 255, 0.18);\n  color: #f8fafc;\n  padding: 8px 18px;\n  border-radius: 20px;\n  font-size: 13px;\n  font-weight: 500;\n  letter-spacing: -0.3px;\n  pointer-events: none;\n  opacity: 0;\n  visibility: hidden;\n  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;\n  z-index: 100;\n  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);\n}\n\n.disagall-toast.show {\n  opacity: 1;\n  visibility: visible;\n  transform: translateX(-50%) translateY(0);\n}\n\n/* No Photo Notice Floating Banner (When navigating into a post without photos / no photo tab) */\n.disagall-no-photo-notice {\n  position: fixed;\n  top: 24px;\n  left: 50%;\n  transform: translateX(-50%);\n  background: rgba(15, 23, 42, 0.94);\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n  border: 1px solid rgba(255, 255, 255, 0.15);\n  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.2);\n  color: #f8fafc;\n  padding: 10px 18px;\n  border-radius: 30px;\n  display: flex;\n  align-items: center;\n  gap: 16px;\n  z-index: 99999999;\n  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;\n  font-size: 13px;\n  font-weight: 500;\n  animation: disagall-slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1);\n}\n\n@keyframes disagall-slide-down {\n  from {\n    opacity: 0;\n    transform: translateX(-50%) translateY(-12px);\n  }\n  to {\n    opacity: 1;\n    transform: translateX(-50%) translateY(0);\n  }\n}\n\n.disagall-notice-content {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.disagall-notice-icon {\n  font-size: 16px;\n}\n\n.disagall-notice-text {\n  color: #e2e8f0;\n  letter-spacing: -0.2px;\n}\n\n.disagall-notice-btns {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.disagall-notice-btn {\n  background: rgba(255, 255, 255, 0.1);\n  border: 1px solid rgba(255, 255, 255, 0.14);\n  color: #f1f5f9;\n  border-radius: 14px;\n  padding: 4px 10px;\n  font-size: 12px;\n  font-weight: 600;\n  cursor: pointer;\n  transition: all 0.15s ease;\n}\n\n.disagall-notice-btn:hover {\n  background: #3b82f6;\n  border-color: #60a5fa;\n  color: #ffffff;\n}\n\n.disagall-notice-btn.close {\n  background: transparent;\n  border: none;\n  color: #94a3b8;\n  padding: 4px 8px;\n}\n\n.disagall-notice-btn.close:hover {\n  color: #ffffff;\n}\n\n/* Immersion Mode (Idle Auto-Hide & Manual Toggle) */\n#disagall-viewer-overlay.disagall-idle,\n#disagall-viewer-overlay.disagall-ui-hidden {\n  cursor: none;\n}\n\n/* Override inline cursor on image/controls while hidden, preserving grabbing cursor during zoom pan drag */\n#disagall-viewer-overlay.disagall-idle *:not([style*="grabbing"]),\n#disagall-viewer-overlay.disagall-ui-hidden *:not([style*="grabbing"]) {\n  cursor: none !important;\n}\n\n#disagall-viewer-overlay.disagall-idle .disagall-header,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-header,\n#disagall-viewer-overlay.disagall-idle .disagall-footer,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-footer,\n#disagall-viewer-overlay.disagall-idle .disagall-nav-btn,\n#disagall-viewer-overlay.disagall-ui-hidden .disagall-nav-btn {\n  opacity: 0;\n  pointer-events: none;\n  transition: opacity 0.3s ease;\n}\n\n';
         document.head.appendChild(style);
-      }
-    }
-    if (typeof GM_getValue !== "undefined") {
-      const savedPadding = GM_getValue(CONFIG.STORAGE_KEY_PADDING, CONFIG.DEFAULT_PADDING);
-      if (typeof savedPadding === "number") {
-        state.currentPadding = savedPadding;
       }
     }
     function initQuickLauncher() {

@@ -1,5 +1,4 @@
 // Disagall Viewer - Safari / Tampermonkey Userscript Entry
-import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { isPostBodyImage, getBestImgUrl } from './parser/image_parser.js';
 import { openViewer, initViewerBase, isOverlayActive } from './controller/viewer_controller.js';
@@ -15,14 +14,6 @@ import { openViewer, initViewerBase, isOverlayActive } from './controller/viewer
       const style = document.createElement('style');
       style.textContent = __INJECTED_CSS__;
       document.head.appendChild(style);
-    }
-  }
-
-  // Load saved padding setting from Tampermonkey GM storage
-  if (typeof GM_getValue !== 'undefined') {
-    const savedPadding = GM_getValue(CONFIG.STORAGE_KEY_PADDING, CONFIG.DEFAULT_PADDING);
-    if (typeof savedPadding === 'number') {
-      state.currentPadding = savedPadding;
     }
   }
 
