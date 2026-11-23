@@ -1785,13 +1785,19 @@
     setupZoomEvents(mainImgEl);
     window.addEventListener("keydown", handleKeyDown, true);
   }
-  function findTargetImageIndex(targetSrc) {
-    const searchUrl = targetSrc ? getCleanOriginalUrl(targetSrc) : state.lastRightClickedImgSrc;
-    if (!searchUrl) return 0;
-    const foundIdx = state.postImages.findIndex(
+  function findImageIndexByUrl(searchUrl) {
+    if (!searchUrl) return -1;
+    return state.postImages.findIndex(
       (item) => item.url === searchUrl || searchUrl.includes(item.url) || item.url.includes(searchUrl)
     );
-    return foundIdx !== -1 ? foundIdx : 0;
+  }
+  function findTargetImageIndex(targetSrc) {
+    if (targetSrc) {
+      const directIdx = findImageIndexByUrl(getCleanOriginalUrl(targetSrc));
+      if (directIdx !== -1) return directIdx;
+    }
+    const fallbackIdx = findImageIndexByUrl(state.lastRightClickedImgSrc);
+    return fallbackIdx !== -1 ? fallbackIdx : 0;
   }
   function openViewer(targetSrc, isAuto = false) {
     forcePreloadPostImages();
@@ -1875,7 +1881,7 @@
     document.addEventListener("contextmenu", (e) => {
       const target = e.target;
       if (target && target.tagName === "IMG" && isPostBodyImage(target)) {
-        state.lastRightClickedImgSrc = getCleanOriginalUrl(target.src);
+        state.lastRightClickedImgSrc = getBestImgUrl(target);
         return;
       }
       state.lastRightClickedImgSrc = null;
