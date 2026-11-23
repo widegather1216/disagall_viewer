@@ -985,9 +985,538 @@ async function runDefect03Tests() {
   }
 }
 
+// Test 10: DEFECT-04 navigatePost() pending timer/sessionStorage cancellation & startAutoOpenPolling() orphan interval guard
+async function runDefect04Tests() {
+  const { state } = await import('../src/state.js');
+  const { CONFIG } = await import('../src/config.js');
+  const {
+    navigatePost,
+    openViewer,
+    closeViewer,
+    checkAutoOpen,
+    initViewerBase,
+  } = await import('../src/controller/viewer_controller.js');
+
+  const origWindow = global.window;
+  const origDocument = global.document;
+  const origSessionStorage = global.sessionStorage;
+  const origSetTimeout = global.setTimeout;
+  const origClearTimeout = global.clearTimeout;
+  const origSetInterval = global.setInterval;
+  const origClearInterval = global.clearInterval;
+  const origRequestAnimationFrame = global.requestAnimationFrame;
+  const origCancelAnimationFrame = global.cancelAnimationFrame;
+  const origImage = global.Image;
+  const origAlert = global.alert;
+
+  const prevStateSnapshot = {
+    postImages: state.postImages,
+    currentIndex: state.currentIndex,
+    lastRightClickedImgSrc: state.lastRightClickedImgSrc,
+    previousBodyOverflow: state.previousBodyOverflow,
+    toastTimer: state.toastTimer,
+    noPhotoNoticeTimer: state.noPhotoNoticeTimer,
+    postNavTimer: state.postNavTimer,
+    autoOpenPollTimer: state.autoOpenPollTimer,
+    idleTimer: state.idleTimer,
+    elements: { ...state.elements },
+  };
+
+  function makeClassList(initial = []) {
+    const set = new Set(initial);
+    return {
+      add: (...c) => c.forEach((n) => set.add(n)),
+      remove: (...c) => c.forEach((n) => set.delete(n)),
+      toggle: (n, force) => {
+        if (force === undefined) {
+          if (set.has(n)) { set.delete(n); return false; }
+          set.add(n); return true;
+        }
+        if (force) set.add(n); else set.delete(n);
+        return Boolean(force);
+      },
+      contains: (n) => set.has(n),
+    };
+  }
+
+  function createDefect04Env() {
+    const timeouts = new Map();
+    const intervals = new Map();
+    let nextTimerId = 1;
+    let nextIntervalId = 1;
+    const winListeners = new Map();
+    const docListeners = new Map();
+    const storageMap = new Map();
+    const navHistory = [];
+    let currentHref = 'https://gall.dcinside.com/mgallery/board/view/?id=pic&no=10';
+    let alertMessages = [];
+    let bodyImages = [];
+    let boardRows = [];
+    let bodyChildren = [];
+
+    function makeNode(tagName, id = '', classes = []) {
+      const attrs = {};
+      const listeners = {};
+      let htmlCache = '';
+      const node = {
+        tagName: tagName.toUpperCase(),
+        id,
+        className: classes.join(' '),
+        classList: makeClassList(classes),
+        style: {},
+        dataset: {},
+        children: [],
+        parentElement: null,
+        parentNode: null,
+        textContent: '',
+        src: '',
+        currentSrc: '',
+        alt: '',
+        title: '',
+        value: '24',
+        offsetHeight: 40,
+        naturalWidth: 1200,
+        naturalHeight: 900,
+        addEventListener(ev, fn) {
+          if (!listeners[ev]) listeners[ev] = [];
+          listeners[ev].push(fn);
+        },
+        dispatchEvent(evObj) {
+          (listeners[evObj.type] || []).forEach((fn) => fn(evObj));
+        },
+        setAttribute(k, v) {
+          attrs[k] = String(v);
+          if (k === 'id') node.id = String(v);
+        },
+        getAttribute(k) {
+          return Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null;
+        },
+        hasAttribute(k) {
+          return Object.prototype.hasOwnProperty.call(attrs, k);
+        },
+        appendChild(child) {
+          child.parentElement = node;
+          child.parentNode = node;
+          node.children.push(child);
+          return child;
+        },
+        remove() {
+          if (node.parentNode) {
+            bodyChildren = bodyChildren.filter((c) => c !== node);
+            node.parentNode = null;
+          }
+        },
+        closest() { return null; },
+        matches() { return false; },
+        contains(other) {
+          if (other === node) return true;
+          return node.children.some((c) => c.contains && c.contains(other));
+        },
+        querySelector(sel) {
+          return node.querySelectorAll(sel)[0] || null;
+        },
+        querySelectorAll(sel) {
+          const idMatches = [];
+          const walk = (cur) => {
+            for (const c of cur.children) {
+              if (sel.startsWith('#') && c.id === sel.slice(1)) idMatches.push(c);
+              else if (sel.startsWith('.') && c.classList.contains(sel.slice(1))) idMatches.push(c);
+              walk(c);
+            }
+          };
+          walk(node);
+          return idMatches;
+        },
+      };
+      Object.defineProperty(node, 'innerHTML', {
+        get: () => htmlCache,
+        set: (html) => {
+          htmlCache = html;
+          node.children = [];
+          if (html.includes('disagall-stage')) {
+            const header = makeNode('div', '', ['disagall-header']);
+            const counter = makeNode('span', 'disagall-counter');
+            const infoBadge = makeNode('span', 'disagall-info-badge');
+            const slider = makeNode('input', 'disagall-padding-slider');
+            const sliderVal = makeNode('span', 'disagall-padding-val');
+            const recBtn = makeNode('button', 'disagall-btn-recommend');
+            const fsBtn = makeNode('button', 'disagall-btn-fullscreen');
+            const closeBtn = makeNode('button', 'disagall-close-btn');
+            header.appendChild(counter);
+            header.appendChild(infoBadge);
+            header.appendChild(slider);
+            header.appendChild(sliderVal);
+            header.appendChild(recBtn);
+            header.appendChild(fsBtn);
+            header.appendChild(closeBtn);
+
+            const stage = makeNode('div', 'disagall-stage');
+            const wrapper = makeNode('div', 'disagall-img-wrapper');
+            const mainImg = makeNode('img', 'disagall-main-img');
+            const loader = makeNode('div', 'disagall-loader');
+            const prevBtn = makeNode('button', 'disagall-prev');
+            const nextBtn = makeNode('button', 'disagall-next');
+            const toast = makeNode('div', 'disagall-toast');
+            wrapper.appendChild(mainImg);
+            stage.appendChild(wrapper);
+            stage.appendChild(loader);
+            stage.appendChild(prevBtn);
+            stage.appendChild(nextBtn);
+            stage.appendChild(toast);
+
+            node.appendChild(header);
+            node.appendChild(stage);
+          } else if (html.includes('disagall-notice-close')) {
+            node.appendChild(makeNode('button', 'disagall-notice-prev'));
+            node.appendChild(makeNode('button', 'disagall-notice-next'));
+            node.appendChild(makeNode('button', 'disagall-notice-close'));
+          }
+        },
+      });
+      return node;
+    }
+
+    const body = makeNode('body');
+    body.style.overflow = 'auto';
+    body.appendChild = (child) => {
+      child.parentElement = body;
+      child.parentNode = body;
+      bodyChildren.push(child);
+      return child;
+    };
+
+    function findById(id) {
+      const walk = (list) => {
+        for (const item of list) {
+          if (item.id === id) return item;
+          const nested = walk(item.children || []);
+          if (nested) return nested;
+        }
+        return null;
+      };
+      return walk(bodyChildren);
+    }
+
+    const doc = {
+      readyState: 'complete',
+      activeElement: body,
+      body,
+      addEventListener(ev, fn) {
+        if (!docListeners.has(ev)) docListeners.set(ev, []);
+        docListeners.get(ev).push(fn);
+      },
+      createElement(tag) {
+        return makeNode(tag);
+      },
+      getElementById(id) {
+        return findById(id);
+      },
+      querySelector() { return null; },
+      querySelectorAll(sel) {
+        if (sel.includes('table.gall_list')) return boardRows;
+        if (sel.includes('img')) return bodyImages;
+        return [];
+      },
+    };
+
+    const win = {
+      innerWidth: 1280,
+      innerHeight: 800,
+      location: {
+        origin: 'https://gall.dcinside.com',
+        protocol: 'https:',
+        get href() { return currentHref; },
+        set href(val) {
+          currentHref = val;
+          navHistory.push(val);
+        },
+      },
+      addEventListener(ev, fn) {
+        if (!winListeners.has(ev)) winListeners.set(ev, new Set());
+        winListeners.get(ev).add(fn);
+      },
+      removeEventListener(ev, fn) {
+        if (winListeners.has(ev)) winListeners.get(ev).delete(fn);
+      },
+      dispatchWindowEvent(evObj) {
+        const ev = typeof evObj === 'string' ? { type: evObj } : evObj;
+        Array.from(winListeners.get(ev.type) || []).forEach((fn) => fn(ev));
+      },
+    };
+
+    const sess = {
+      getItem(k) { return storageMap.has(k) ? storageMap.get(k) : null; },
+      setItem(k, v) { storageMap.set(k, String(v)); },
+      removeItem(k) { storageMap.delete(k); },
+    };
+
+    function makeBodyImage(src) {
+      const img = makeNode('img');
+      img.src = src;
+      img.currentSrc = src;
+      img.clientWidth = 800;
+      img.naturalWidth = 1200;
+      img.naturalHeight = 900;
+      img.closest = (sel) => {
+        if (sel.includes('.write_div')) return { tagName: 'DIV' };
+        return null;
+      };
+      return img;
+    }
+
+    function makeBoardRow({ numText, href, title, isCurrent = false }) {
+      const link = {
+        href,
+        textContent: title,
+        getAttribute: (n) => (n === 'href' ? href : null),
+      };
+      return {
+        className: isCurrent ? 'ub-content crt>' : 'ub-content',
+        classList: makeClassList(isCurrent ? ['ub-content', 'crt>'] : ['ub-content']),
+        dataset: {},
+        querySelector(sel) {
+          if (sel.includes('.gall_tit a')) return link;
+          if (sel === '.gall_num') return { textContent: numText };
+          if (sel === '.gall_subject') return { textContent: '사진' };
+          if (sel.includes('.crt_icon') && isCurrent) return { className: 'crt_icon' };
+          if (sel.includes('.icon_pic')) return { className: 'icon_pic' };
+          return null;
+        },
+      };
+    }
+
+    return {
+      doc,
+      win,
+      sess,
+      timeouts,
+      intervals,
+      navHistory,
+      alertMessages,
+      setBodyImages: (urls) => { bodyImages = urls.map(makeBodyImage); },
+      setBoardRows: (rows) => { boardRows = rows.map(makeBoardRow); },
+      fakeSetTimeout: (fn, delay) => {
+        const id = nextTimerId++;
+        timeouts.set(id, { fn, delay });
+        return id;
+      },
+      fakeClearTimeout: (id) => {
+        timeouts.delete(id);
+      },
+      fakeSetInterval: (fn, delay) => {
+        const id = nextIntervalId++;
+        intervals.set(id, { fn, delay });
+        return id;
+      },
+      fakeClearInterval: (id) => {
+        intervals.delete(id);
+      },
+      flushTimeouts: (targetDelay = null) => {
+        const entries = Array.from(timeouts.entries());
+        for (const [id, entry] of entries) {
+          if (targetDelay === null || entry.delay === targetDelay) {
+            timeouts.delete(id);
+            entry.fn();
+          }
+        }
+      },
+      tickIntervals: () => {
+        const entries = Array.from(intervals.entries());
+        for (const [, entry] of entries) {
+          entry.fn();
+        }
+      },
+    };
+  }
+
+  function resetControllerState() {
+    state.postImages = [];
+    state.currentIndex = 0;
+    state.lastRightClickedImgSrc = null;
+    state.previousBodyOverflow = 'auto';
+    state.toastTimer = null;
+    state.noPhotoNoticeTimer = null;
+    state.idleTimer = null;
+    state.postNavTimer = null;
+    state.autoOpenPollTimer = null;
+    state.elements = {
+      overlayEl: null,
+      stageEl: null,
+      mainImgEl: null,
+      counterEl: null,
+      infoBadgeEl: null,
+      sliderEl: null,
+      sliderValEl: null,
+      prevBtnEl: null,
+      nextBtnEl: null,
+      loaderEl: null,
+      toastEl: null,
+      recommendBtnEl: null,
+      fullscreenBtnEl: null,
+    };
+  }
+
+  try {
+    const env = createDefect04Env();
+    global.window = env.win;
+    global.document = env.doc;
+    global.sessionStorage = env.sess;
+    global.setTimeout = env.fakeSetTimeout;
+    global.clearTimeout = env.fakeClearTimeout;
+    global.setInterval = env.fakeSetInterval;
+    global.clearInterval = env.fakeClearInterval;
+    global.requestAnimationFrame = (fn) => 1;
+    global.cancelAnimationFrame = () => {};
+    global.alert = (msg) => env.alertMessages.push(msg);
+    global.Image = function MockImage() {
+      return { onload: null, onerror: null, src: '' };
+    };
+
+    resetControllerState();
+    initViewerBase();
+
+    // 10.1 navigatePost() followed by closeViewer() within 150ms must cancel navigation & clear auto_open
+    env.setBodyImages(['https://dcimg.example.com/1.jpg']);
+    env.setBoardRows([
+      { numText: '11', href: '/mgallery/board/view/?id=pic&no=11', title: '최신 글' },
+      { numText: '', href: '/mgallery/board/view/?id=pic&no=10', title: '현재 글', isCurrent: true },
+      { numText: '9', href: '/mgallery/board/view/?id=pic&no=9', title: '이전 글' },
+    ]);
+    openViewer(null, false);
+    navigatePost('down');
+    assert.strictEqual(env.sess.getItem(CONFIG.STORAGE_KEY_AUTO_OPEN), '1');
+    closeViewer();
+    assert.strictEqual(state.postNavTimer, null, 'DEFECT-04: closeViewer() must clear state.postNavTimer');
+    assert.strictEqual(state.toastTimer, null, 'DEFECT-04: closeViewer() must clear state.toastTimer');
+    assert.strictEqual(state.elements.toastEl.classList.contains('show'), false, 'DEFECT-04: closeViewer() must hide toast');
+    assert.strictEqual(env.timeouts.size, 0, 'DEFECT-04: closeViewer() must leave 0 pending timeouts');
+    assert.strictEqual(env.sess.getItem(CONFIG.STORAGE_KEY_AUTO_OPEN), null, 'DEFECT-04: closeViewer() must remove disagall_auto_open when cancelling pending nav');
+    env.flushTimeouts(CONFIG.POST_NAV_DELAY);
+    assert.deepStrictEqual(env.navHistory, [], 'DEFECT-04: Cancelled navigatePost() timer must NOT navigate after closeViewer()');
+
+    // 10.2 Rapid double-tap navigatePost('down') -> navigatePost('up'), then 'down' -> boundary 'top'
+    openViewer(null, false);
+    navigatePost('down');
+    navigatePost('up');
+    const navTimersAfterDoubleTap = Array.from(env.timeouts.values()).filter((t) => t.delay === CONFIG.POST_NAV_DELAY);
+    assert.strictEqual(navTimersAfterDoubleTap.length, 1, 'DEFECT-04: Rapid navigatePost() must replace previous pending timer');
+    env.flushTimeouts(CONFIG.POST_NAV_DELAY);
+    assert.deepStrictEqual(env.navHistory, ['/mgallery/board/view/?id=pic&no=11'], 'DEFECT-04: Last-wins navigatePost() must navigate only to latest target');
+    env.navHistory.length = 0;
+
+    // Boundary error after pending valid navigatePost() must cancel stale navigation
+    env.setBoardRows([
+      { numText: '', href: '/mgallery/board/view/?id=pic&no=10', title: '현재 최상단', isCurrent: true },
+      { numText: '9', href: '/mgallery/board/view/?id=pic&no=9', title: '이전 글' },
+    ]);
+    navigatePost('down');
+    navigatePost('up'); // hits 'top' error
+    assert.strictEqual(state.postNavTimer, null, 'DEFECT-04: Boundary navigatePost() must cancel prior pending nav timer');
+    assert.strictEqual(env.sess.getItem(CONFIG.STORAGE_KEY_AUTO_OPEN), null, 'DEFECT-04: Boundary cancel must remove pending auto_open flag');
+    env.flushTimeouts(CONFIG.POST_NAV_DELAY);
+    assert.deepStrictEqual(env.navHistory, [], 'DEFECT-04: Cancelled nav must not fire after boundary error');
+    closeViewer();
+
+    // 10.3 startAutoOpenPolling() + manual openViewer(src2) must stop interval and NOT reset currentIndex to 0
+    env.setBodyImages([]);
+    env.sess.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, '1');
+    checkAutoOpen();
+    assert.strictEqual(env.intervals.size, 1, 'checkAutoOpen() must start polling interval');
+
+    env.setBodyImages(['https://dcimg.example.com/1.jpg', 'https://dcimg.example.com/2.jpg']);
+    openViewer('https://dcimg.example.com/2.jpg', false);
+    assert.strictEqual(state.currentIndex, 1, 'Manual openViewer(src2) must open index 1');
+    assert.strictEqual(env.intervals.size, 0, 'DEFECT-04: Manual openViewer() must clear autoOpenPollTimer');
+    assert.strictEqual(state.autoOpenPollTimer, null, 'DEFECT-04: state.autoOpenPollTimer must be null after manual openViewer()');
+    env.tickIntervals();
+    assert.strictEqual(state.currentIndex, 1, 'DEFECT-04: Polling tick must NOT reset active viewer index to 0');
+    closeViewer();
+
+    // 10.4 startAutoOpenPolling() + closeViewer() must stop interval (no ghost reopen & no orphan no-photo notice)
+    env.setBodyImages([]);
+    env.sess.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, '1');
+    checkAutoOpen();
+    assert.strictEqual(env.intervals.size, 1);
+    closeViewer();
+    assert.strictEqual(env.intervals.size, 0, 'DEFECT-04: closeViewer() must clear autoOpenPollTimer');
+    assert.strictEqual(state.autoOpenPollTimer, null);
+
+    // Even if images appear or 15 ticks pass, overlay stays closed and notice stays absent
+    env.setBodyImages(['https://dcimg.example.com/late.jpg']);
+    env.tickIntervals();
+    assert.strictEqual(state.elements.overlayEl.classList.contains('active'), false, 'DEFECT-04: Closed viewer must not be ghost-reopened');
+    env.setBodyImages([]);
+    for (let i = 0; i < CONFIG.AUTO_OPEN_MAX_ATTEMPTS; i++) env.tickIntervals();
+    assert.strictEqual(env.doc.getElementById('disagall-no-photo-notice'), null, 'DEFECT-04: Orphan no-photo notice must not mount after closeViewer()');
+
+    // 10.5 Manual openViewer() failing with 0 images during polling must keep polling alive
+    env.setBodyImages([]);
+    env.sess.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, '1');
+    checkAutoOpen();
+    openViewer(null, false); // fails with alert
+    assert.strictEqual(env.alertMessages.length, 1);
+    assert.strictEqual(env.intervals.size, 1, 'DEFECT-04: Failed openViewer(0 images) must NOT kill active auto-open polling');
+    env.setBodyImages(['https://dcimg.example.com/lazy.jpg']);
+    env.tickIntervals();
+    assert.strictEqual(state.elements.overlayEl.classList.contains('active'), true, 'Polling should still auto-open once lazy image appears');
+    assert.strictEqual(env.intervals.size, 0);
+    closeViewer();
+
+    // 10.6 Duplicate checkAutoOpen() & pagehide lifecycle cleanup
+    env.setBodyImages([]);
+    env.sess.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, '1');
+    checkAutoOpen();
+    env.sess.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, '1');
+    checkAutoOpen();
+    assert.strictEqual(env.intervals.size, 1, 'DEFECT-04: Duplicate checkAutoOpen() must not spawn parallel intervals');
+    env.win.dispatchWindowEvent({ type: 'pagehide' });
+    assert.strictEqual(env.intervals.size, 0, 'DEFECT-04: pagehide must clear autoOpenPollTimer');
+
+    // pagehide cancels un-fired navigatePost timer + auto_open, but preserves auto_open if nav already fired
+    env.setBodyImages(['https://dcimg.example.com/1.jpg']);
+    openViewer(null, false);
+    navigatePost('down');
+    assert.strictEqual(env.sess.getItem(CONFIG.STORAGE_KEY_AUTO_OPEN), '1');
+    env.win.dispatchWindowEvent({ type: 'pagehide' });
+    assert.strictEqual(state.postNavTimer, null, 'DEFECT-04: pagehide must cancel pending postNavTimer');
+    assert.strictEqual(env.sess.getItem(CONFIG.STORAGE_KEY_AUTO_OPEN), null, 'DEFECT-04: pagehide must remove auto_open if nav timer had not fired');
+
+    navigatePost('down');
+    env.flushTimeouts(CONFIG.POST_NAV_DELAY); // fires navigation -> sets window.location.href
+    env.win.dispatchWindowEvent({ type: 'pagehide' });
+    assert.strictEqual(env.sess.getItem(CONFIG.STORAGE_KEY_AUTO_OPEN), '1', 'DEFECT-04: pagehide after navigation already fired must preserve auto_open for destination page');
+
+    console.log('✅ Test 10: DEFECT-04 navigatePost & autoOpenPolling timer lifecycle tests passed');
+  } finally {
+    global.window = origWindow;
+    global.document = origDocument;
+    global.sessionStorage = origSessionStorage;
+    global.setTimeout = origSetTimeout;
+    global.clearTimeout = origClearTimeout;
+    global.setInterval = origSetInterval;
+    global.clearInterval = origClearInterval;
+    global.requestAnimationFrame = origRequestAnimationFrame;
+    global.cancelAnimationFrame = origCancelAnimationFrame;
+    global.Image = origImage;
+    global.alert = origAlert;
+
+    state.postImages = prevStateSnapshot.postImages;
+    state.currentIndex = prevStateSnapshot.currentIndex;
+    state.lastRightClickedImgSrc = prevStateSnapshot.lastRightClickedImgSrc;
+    state.previousBodyOverflow = prevStateSnapshot.previousBodyOverflow;
+    state.toastTimer = prevStateSnapshot.toastTimer;
+    state.noPhotoNoticeTimer = prevStateSnapshot.noPhotoNoticeTimer;
+    state.postNavTimer = prevStateSnapshot.postNavTimer;
+    state.autoOpenPollTimer = prevStateSnapshot.autoOpenPollTimer;
+    state.idleTimer = prevStateSnapshot.idleTimer;
+    state.elements = prevStateSnapshot.elements;
+  }
+}
+
 Promise.resolve()
   .then(() => runDefect02Tests())
   .then(() => runDefect03Tests())
+  .then(() => runDefect04Tests())
   .then(() => {
     console.log('\n🎉 ALL UNIT & INTEGRATION TESTS PASSED SUCCESSFULLY! 🎉');
   })
