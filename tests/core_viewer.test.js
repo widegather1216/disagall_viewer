@@ -233,6 +233,16 @@ function createMockDom() {
       }
       (docListeners.bubble.click || []).forEach((fn) => fn(ev));
     },
+    dispatchContextMenu: (target) => {
+      const ev = {
+        type: 'contextmenu',
+        target,
+        preventDefault() {},
+        stopPropagation() {},
+      };
+      (docListeners.capture.contextmenu || []).forEach((fn) => fn(ev));
+      (docListeners.bubble.contextmenu || []).forEach((fn) => fn(ev));
+    },
   };
 
   const win = {
@@ -818,6 +828,127 @@ async function run() {
       assert.strictEqual(overlay.classList.contains('active'), false, 'Subsequent genuine stage click closes viewer');
 
       console.log('✅ Test 6: DEFECT-03 zoomed drag-release backdrop click suppression verified');
+    } finally {
+      global.window = origWindow;
+      global.document = origDocument;
+      global.Image = origImage;
+      global.Event = origEvent;
+      global.requestAnimationFrame = origRAF;
+      global.cancelAnimationFrame = origCAF;
+    }
+  }
+
+  // Test 7 (DEFECT-04): Right-clicking lazy-loaded images must store resolved best URL
+  // and open the exact target index even when Chrome context menu sends placeholder info.srcUrl
+  {
+    const dom = createMockDom();
+    const writeDiv = dom.createElement('div', '', ['write_div']);
+
+    const img1 = dom.createElement('img');
+    img1.src = 'https://nstatic.dcinside.com/dc/w/images/gallview_loading_ori.gif';
+    img1.setAttribute('data-original', 'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=401');
+
+    const img2 = dom.createElement('img');
+    img2.src = 'https://nstatic.dcinside.com/dc/w/images/gallview_loading_ori.gif';
+    img2.setAttribute('data-original', 'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=402');
+
+    const img3 = dom.createElement('img');
+    img3.src = 'https://nstatic.dcinside.com/dc/w/images/blank.gif';
+    img3.setAttribute('data-src', 'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=403&s=1');
+
+    const commentBox = dom.createElement('div', '', ['comment_box']);
+    const dcconImg = dom.createElement('img');
+    dcconImg.src = 'https://dcimg5.dcinside.com/dccon.php?no=999';
+    commentBox.appendChild(dcconImg);
+
+    writeDiv.appendChild(img1);
+    writeDiv.appendChild(img2);
+    writeDiv.appendChild(img3);
+    dom.body.appendChild(writeDiv);
+    dom.body.appendChild(commentBox);
+
+    const origWindow = global.window;
+    const origDocument = global.document;
+    const origImage = global.Image;
+    const origEvent = global.Event;
+    const origRAF = global.requestAnimationFrame;
+    const origCAF = global.cancelAnimationFrame;
+
+    global.window = dom.win;
+    global.document = dom.doc;
+    global.Event = class { constructor(type) { this.type = type; } };
+    global.requestAnimationFrame = () => 1;
+    global.cancelAnimationFrame = () => {};
+    global.Image = class {
+      set src(v) {
+        this._src = v;
+        if (typeof this.onload === 'function') this.onload();
+      }
+      get src() { return this._src; }
+    };
+
+    try {
+      const { state } = await import('../src/state.js');
+      Object.keys(state.elements).forEach((k) => { state.elements[k] = null; });
+      state.previousBodyOverflow = '';
+      state.postImages = [];
+      state.currentIndex = 0;
+      state.lastRightClickedImgSrc = null;
+      state.zoom.scale = 1.0;
+
+      const controller = await import('../src/controller/viewer_controller.js');
+      controller.initViewerBase();
+
+      // 7.1 Right-click 2nd lazy image (gallview_loading_ori.gif) -> openViewer() without srcUrl
+      dom.doc.dispatchContextMenu(img2);
+      assert.strictEqual(
+        state.lastRightClickedImgSrc,
+        'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=402',
+        'DEFECT-04: contextmenu must store resolved getBestImgUrl() instead of placeholder target.src'
+      );
+
+      controller.openViewer();
+      assert.strictEqual(
+        state.currentIndex,
+        1,
+        'DEFECT-04: openViewer() after right-clicking 2nd lazy image must open index 1'
+      );
+      assert.strictEqual(state.elements.counterEl.textContent, '2 / 3');
+      assert.strictEqual(
+        state.elements.mainImgEl.src,
+        'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=402'
+      );
+      controller.closeViewer();
+
+      // 7.2 Right-click 3rd lazy image (blank.gif + data-src with &s=1) -> Chrome context menu sends placeholder srcUrl
+      const placeholderSrc3 = img3.src;
+      dom.doc.dispatchContextMenu(img3);
+      assert.strictEqual(
+        state.lastRightClickedImgSrc,
+        'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=403'
+      );
+
+      controller.openViewer(placeholderSrc3);
+      assert.strictEqual(
+        state.currentIndex,
+        2,
+        'DEFECT-04: openViewer(placeholderSrc) from Chrome context menu must fall back to lastRightClickedImgSrc (index 2)'
+      );
+      assert.strictEqual(state.elements.counterEl.textContent, '3 / 3');
+      assert.strictEqual(
+        state.elements.mainImgEl.src,
+        'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=403'
+      );
+      controller.closeViewer();
+
+      // 7.3 Right-click excluded dccon / non-image clears lastRightClickedImgSrc and opens index 0
+      dom.doc.dispatchContextMenu(dcconImg);
+      assert.strictEqual(state.lastRightClickedImgSrc, null);
+      controller.openViewer('https://nstatic.dcinside.com/dc/w/images/gallview_loading_ori.gif');
+      assert.strictEqual(state.currentIndex, 0);
+      controller.closeViewer();
+
+      console.log('✅ Test 7: DEFECT-04 lazy-loaded contextmenu tracking & target index matching verified');
     } finally {
       global.window = origWindow;
       global.document = origDocument;
