@@ -1,8 +1,8 @@
 # 📦 [viewer-immersion] 몰입 모드 및 UI 클린 감상 패키지
 
-- **현재 상태 (Lifecycle)**: `🩹 Debugging`
+- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
 - **구현 진척도**: `[■■■■■■■■] 8/8 Steps` (기본 4/4 + 확장 피팅 2/2 + 전체화면 모드 2/2)
-- **미해결 티켓 현황**: `🚨 DEFECT: 1건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -47,21 +47,22 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-23 / `systematic-debugger` / `DEFECT-02` (P1: `pointer-events: none` 전환 시 `.disagall-header` 합성 `mouseleave`가 UI 숨김을 즉시 취소하는 결함 — `!isOverlayActive() || isAnyUiHiddenClass(overlayEl)` 가드 추가) 해결 (`src/controller/immersion_controller.js`, `tests/immersion.test.js` Test 28, `tests/immersion_e2e.test.js` `TC-HP-02`/`TC-HP-06`)
+- **직전 완료 작업**: 2026-11-23 / `systematic-debugger` / `DEFECT-03` (P1: `defaultPadding` `onChanged` 실시간 동기화 단절 및 비동기 `storage.sync.get` 초기화 레이스 — `immersion_controller.js` 3키 단일 통합·`Option A`·`ADR-07`·자기 에코/역순 덮어쓰기 방어·지연 `autoFullscreen` 소급 진입) 해결 및 최종 **`🟢 Sign-Off`** 확정 (`src/controller/immersion_controller.js`, `src/controller/viewer_controller.js`, `src/extension.js`, `src/userscript.js`, `tests/immersion.test.js` Test 29, `tests/immersion_e2e.test.js` `TC-HP-04`/`TC-BD-05b`)
 - **Recent Commits**:
+  - `317de54`: `fix(immersion): unify defaultPadding sync and guard async storage init races`
+  - `cd985b0`: `test(immersion): add unit and E2E tests for DEFECT-03 padding sync and async init races`
   - `b4bf989`: `fix(immersion): ignore synthetic header mouseleave when UI is already hidden`
   - `3fc9aa6`: `test(immersion): add unit and E2E regression tests for DEFECT-02 header mouseleave`
   - `57e7826`: `fix(immersion): guard fullscreen Promise races against viewer close and reopen`
-  - `94ca0e8`: `test(immersion): add unit and E2E regression tests for DEFECT-01 fullscreen races`
-  - `36851e1`: `feat(immersion): implement stage expansion on UI hide and fullscreen mode UX`
 - **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **실행 검증 명령 및 결과**:
   - `npm run build`: `content.js`, `disagall_viewer.user.js` 번들 생성 PASS
-  - `npm test`: 5개 테스트 스위트(`module_import`, `core_viewer`, `post_navigation`, `recommend`, `immersion` 28개 테스트) 전원 PASS
-  - `node tests/immersion_e2e.test.js`: 실제 번들(`content.js`, `content.css`, `popup.js`, `test_page.html`) 기반 15개 시나리오(`TC-HP-02`/`TC-HP-06` `DEFECT-02` 포함) 전원 PASS
-  - `node --check`: 수정된 `src/controller/immersion_controller.js`, `tests/immersion.test.js`, `tests/immersion_e2e.test.js`, 번들(`content.js`, `disagall_viewer.user.js`) 구문 검사 PASS
-  - 미해결 티켓 (`1 / 0` — `🚨 DEFECT: 1건`, `🧐 REFACTOR: 0건`)
+  - `npm test`: 5개 테스트 스위트(`module_import`, `core_viewer`, `post_navigation`, `recommend`, `immersion` 29개 테스트) 전원 PASS
+  - `node tests/immersion_e2e.test.js`: 실제 번들(`content.js`, `content.css`, `popup.js`, `test_page.html`) 기반 15개 시나리오(`TC-HP-04` padding live sync·`TC-BD-05b` 비동기 초기화 레이스 포함) 전원 PASS
+  - `node --check`: 수정된 `src/`·`tests/`·번들(`content.js`, `disagall_viewer.user.js`) 구문 검사 PASS
+  - 미해결 티켓 (`0 / 0` — `🚨 DEFECT: 0건`, `🧐 REFACTOR: 0건`)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `systematic-debugger`로 `DEFECT-03`(`defaultPadding` `onChanged`·비동기 초기화 레이스) 수정 필요.
+  - `viewer-immersion` 도메인 모든 시나리오 `15/15 (100%) PASS` 및 `DEFECT-01~03`·`REFACTOR-01~03` 전건 해결로 `🟢 Sign-Off` 완료.
+  - 다음 미해결 도메인(`post-navigation/DEFECT-03` 등) 디버깅 진행 가능 (`atomic-commit-crafter`로 현재 변경사항 커밋 후 진행 권장).
   - 참고: 실제 오버레이 패딩 슬라이더의 DOM ID는 `#disagall-slider`(스펙 표기 `#disagall-padding-slider` 대신 실제 마크업 `src/ui/overlay.js#L30`)임.
   - Chrome `--headless=new` 환경은 OS 전체화면 권한 제약(`TypeError: not granted`)이 있으므로, 전체화면 중 `closeViewer` 해제 경로는 `tests/immersion_e2e.test.js`의 Fullscreen API 계약 시뮬레이션과 실브라우저 `closeViewer` 경로를 병행해 검증함.

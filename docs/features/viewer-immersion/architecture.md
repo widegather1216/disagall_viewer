@@ -23,8 +23,8 @@ flowchart TD
   - `[기존]` `src/config.js`: `UI_IDLE_TIMEOUT`(2500), `STORAGE_KEY_AUTO_HIDE_UI`, `STORAGE_KEY_AUTO_FULLSCREEN` 상수 정의
   - `[기존]` `src/state.js`: `idleTimer`, `autoHideUi`, `autoFullscreen`, `isUiHidden`, `isFullscreenMode` 상태 관리 및 초기화
 - **사용자 제어 및 비즈니스 레이어**:
-  - `[기존]` `src/controller/immersion_controller.js`: 마우스 유휴 타이머 시작/리셋, 호버/드래그/슬라이더 가드레일, `H` 수동 토글, `F`/버튼 전체화면 토글 및 `fullscreenchange` 동기화·자동 전체화면 폴백, `autoHideUi`/`autoFullscreen` 스토리지 동기화, UI 숨김/복귀 시 `applyFittingAndPadding()` 호출
-  - `[기존]` `src/controller/viewer_controller.js`: 뷰어 생명주기(`openViewer`/`closeViewer`), 이미지/게시글 탐색, 단축키/헤더 버튼 디스패치, 패딩 슬라이더 디바운스/`change` 저장 및 `immersion_controller.js` re-export
+  - `[기존]` `src/controller/immersion_controller.js`: 마우스 유휴 타이머 시작/리셋, 호버/드래그/슬라이더 가드레일, `H` 수동 토글, `F`/버튼 전체화면 토글 및 `fullscreenchange` 동기화·자동 전체화면 폴백, `defaultPadding`/`autoHideUi`/`autoFullscreen` 3키 통합 초기화(`loadInitialSettings`)·`onChanged` 실시간 동기화(자기 에코/로컬 편집/비동기 레이스 방어 포함), UI 숨김/복귀/패딩 변경 시 `syncFittingIfUnzoomed()` 호출
+  - `[기존]` `src/controller/viewer_controller.js`: 뷰어 생명주기(`openViewer`/`closeViewer`), 이미지/게시글 탐색, 단축키/헤더 버튼 디스패치, 패딩 슬라이더 클램핑·디바운스/`change` 저장·에코 추적 및 `immersion_controller.js` re-export
   - `[기존]` `popup.html`: 몰입 모드(자동 숨김) 및 뷰어 열 때 자동 전체화면(`#auto-fullscreen-toggle`) 스위치 UI 마크업 및 2.5초/H/F 단축키 안내
   - `[기존]` `popup.js`: 스토리지 조회, `bindPopupSlider`(250ms 디바운스/`change` 저장·`NaN` 가드)·`bindPopupToggle`(자동 숨김/자동 전체화면 공용)·`bindStorageSync`(`onChanged` 타입 가드) 동기화 처리
 - **UI 및 프레젠테이션 레이어**:

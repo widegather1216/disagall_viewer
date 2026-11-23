@@ -60,3 +60,14 @@
   - **전체화면 시 여백 `0px` 임시 적용 + UI 즉시 숨김**: `state.isFullscreenMode === true` 동안 `state.currentPadding` 저장값은 건드리지 않고 피팅 계산에서만 임시 여백 `0px`을 사용하며 `hideUi(true)`로 UI를 즉시 숨김. 전체화면 해제 시 `state.currentPadding`과 UI를 원래대로 복원.
   - **팝업 `autoFullscreen` 설정 및 꽉 채움 폴백**: `popup.html`/`popup.js`에 `autoFullscreen`(기본 `false`) 토글을 추가하고 `openViewer()` 시 `requestFullscreen()`을 시도하되, 브라우저가 User Gesture 부재로 차단(reject)하면 `state.isFullscreenMode = true` 뷰어 꽉 채움(`여백 0px + UI 숨김`) 폴백을 즉시 적용하고 토스트로 `F` 키/버튼 OS 전체화면 전환을 안내함.
 - **결과 및 트레이드오프 (Consequences)**: 유저스크립트 클릭/`V` 키 및 뷰어 내 `F`/버튼 조작에서는 즉시 OS 전체화면으로 진입하며, 확장 프로그램 우클릭·연속 게시글 이동 시에도 차단 에러 없이 동일한 꽉 찬 화면을 제공함.
+
+---
+
+### [ADR-07] 통합 스토리지 동기화, 비동기 초기화 지연 보정 및 `defaultPadding` 에코/삭제 방어 정책 (2026-11-23)
+- **상태**: Accepted
+- **배경 및 문제 상황 (Context)**: `DEFECT-03` 추적(`Tracer A/B`) 결과, `src/extension.js`와 `src/userscript.js`가 `defaultPadding`을 개별 로드하고 `immersion_controller.js` `onChanged`가 `defaultPadding`을 무시하여 팝업→뷰어 실시간 리피팅이 단절됨. 또한 비동기 `chrome.storage.sync.get` 응답 전에 `openViewer()`가 먼저 실행되면 `defaultPadding` 리피팅 및 `autoFullscreen` 진입이 누락되고, 지연된 초기 `get`·역순 `onChanged`·슬라이더 디바운스 자기 에코가 사용자 조작을 덮어쓸 수 있었음.
+- **결정 내용 (Decision)**:
+  - **컨트롤러 단일 통합 (`Option A`)**: `src/extension.js`·`src/userscript.js`의 독립 `defaultPadding` 로드를 제거하고, `immersion_controller.js`의 `loadInitialSettings()`·`bindImmersionStorageListener()`에서 `defaultPadding`, `autoHideUi`, `autoFullscreen` 3개 키를 단일 `chrome.storage.sync.get`/`GM_getValue`/`onChanged`로 통합 관리해 `00_core_foundation` 단방향 레이어 규칙(`Entry -> Controllers -> UI -> State`)을 준수함.
+  - **초기 지연 `get` 한정 소급 진입**: 지연된 초기 `storage.sync.get` 콜백에서만 아직 열려 있고 수동 `F` 조작(`hasUserToggledFullscreenInSession`)이 없는 세션에 `enterAutoFullscreenOnOpen()`을 소급 실행하며, 팝업 `onChanged` `autoFullscreen: true`는 다음 `openViewer()`부터 적용함.
+  - **`defaultPadding` 클램핑·삭제 무시·자기 에코 방어**: `onChanged`의 `newValue === undefined` 삭제 이벤트는 `popup.js`와 동일하게 무시(현재 값 유지)하고, 유한 숫자는 `0~100` 정수로 클램핑하며, 슬라이더 드래그/디바운스 대기/역전된 자기 에코(`pendingSelfPaddingWrites`)·로컬 선편집·선도착 `onChanged`로부터 사용자 조작을 보호함.
+- **결과 및 트레이드오프 (Consequences)**: 스토리지 IPC를 2회→1회로 축소하고 확장·유저스크립트·팝업 간 3개 설정 동기화 및 초기화 레이스 방어를 일원화함.

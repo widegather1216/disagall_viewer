@@ -32,15 +32,23 @@
 
 ## 2. 저장소 및 통신 계약 (Storage & Communication Contracts)
 - **Chrome Extension Storage**:
-  - 키: `autoHideUi`, `autoFullscreen`
-  - 읽기: `chrome.storage.sync.get({ autoHideUi: true, autoFullscreen: false }, callback)`
-  - 쓰기: `chrome.storage.sync.set({ autoHideUi: value })`, `chrome.storage.sync.set({ autoFullscreen: value })`
+  - 키: `defaultPadding` (`number`, `0~100`, 기본값 `24`), `autoHideUi` (`boolean`, 기본값 `true`), `autoFullscreen` (`boolean`, 기본값 `false`)
+  - 읽기 (단일 통합 로드): `immersion_controller.js` `initImmersionSettings()`에서 `chrome.storage.sync.get({ defaultPadding: 24, autoHideUi: true, autoFullscreen: false }, callback)` 호출 (`src/extension.js` 독립 로드 제거)
+  - 쓰기: `chrome.storage.sync.set({ defaultPadding: value })`, `chrome.storage.sync.set({ autoHideUi: value })`, `chrome.storage.sync.set({ autoFullscreen: value })`
 - **Tampermonkey / Userscript Storage**:
-  - 읽기: `GM_getValue('autoHideUi', true)`, `GM_getValue('autoFullscreen', false)`
-  - 쓰기: `GM_setValue('autoHideUi', value)`
-- **동기화 시점**: 뷰어 초기화 시 스토리지 값을 읽어 `state.autoHideUi`·`state.autoFullscreen`에 저장. 팝업에서 변경 시 `onChanged`로 실시간 동기화.
+  - 읽기 (단일 통합 로드): `immersion_controller.js`에서 `GM_getValue('defaultPadding', 24)`, `GM_getValue('autoHideUi', true)`, `GM_getValue('autoFullscreen', false)` 동기 호출 (`src/userscript.js` 중복 로드 제거)
+  - 쓰기: `GM_setValue('defaultPadding', value)`, `GM_setValue('autoHideUi', value)`
+- **동기화 및 비동기 레이스 해결 계약 (`ADR-07`)**:
+  - **`onChanged` 실시간 동기화 (`sync` 영역)**:
+    - `defaultPadding`: 유한 숫자(`Number.isFinite`)를 `0~100` 정수로 클램핑하여 `state.currentPadding`·캐시된 `#disagall-slider`/`#disagall-slider-val`을 갱신하고, 뷰어 활성·비전체화면(`!state.isFullscreenMode`)·비확대(`scale <= 1.001`) 시 `applyFittingAndPadding()` 호출. 키 삭제(`newValue === undefined`)는 `popup.js`와 동일하게 무시하며, 슬라이더 드래그(`isSliderInteracting`)·디바운스 대기(`isPaddingSavePending`)·역전된 자기 에코(`consumeSupersededSelfPaddingEcho`)는 차단.
+    - `autoHideUi`: 활성 상태에서 `false` 전환 시 타이머 해제 및 `.disagall-idle` 복원; 이미 `.disagall-idle` 또는 타이머 실행 중인 상태에서 동일 `true` 수신 시 UI를 강제 복원하지 않음.
+    - `autoFullscreen`: `onChanged`로 `true` 전환 시 이미 열린 뷰어를 강제 진입시키지 않고 다음 `openViewer()`부터 적용 (`false` 전환 시 비OS 폴백 전체화면 해제).
+  - **초기 비동기 `get` 지연 보정 (T0→T1→T2)**:
+    - `openViewer()` 이후 초기 `storage.sync.get`이 지연 도착하면, 로컬 슬라이더 수정(`hasLocalPaddingEditSinceLoad`) 및 선도착 `onChanged`(`hasOnChangedSync`)가 없는 키에 한해 반영.
+    - `defaultPadding` 지연 반영 시 활성·비전체화면·비확대 상태면 즉시 리피팅; `autoFullscreen === true` 지연 반영 시 오버레이가 활성이고 비전체화면이며 해당 세션에서 사용자가 `F`/버튼을 수동 조작하지 않은 경우(`!hasUserToggledFullscreenInSession`)에 한해 `enterAutoFullscreenOnOpen()` 소급 진입.
 
 ## 3. 클라이언트 상태 계약 (Client State & Lifecycle)
+- **`applyPaddingSetting(padding)`**: `normalizePaddingValue`로 유한 숫자·`0~100` 클램핑 검증 후 `state.currentPadding` 및 캐시된 슬라이더 DOM을 갱신하고, 활성·비전체화면·비확대(`scale <= 1.001`) 시 리피팅.
 - **`resetIdleTimer()`**:
   1. `state.idleTimer` 존재 시 `clearTimeout` 호출
   2. `mousemove` 또는 슬라이더 조작 등으로 호출되며, UI가 숨겨져 있던 상태(`.disagall-idle` 또는 `state.isUiHidden === true`)라면 즉시 UI 복원 및 커서 복원
