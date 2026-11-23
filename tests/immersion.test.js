@@ -1566,6 +1566,97 @@ async function run() {
   });
   console.log('✅ Test 27: DEFECT-01 async fullscreen Promise vs closeViewer/openViewer & rapid toggle races verified');
 
+  // 28. DEFECT-02: pointer-events: none synthetic header mouseleave must not cancel UI hide
+  await withFakeTimers(async (timers) => {
+    await withControllerHarness(async ({
+      controller,
+      overlayNode,
+      headerNode,
+      fullscreenBtnNode,
+    }) => {
+      controller.createOverlay();
+      overlayNode.classList.add('active');
+
+      // 28.1 Hover header -> press 'h' -> synthetic mouseleave from pointer-events: none
+      headerNode.dispatchEvent('mouseenter');
+      controller.handleKeyDown({ key: 'h', preventDefault() {}, stopPropagation() {} });
+      assert.strictEqual(state.isUiHidden, true, 'Pressing h on header must hide UI');
+      assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true);
+      assert.strictEqual(timers.count, 0);
+
+      headerNode.dispatchEvent('mouseleave');
+      assert.strictEqual(
+        state.isUiHidden,
+        true,
+        'DEFECT-02: Synthetic header mouseleave after H hide must NOT reset state.isUiHidden'
+      );
+      assert.strictEqual(
+        overlayNode.classList.contains('disagall-ui-hidden'),
+        true,
+        'DEFECT-02: Synthetic header mouseleave must keep .disagall-ui-hidden'
+      );
+      assert.strictEqual(timers.count, 0, 'DEFECT-02: Synthetic header mouseleave must NOT start idle timer');
+
+      // Moving mouse on overlay restores UI and resets isHeaderHovered cleanly
+      overlayNode.dispatchEvent('mousemove');
+      assert.strictEqual(state.isUiHidden, false);
+      assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), false);
+      assert.strictEqual(timers.count, 1);
+
+      // Verify auto-hide still works after mousemove (isHeaderHovered was cleared on mouseleave)
+      timers.runNext();
+      assert.strictEqual(overlayNode.classList.contains('disagall-idle'), true, 'Auto-hide must not stay blocked after synthetic mouseleave');
+
+      // Restore UI via mousemove
+      overlayNode.dispatchEvent('mousemove');
+      assert.strictEqual(overlayNode.classList.contains('disagall-idle'), false);
+
+      // 28.2 Hover header -> click fullscreen button -> synthetic mouseleave must keep UI hidden
+      headerNode.dispatchEvent('mouseenter');
+      fullscreenBtnNode.dispatchEvent('click');
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(state.isFullscreenMode, true);
+      assert.strictEqual(state.isUiHidden, true);
+      assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true);
+
+      headerNode.dispatchEvent('mouseleave');
+      assert.strictEqual(
+        state.isUiHidden,
+        true,
+        'DEFECT-02: Synthetic header mouseleave after fullscreen button click must NOT show UI'
+      );
+      assert.strictEqual(
+        overlayNode.classList.contains('disagall-ui-hidden'),
+        true,
+        'DEFECT-02: Fullscreen UI hidden class must persist after synthetic header mouseleave'
+      );
+      assert.strictEqual(timers.count, 0);
+
+      // Exit fullscreen -> UI restores normally
+      controller.handleKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() {} });
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(state.isFullscreenMode, false);
+      assert.strictEqual(state.isUiHidden, false);
+
+      // 28.3 Even if .disagall-idle is active when mouseleave fires, it must not cancel idle hide
+      overlayNode.classList.add('disagall-idle');
+      headerNode.dispatchEvent('mouseleave');
+      assert.strictEqual(overlayNode.classList.contains('disagall-idle'), true, 'Header mouseleave must not cancel .disagall-idle');
+
+      // 28.4 Normal mouseleave while UI is visible must still schedule idle timer
+      overlayNode.dispatchEvent('mousemove');
+      assert.strictEqual(overlayNode.classList.contains('disagall-idle'), false);
+      headerNode.dispatchEvent('mouseenter');
+      headerNode.dispatchEvent('mouseleave');
+      assert.strictEqual(timers.count, 1, 'Normal header mouseleave while UI visible must schedule idle timer');
+      timers.runNext();
+      assert.strictEqual(overlayNode.classList.contains('disagall-idle'), true);
+    });
+  });
+  console.log('✅ Test 28: DEFECT-02 synthetic header mouseleave after UI hide verified');
+
   console.log('\n🎉 ALL VIEWER IMMERSION UNIT TESTS PASSED! 🎉');
 }
 

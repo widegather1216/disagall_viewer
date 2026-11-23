@@ -450,10 +450,15 @@ async function run() {
 
     env.win.postMessage({ action: 'disagall_test_open' }, '*');
     const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const header = overlay.querySelector('.disagall-header');
 
-    // Press 'h' -> immediate .disagall-ui-hidden
+    // Press 'h' while hovering header -> immediate .disagall-ui-hidden, synthetic mouseleave must NOT cancel
+    header.dispatchEvent({ type: 'mouseenter' });
     env.win.dispatchEvent({ type: 'keydown', key: 'h' });
     assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true, 'TC-HP-02: h must immediately add .disagall-ui-hidden');
+    header.dispatchEvent({ type: 'mouseleave' });
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true, 'TC-HP-02 (DEFECT-02): synthetic header mouseleave must keep .disagall-ui-hidden');
+    assert.strictEqual(timers.timers.size, 0, 'TC-HP-02 (DEFECT-02): synthetic header mouseleave must not start idle timer');
 
     // ADR-04: ArrowRight & ArrowLeft navigate images while preserving .disagall-ui-hidden
     env.win.dispatchEvent({ type: 'keydown', key: 'ArrowRight' });
@@ -905,13 +910,16 @@ async function run() {
     timers.advanceBy(20);
     assert.strictEqual(mainImg.style.maxHeight, '638px');
 
-    // Click header fullscreen button -> enters OS fullscreen, sets 0px temp padding & hides UI
+    // Click header fullscreen button while hovering header -> enters OS fullscreen, sets 0px temp padding, hides UI & synthetic mouseleave keeps UI hidden
+    header.dispatchEvent({ type: 'mouseenter' });
     fullscreenBtn.dispatchEvent('click');
     await Promise.resolve();
     await Promise.resolve();
     assert.strictEqual(env.doc.fullscreenElement, overlay, 'TC-HP-06: Fullscreen button click must enter OS fullscreen');
     assert.strictEqual(overlay.classList.contains('disagall-fullscreen'), true);
     assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true);
+    header.dispatchEvent({ type: 'mouseleave' });
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true, 'TC-HP-06 (DEFECT-02): synthetic header mouseleave must keep UI hidden');
     assert.strictEqual(fullscreenBtn.classList.contains('active'), true);
     assert.strictEqual(mainImg.style.maxHeight, '800px', 'TC-HP-06: Fullscreen must temporarily apply 0px padding');
     assert.strictEqual(stage.style.paddingTop, '0px');
