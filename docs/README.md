@@ -1,14 +1,14 @@
 # 🧭 Disagall Viewer Master Control Tower (Living Wiki Hub)
 
-> **최종 업데이트**: 2026-11-22 (by `systematic-debugger`)
+> **최종 업데이트**: 2026-11-23 (by `systematic-debugger`)
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: 전 도메인 (`core-viewer`, `post-navigation`, `post-recommend`, `viewer-immersion`, `modular-bundler-migration`)
-- **현재 단계 (Stage)**: `🩹 Debugging` (`잔여 결함 6건 OPEN` — P0 0건 / P1 6건; `core-viewer/DEFECT-01~03`, `post-navigation/DEFECT-02`, `post-recommend/DEFECT-03`, `viewer-immersion/DEFECT-01` 해결 완료)
-- **직전 완료 작업**: `systematic-debugger`로 `core-viewer/DEFECT-03` (줌 상태 팬 드래그 종료 시 백드롭 클릭 오인 닫힘 방지, 우클릭 간섭·드래그 중 `navigate()`·0ms 만료 가드) 해결, `tests/core_viewer.test.js`(6/6)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build`·`node --check` PASS
+- **Active 도메인**: 전 도메인 (`core-viewer` `🟢 Sign-Off`, `post-navigation`, `post-recommend` `🟢 Sign-Off`, `viewer-immersion`, `modular-bundler-migration`)
+- **현재 단계 (Stage)**: `🩹 Debugging` (`잔여 결함 5건 OPEN` — P0 0건 / P1 5건; `core-viewer/DEFECT-01~04`, `post-navigation/DEFECT-02`, `post-recommend/DEFECT-03`, `viewer-immersion/DEFECT-01` 해결 완료)
+- **직전 완료 작업**: `systematic-debugger`로 `core-viewer/DEFECT-04` (지연 로딩 이미지 우클릭 시 `getBestImgUrl(target)` 저장 및 `findTargetImageIndex()` 플레이스홀더 `srcUrl` 폴백 보완) 해결 및 `core-viewer` `🟢 Sign-Off` 확정 — `tests/core_viewer.test.js`(7/7)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build`·`node --check` PASS
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `core-viewer` 도메인의 `DEFECT-04` 티켓 해결해줘 (또는 `viewer-immersion/DEFECT-02`)
+  > `viewer-immersion` 도메인의 `DEFECT-02` 티켓 해결해줘 (또는 `post-navigation/DEFECT-03`)
 
 ---
 
@@ -17,7 +17,7 @@
 | 도메인 (Bounded Context) | 생명주기 상태 | 구현 진척도 (Step 1~4) | QA 인수 통과율 | 미해결 티켓 (`🚨D` / `🧐R`) | 최근 작업 요약 |
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 기술 스택/동시성 제약 확립 |
-| [`core-viewer`](./features/core-viewer/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `7/9 (78%)` | `1 / 0` | `DEFECT-01~03` 해결 완료, `DEFECT-04` 잔여 (지연 로딩 우클릭) |
+| [`core-viewer`](./features/core-viewer/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 0` | `DEFECT-01~04` 전건 해결 완료 (`bindContextMenuTracker` 지연 로딩 우클릭 매칭 보완, 최종 Sign-Off) |
 | [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `-` | `2 / 1` | `DEFECT-02` 해결 완료, `DEFECT-03~04` 잔여 (`'bottom'` dead code, 이동/폴링 타이머 충돌) |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `DEFECT-03` 해결 완료 (우선순위 셀렉터·뷰어 배제·디스패치 실패/타이머 정리) |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `1/3 (33%)` | `1 / 0` | `DEFECT-01` 등록 (Safari v1.0.0 번들 미동기화 및 `#disagall-quick-launcher` CSS 누락) |
@@ -29,6 +29,9 @@
 ---
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
+
+- **`[2026-11-23]` `[atomic-commit-crafter]` [`core-viewer`]**: `e70e62f` (`fix(core-viewer)` `DEFECT-04`), `3d147a1` (`test(core-viewer)` Test 7 회귀 테스트) 및 `🟢 Sign-Off` 위키/관제탑 동기화 커밋 완료.
+- **`[2026-11-23]` `[systematic-debugger]` [`core-viewer`]**: `DEFECT-04` 해결 및 `🟢 Sign-Off` 전환 — `bindContextMenuTracker()` `getBestImgUrl(target)` 적용 및 `findTargetImageIndex()`의 `state.lastRightClickedImgSrc` 플레이스홀더 `srcUrl` 폴백 보완 (`tests/core_viewer.test.js` 7/7·`npm test`·`immersion_e2e.test.js` 15/15·`npm run build`·`node --check` PASS).
 
 - **`[2026-11-22]` `[atomic-commit-crafter]` [`core-viewer`]**: `1b001e6` (`fix(core-viewer)` `DEFECT-03`), `2fb2576` (`test(core-viewer)` Test 6.1~6.7 회귀 테스트) 및 위키/관제탑 동기화 커밋 완료.
 - **`[2026-11-22]` `[systematic-debugger]` [`core-viewer`]**: `DEFECT-03` 해결 — `state.zoom.suppressNextBackdropClick`/`suppressClickTimer`/`pendingDragRelease` 및 `onWindowMouseUp(e)` 좌클릭 가드로 줌 드래그 이미지 밖 종료·우클릭 간섭·드래그 중 `navigate()` 백드롭 오인 닫힘 차단 (`tests/core_viewer.test.js` 6/6·`npm test`·`immersion_e2e.test.js` 15/15·`npm run build` PASS).
