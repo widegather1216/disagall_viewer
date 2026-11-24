@@ -174,6 +174,17 @@ export function hasPhotoAttachment(row) {
   return false;
 }
 
+const NAV_UNAVAILABLE_MESSAGE = '이동할 수 있는 게시글 목록을 찾을 수 없습니다.';
+
+function createUnavailableResult(error) {
+  return {
+    ok: false,
+    status: 'unavailable',
+    error,
+    message: NAV_UNAVAILABLE_MESSAGE,
+  };
+}
+
 export function getAdjacentPostUrl(
   direction,
   preferPhotos = true,
@@ -184,12 +195,12 @@ export function getAdjacentPostUrl(
   const validRows = getValidPostRows(currentPostNo, root);
 
   if (validRows.length === 0) {
-    return null;
+    return createUnavailableResult('no_list');
   }
 
   const currentIdx = findCurrentPostRowIndex(validRows, currentPostNo);
   if (currentIdx === -1) {
-    return null;
+    return createUnavailableResult('current_not_found');
   }
 
   const step = direction === 'up' ? -1 : 1;
@@ -215,17 +226,23 @@ export function getAdjacentPostUrl(
 
   if (targetIdx < 0 || targetIdx >= validRows.length) {
     return direction === 'up'
-      ? { error: 'top', message: '목록의 가장 최신 글입니다.' }
-      : { error: 'bottom', message: '목록의 마지막 글입니다.' };
+      ? { ok: false, status: 'boundary', error: 'top', message: '목록의 가장 최신 글입니다.' }
+      : { ok: false, status: 'boundary', error: 'bottom', message: '목록의 마지막 글입니다.' };
   }
 
   const targetRow = validRows[targetIdx];
   const targetLink = targetRow.querySelector?.('.gall_tit a:not(.reply_numbox)') || targetRow.querySelector?.('a');
-  const targetTitle = targetLink ? (targetLink.textContent || '').trim().replace(/\s+/g, ' ') : '';
+  if (!targetLink || !isSafePostLink(targetLink)) {
+    return createUnavailableResult('unsafe_url');
+  }
+
+  const targetTitle = (targetLink.textContent || '').trim().replace(/\s+/g, ' ');
 
   return {
-    url: targetLink && isSafePostLink(targetLink) ? targetLink.href : null,
+    ok: true,
+    status: 'found',
+    url: targetLink.href,
     title: targetTitle,
-    hasPhoto: hasPhotoAttachment(targetRow)
+    hasPhoto: hasPhotoAttachment(targetRow),
   };
 }

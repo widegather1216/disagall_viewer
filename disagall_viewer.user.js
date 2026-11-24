@@ -346,15 +346,24 @@
     }
     return false;
   }
+  var NAV_UNAVAILABLE_MESSAGE = "\uC774\uB3D9\uD560 \uC218 \uC788\uB294 \uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
+  function createUnavailableResult(error) {
+    return {
+      ok: false,
+      status: "unavailable",
+      error,
+      message: NAV_UNAVAILABLE_MESSAGE
+    };
+  }
   function getAdjacentPostUrl(direction, preferPhotos = true, currentUrl = typeof window !== "undefined" ? window.location?.href : "", root = typeof document !== "undefined" ? document : null) {
     const currentPostNo = extractPostNo(currentUrl);
     const validRows = getValidPostRows(currentPostNo, root);
     if (validRows.length === 0) {
-      return null;
+      return createUnavailableResult("no_list");
     }
     const currentIdx = findCurrentPostRowIndex(validRows, currentPostNo);
     if (currentIdx === -1) {
-      return null;
+      return createUnavailableResult("current_not_found");
     }
     const step = direction === "up" ? -1 : 1;
     let targetIdx = -1;
@@ -375,13 +384,18 @@
       }
     }
     if (targetIdx < 0 || targetIdx >= validRows.length) {
-      return direction === "up" ? { error: "top", message: "\uBAA9\uB85D\uC758 \uAC00\uC7A5 \uCD5C\uC2E0 \uAE00\uC785\uB2C8\uB2E4." } : { error: "bottom", message: "\uBAA9\uB85D\uC758 \uB9C8\uC9C0\uB9C9 \uAE00\uC785\uB2C8\uB2E4." };
+      return direction === "up" ? { ok: false, status: "boundary", error: "top", message: "\uBAA9\uB85D\uC758 \uAC00\uC7A5 \uCD5C\uC2E0 \uAE00\uC785\uB2C8\uB2E4." } : { ok: false, status: "boundary", error: "bottom", message: "\uBAA9\uB85D\uC758 \uB9C8\uC9C0\uB9C9 \uAE00\uC785\uB2C8\uB2E4." };
     }
     const targetRow = validRows[targetIdx];
     const targetLink = targetRow.querySelector?.(".gall_tit a:not(.reply_numbox)") || targetRow.querySelector?.("a");
-    const targetTitle = targetLink ? (targetLink.textContent || "").trim().replace(/\s+/g, " ") : "";
+    if (!targetLink || !isSafePostLink(targetLink)) {
+      return createUnavailableResult("unsafe_url");
+    }
+    const targetTitle = (targetLink.textContent || "").trim().replace(/\s+/g, " ");
     return {
-      url: targetLink && isSafePostLink(targetLink) ? targetLink.href : null,
+      ok: true,
+      status: "found",
+      url: targetLink.href,
       title: targetTitle,
       hasPhoto: hasPhotoAttachment(targetRow)
     };
@@ -1799,12 +1813,8 @@
   function navigatePost(direction) {
     cancelPendingPostNavigation();
     const result = getAdjacentPostUrl(direction);
-    if (!result) {
-      showViewerToast("\uC774\uB3D9\uD560 \uC218 \uC788\uB294 \uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
-      return;
-    }
-    if (result.error) {
-      showViewerToast(result.message);
+    if (!result || !result.ok || result.status !== "found") {
+      showViewerToast(result?.message || "\uC774\uB3D9\uD560 \uC218 \uC788\uB294 \uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
       return;
     }
     if (!result.url || !isSafeNavigationHref(result.url)) return;

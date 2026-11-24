@@ -206,12 +206,8 @@ export function clearAutoOpenPollTimer() {
 export function navigatePost(direction) {
   cancelPendingPostNavigation();
   const result = getAdjacentPostUrl(direction);
-  if (!result) {
-    showViewerToast('이동할 수 있는 게시글 목록을 찾을 수 없습니다.');
-    return;
-  }
-  if (result.error) {
-    showViewerToast(result.message);
+  if (!result || !result.ok || result.status !== 'found') {
+    showViewerToast(result?.message || '이동할 수 있는 게시글 목록을 찾을 수 없습니다.');
     return;
   }
   if (!result.url || !isSafeNavigationHref(result.url)) return;
