@@ -1513,10 +1513,226 @@ async function runDefect04Tests() {
   }
 }
 
+// Test 11: REFACTOR-05 getAdjacentPostUrl() Discriminated Result contract (found / boundary / unavailable)
+async function runRefactor05Tests() {
+  const { getAdjacentPostUrl } = await import('../src/parser/post_navigator.js');
+  const { navigatePost } = await import('../src/controller/viewer_controller.js');
+  const { state } = await import('../src/state.js');
+  const { CONFIG } = await import('../src/config.js');
+
+  const origWindow = global.window;
+  const origDocument = global.document;
+  const origSessionStorage = global.sessionStorage;
+  const origSetTimeout = global.setTimeout;
+  const origClearTimeout = global.clearTimeout;
+  const prevElements = { ...state.elements };
+  const prevToastTimer = state.toastTimer;
+
+  function makeClassList(classNameStr = '') {
+    const tokens = new Set(classNameStr.split(/\s+/).filter(Boolean));
+    return {
+      contains: (c) => tokens.has(c),
+      add: (c) => tokens.add(c),
+      remove: (c) => tokens.delete(c),
+    };
+  }
+
+  function makeRow({ numText = '', href, title = '게시글', isCurrent = false, hasPic = true }) {
+    const link = {
+      href,
+      textContent: title,
+      getAttribute: (name) => (name === 'href' ? href : null),
+    };
+    return {
+      className: isCurrent ? 'ub-content crt>' : 'ub-content',
+      classList: makeClassList(isCurrent ? 'ub-content crt>' : 'ub-content'),
+      dataset: {},
+      querySelector(sel) {
+        if (sel.includes('.gall_tit a') || sel === 'a') return link;
+        if (sel === '.gall_num') return { textContent: numText };
+        if (sel === '.gall_subject') return { textContent: '일반' };
+        if (sel.includes('.crt_icon') && isCurrent) return { className: 'crt_icon' };
+        if (sel.includes('.icon_pic') && hasPic) return { className: 'icon_pic' };
+        return null;
+      },
+    };
+  }
+
+  let toastMessages = [];
+  let assignedHref = null;
+  let storedAutoOpen = null;
+
+  try {
+    state.elements.toastEl = {
+      textContent: '',
+      classList: makeClassList(),
+    };
+    // Monkey-patch showViewerToast observation via toastEl.textContent
+    Object.defineProperty(state.elements.toastEl, 'textContent', {
+      get: () => toastMessages[toastMessages.length - 1] || '',
+      set: (val) => { toastMessages.push(val); },
+    });
+
+    global.sessionStorage = {
+      setItem(k, v) { if (k === CONFIG.STORAGE_KEY_AUTO_OPEN) storedAutoOpen = v; },
+      getItem() { return null; },
+      removeItem() {},
+    };
+    global.setTimeout = (fn) => { fn(); return 1; };
+    global.clearTimeout = () => {};
+
+    // 11.1 unavailable: no_list (empty board / null root)
+    global.document = { querySelectorAll: () => [] };
+    global.window = {
+      location: {
+        origin: 'https://gall.dcinside.com',
+        get href() { return 'https://gall.dcinside.com/mgallery/board/view/?id=pic&no=100'; },
+        set href(val) { assignedHref = val; },
+      },
+    };
+
+    const noListResult = getAdjacentPostUrl('down', true);
+    assert.strictEqual(noListResult.ok, false, 'REFACTOR-05: empty board must return ok: false');
+    assert.strictEqual(noListResult.status, 'unavailable', 'REFACTOR-05: empty board must return status: unavailable');
+    assert.strictEqual(noListResult.error, 'no_list', 'REFACTOR-05: empty board must return error: no_list');
+    assert.strictEqual(noListResult.message, '이동할 수 있는 게시글 목록을 찾을 수 없습니다.');
+
+    const nullRootResult = getAdjacentPostUrl('up', true, 'https://gall.dcinside.com/mgallery/board/view/?id=pic&no=100', null);
+    assert.deepStrictEqual(nullRootResult, {
+      ok: false,
+      status: 'unavailable',
+      error: 'no_list',
+      message: '이동할 수 있는 게시글 목록을 찾을 수 없습니다.',
+    });
+
+    toastMessages = [];
+    navigatePost('down');
+    assert.deepStrictEqual(toastMessages, ['이동할 수 있는 게시글 목록을 찾을 수 없습니다.']);
+    assert.strictEqual(assignedHref, null);
+    assert.strictEqual(storedAutoOpen, null);
+
+    // 11.2 unavailable: current_not_found
+    const rowsWithoutCurrent = [
+      makeRow({ numText: '200', href: '/mgallery/board/view/?id=pic&no=200', title: '다른 글 1' }),
+      makeRow({ numText: '199', href: '/mgallery/board/view/?id=pic&no=199', title: '다른 글 2' }),
+    ];
+    global.document = { querySelectorAll: (sel) => (sel.includes('table.gall_list') ? rowsWithoutCurrent : []) };
+    const notFoundResult = getAdjacentPostUrl('down', true);
+    assert.deepStrictEqual(notFoundResult, {
+      ok: false,
+      status: 'unavailable',
+      error: 'current_not_found',
+      message: '이동할 수 있는 게시글 목록을 찾을 수 없습니다.',
+    });
+
+    toastMessages = [];
+    navigatePost('up');
+    assert.deepStrictEqual(toastMessages, ['이동할 수 있는 게시글 목록을 찾을 수 없습니다.']);
+    assert.strictEqual(assignedHref, null);
+
+    // 11.3 unavailable: unsafe_url (defense-in-depth if href mutates after row validation)
+    let readCount = 0;
+    const mutatingLink = {
+      get href() {
+        readCount += 1;
+        return readCount <= 3 ? '/mgallery/board/view/?id=pic&no=99' : 'javascript:alert(1)';
+      },
+      textContent: '변조 링크',
+      getAttribute: (name) => (name === 'href' ? (readCount <= 3 ? '/mgallery/board/view/?id=pic&no=99' : 'javascript:alert(1)') : null),
+    };
+    const mutatingRows = [
+      makeRow({ numText: '', href: '/mgallery/board/view/?id=pic&no=100', title: '현재 글', isCurrent: true }),
+      {
+        className: 'ub-content',
+        classList: makeClassList('ub-content'),
+        dataset: {},
+        querySelector(sel) {
+          if (sel.includes('.gall_tit a') || sel === 'a') return mutatingLink;
+          if (sel === '.gall_num') return { textContent: '99' };
+          if (sel === '.gall_subject') return { textContent: '일반' };
+          if (sel.includes('.icon_pic')) return { className: 'icon_pic' };
+          return null;
+        },
+      },
+    ];
+    global.document = { querySelectorAll: (sel) => (sel.includes('table.gall_list') ? mutatingRows : []) };
+    const unsafeResult = getAdjacentPostUrl('down', true);
+    assert.deepStrictEqual(unsafeResult, {
+      ok: false,
+      status: 'unavailable',
+      error: 'unsafe_url',
+      message: '이동할 수 있는 게시글 목록을 찾을 수 없습니다.',
+    });
+
+    readCount = 0;
+    toastMessages = [];
+    navigatePost('down');
+    assert.deepStrictEqual(toastMessages, ['이동할 수 있는 게시글 목록을 찾을 수 없습니다.']);
+    assert.strictEqual(assignedHref, null);
+    assert.strictEqual(storedAutoOpen, null);
+
+    // 11.4 boundary: top & bottom
+    const singleRows = [
+      makeRow({ numText: '', href: '/mgallery/board/view/?id=pic&no=100', title: '단일 현재 글', isCurrent: true }),
+    ];
+    global.document = { querySelectorAll: (sel) => (sel.includes('table.gall_list') ? singleRows : []) };
+    assert.deepStrictEqual(getAdjacentPostUrl('up', true), {
+      ok: false,
+      status: 'boundary',
+      error: 'top',
+      message: '목록의 가장 최신 글입니다.',
+    });
+    assert.deepStrictEqual(getAdjacentPostUrl('down', true), {
+      ok: false,
+      status: 'boundary',
+      error: 'bottom',
+      message: '목록의 마지막 글입니다.',
+    });
+
+    // 11.5 found: normal target result
+    const normalRows = [
+      makeRow({ numText: '101', href: '/mgallery/board/view/?id=pic&no=101', title: '  최신   글  ', hasPic: true }),
+      makeRow({ numText: '', href: '/mgallery/board/view/?id=pic&no=100', title: '현재 글', isCurrent: true }),
+      makeRow({ numText: '99', href: '/mgallery/board/view/?id=pic&no=99', title: '이전 일반 글', hasPic: false }),
+    ];
+    global.document = { querySelectorAll: (sel) => (sel.includes('table.gall_list') ? normalRows : []) };
+    assert.deepStrictEqual(getAdjacentPostUrl('up', true), {
+      ok: true,
+      status: 'found',
+      url: '/mgallery/board/view/?id=pic&no=101',
+      title: '최신 글',
+      hasPhoto: true,
+    });
+    assert.deepStrictEqual(getAdjacentPostUrl('down', false), {
+      ok: true,
+      status: 'found',
+      url: '/mgallery/board/view/?id=pic&no=99',
+      title: '이전 일반 글',
+      hasPhoto: false,
+    });
+
+    toastMessages = [];
+    navigatePost('up');
+    assert.strictEqual(storedAutoOpen, '1');
+    assert.strictEqual(assignedHref, '/mgallery/board/view/?id=pic&no=101');
+
+    console.log('✅ Test 11: REFACTOR-05 getAdjacentPostUrl() Discriminated Result contract passed');
+  } finally {
+    global.window = origWindow;
+    global.document = origDocument;
+    global.sessionStorage = origSessionStorage;
+    global.setTimeout = origSetTimeout;
+    global.clearTimeout = origClearTimeout;
+    state.elements = prevElements;
+    state.toastTimer = prevToastTimer;
+  }
+}
+
 Promise.resolve()
   .then(() => runDefect02Tests())
   .then(() => runDefect03Tests())
   .then(() => runDefect04Tests())
+  .then(() => runRefactor05Tests())
   .then(() => {
     console.log('\n🎉 ALL UNIT & INTEGRATION TESTS PASSED SUCCESSFULLY! 🎉');
   })
