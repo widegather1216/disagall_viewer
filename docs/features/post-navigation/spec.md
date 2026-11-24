@@ -7,6 +7,10 @@
 - `CONFIG.POST_NAV_DELAY`: `150` (ms, 토스트 노출 후 페이지 전환 대기 시간)
 - `CONFIG.NO_PHOTO_NOTICE_DURATION`: `8000` (ms, 사진 없는 글 알림바 노출 시간)
 - `PostRowInfo`: `{ element: HTMLElement, no: string, title: string, url: string, hasPhoto: boolean, isCurrent: boolean }`
+- `AdjacentPostResult` (Discriminated Result Union — `REFACTOR-05` / `ADR-005`):
+  - **Found**: `{ ok: true, status: 'found', url: string, title: string, hasPhoto: boolean }`
+  - **Boundary**: `{ ok: false, status: 'boundary', error: 'top' | 'bottom', message: string }`
+  - **Unavailable**: `{ ok: false, status: 'unavailable', error: 'no_list' | 'current_not_found' | 'unsafe_url', message: '이동할 수 있는 게시글 목록을 찾을 수 없습니다.' }`
 
 ## 2. DOM 탐색 및 게시글 필터링 계약 (`post_navigator.js`)
 
@@ -28,16 +32,22 @@
 - 사진 탭이 활성화되지 않은 일반 게시판에서, 글 목록 내 이미지 아이콘(`.sp_img.icon_pic`, `.icon_pic`, `.pic_icon`)을 보유한 게시글을 우선 탐색하여 글만 있는 게시글을 자동으로 건너뜀.
 - 목록 내 잔여 사진글이 없을 경우 가장 가까운 일반 글로 폴백.
 
+### 2.4 반환 계약 (`getAdjacentPostUrl` — `AdjacentPostResult`)
+- `getAdjacentPostUrl(direction, preferPhotos = true, currentUrl, root)`는 `null`을 반환하지 않고 항상 `ok`/`status` 판별자를 포함한 `AdjacentPostResult` 객체를 반환한다:
+  1. **목록 없음 / 현재 글 미발견 / 안전하지 않은 URL**: `{ ok: false, status: 'unavailable', error: 'no_list' | 'current_not_found' | 'unsafe_url', message: '이동할 수 있는 게시글 목록을 찾을 수 없습니다.' }`
+  2. **목록 상·하단 경계 도달**: `{ ok: false, status: 'boundary', error: 'top' | 'bottom', message: '목록의 가장 최신 글입니다.' | '목록의 마지막 글입니다.' }`
+  3. **유효 인접 글 탐색 성공**: `{ ok: true, status: 'found', url: string, title: string, hasPhoto: boolean }`
+
 ## 3. 세션 및 페이지 전환 계약 (`viewer_controller.js`)
 
 ### 3.1 `navigatePost(direction)`
 - `direction`: `'up'` (이전/최신 글, 목록 상 위쪽) | `'down'` (다음/과거 글, 목록 상 아래쪽)
-- 유효한 타겟 URL이 있을 경우:
-  1. 토스트 안내: `showToast("이전 글(사진)로 이동합니다... ⏳")`
+- `result.ok && result.status === 'found'`이고 `isSafeNavigationHref(result.url)`를 통과한 경우:
+  1. 토스트 안내: `showViewerToast("위쪽 최신 글/아래쪽 이전 글로 이동 중...")`
   2. 세션 플래그 설정: `sessionStorage.setItem('disagall_auto_open', '1')`
-  3. 지연 전환: `setTimeout(() => { window.location.href = targetUrl; }, 150)`
-- 유효한 타겟이 없을 경우:
-  - `showToast("목록의 처음/마지막 글입니다.")` 토스트 출력 후 페이지 유지
+  3. 지연 전환: `setTimeout(() => { window.location.href = result.url; }, 150)`
+- `!result || !result.ok || result.status !== 'found'` (`boundary` 또는 `unavailable`)인 경우:
+  - `showViewerToast(result?.message || '이동할 수 있는 게시글 목록을 찾을 수 없습니다.')` 토스트 출력 후 페이지 유지
 
 ### 3.2 `checkAutoOpen()` 부트스트랩
 - 페이지 로드(`DOMContentLoaded` / document-end) 시 실행:

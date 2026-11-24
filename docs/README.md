@@ -1,14 +1,14 @@
 # 🧭 Disagall Viewer Master Control Tower (Living Wiki Hub)
 
-> **최종 업데이트**: 2026-11-23 (by `systematic-debugger`)
+> **최종 업데이트**: 2026-11-24 (by `systematic-debugger`)
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: 전 도메인 (`core-viewer` `🟢 Sign-Off`, `post-navigation`, `post-recommend` `🟢 Sign-Off`, `viewer-immersion` `🟢 Sign-Off`, `modular-bundler-migration` `🟢 Sign-Off`)
-- **현재 단계 (Stage)**: `🩹 Debugging` (`잔여 결함 0건 OPEN` — P0 0건 / P1+ 0건 + REFACTOR 1건; `core-viewer/DEFECT-01~04`, `post-navigation/DEFECT-01~04`, `post-recommend/DEFECT-01~03`, `viewer-immersion/DEFECT-01~03`, `modular-bundler-migration/DEFECT-01` 해결 완료)
-- **직전 완료 작업**: `systematic-debugger`로 `modular-bundler-migration/DEFECT-01` (`content.css` `#disagall-quick-launcher` 스타일 복구, `build.js` `syncSafariResources()` 9종 에셋 자동 동기화, `disagall_viewer.zip` 재생성) 해결 및 `🟢 Sign-Off` 전환 — `tests/module_import.test.js`(4/4)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build`·`npm run pack`·`node --check` PASS
+- **Active 도메인**: `post-navigation` (`core-viewer` `🟢 Sign-Off`, `post-recommend` `🟢 Sign-Off`, `viewer-immersion` `🟢 Sign-Off`, `modular-bundler-migration` `🟢 Sign-Off`)
+- **현재 단계 (Stage)**: `🧪 QA Testing` (`전 도메인 잔여 결함 0건 OPEN` — DEFECT 0건 / REFACTOR 0건; `post-navigation` 동적 QA 검증 대기)
+- **직전 완료 작업**: `systematic-debugger`로 `post-navigation/REFACTOR-05` (`getAdjacentPostUrl()` 하위 호환 Discriminated Result `AdjacentPostResult` 계약 통일 — Option A, `navigatePost()` 단일 가드 정리, `spec.md`·`ADR-005` 명문화) 해결 완료 — `tests/post_navigation.test.js`(11/11)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build`·`node --check` PASS
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `post-navigation` 도메인의 `REFACTOR-05` 티켓 해결해줘
+  > `post-navigation` 도메인 Happy Path QA 검증 진행해줘
 
 ---
 
@@ -18,7 +18,7 @@
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 기술 스택/동시성 제약 확립 |
 | [`core-viewer`](./features/core-viewer/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 0` | `DEFECT-01~04` 전건 해결 완료 (`bindContextMenuTracker` 지연 로딩 우클릭 매칭 보완, 최종 Sign-Off) |
-| [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `-` | `0 / 1` | `DEFECT-01~04` 전건 해결 완료 (이동/폴링 타이머 수명주기·`pagehide` 정리), `REFACTOR-05`(Nitpick) 잔여 |
+| [`post-navigation`](./features/post-navigation/README.md) | 🧪 QA Testing | `[■■■■] 4/4` | `-` | `0 / 0` | `DEFECT-01~04`·`REFACTOR-05` 전건 해결 완료 (하위 호환 Discriminated Result 통일, 동적 QA 대기) |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `DEFECT-03` 해결 완료 (우선순위 셀렉터·뷰어 배제·디스패치 실패/타이머 정리) |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 0` | `DEFECT-01` 해결 완료 (`#disagall-quick-launcher` CSS 복구·Safari 9종 자동 동기화·`pack` 갱신, 최종 Sign-Off) |
 | [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■■■■■] 8/8` | `15/15 (100%)` | `0 / 0` | `DEFECT-01~03 전건 해결 완료 (단일 스토리지 동기화 통합·비동기 초기화 레이스 방어, 최종 Sign-Off)` |
@@ -30,6 +30,8 @@
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
 
+- **`[2026-11-24]` `[atomic-commit-crafter]` [`post-navigation`]**: `849a3d4` (`refactor(post-navigation)` `REFACTOR-05`), `d0bc853` (`test(post-navigation)` Test 11) 및 `spec.md`/`ADR-005`/관제탑 동기화 커밋 완료 (전 도메인 미해결 티켓 `0 / 0`).
+- **`[2026-11-24]` `[systematic-debugger]` [`post-navigation`]**: `REFACTOR-05` 해결 및 `🧪 QA Testing` 전환 — `getAdjacentPostUrl()` 하위 호환 Discriminated Result `AdjacentPostResult`(`found`/`boundary`/`unavailable`, Option A) 통일, `navigatePost()` 단일 가드 정리, `spec.md`·`ADR-005` 명문화 (`tests/post_navigation.test.js` 11/11·`npm test`·`immersion_e2e.test.js` 15/15·`npm run build`·`node --check` PASS).
 - **`[2026-11-23]` `[atomic-commit-crafter]` [`modular-bundler-migration`]**: `e7f1fcd` (`fix(bundler)` `DEFECT-01`), `f7e5eb8` (`test(bundler)` Test 4) 및 `🟢 Sign-Off` 위키/관제탑 동기화 커밋 완료.
 - **`[2026-11-23]` `[systematic-debugger]` [`modular-bundler-migration`]**: `DEFECT-01` 해결 및 `🟢 Sign-Off` 전환 — `content.css` `#disagall-quick-launcher` 스타일 복구, `build.js` `syncSafariResources()` 9종 에셋 자동 동기화 통합, `npm run pack`으로 `disagall_viewer.zip` 재생성 (`tests/module_import.test.js` 4/4·`npm test`·`immersion_e2e.test.js` 15/15·`npm run build`·`npm run pack`·`node --check` PASS).
 - **`[2026-11-23]` `[atomic-commit-crafter]` [`post-navigation`]**: `40ec587` (`fix(post-navigation)` `DEFECT-04`), `f55f8b3` (`test(post-navigation)` Test 10 회귀 테스트) 및 위키/관제탑 동기화 커밋 완료.

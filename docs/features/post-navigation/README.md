@@ -1,8 +1,8 @@
 # 📦 [post-navigation] 위/아래 방향키 게시글 탐색 (Post Navigation)
 
-- **현재 상태 (Lifecycle)**: `🩹 Debugging`
+- **현재 상태 (Lifecycle)**: `🧪 QA Testing`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,24 +29,24 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-23 / `systematic-debugger` / `DEFECT-04` (`navigatePost()` 미취소 `setTimeout`·`disagall_auto_open` 잔류 및 `startAutoOpenPolling()` 고아 `setInterval` 충돌) 해결 및 회귀 검증 완료
+- **직전 완료 작업**: 2026-11-24 / `systematic-debugger` / `REFACTOR-05` (`getAdjacentPostUrl()` 하위 호환 확장형 Discriminated Result 계약 통일 — Option A) 해결 및 회귀 검증 완료
 - **생성/수정된 핵심 파일**:
-  - `src/state.js`: `postNavTimer`, `autoOpenPollTimer` 타이머 상태 등록
-  - `src/ui/overlay.js`: `dismissViewerToast()` 추가 및 `showViewerToast()` `toastSeq`·널 가드 보완
-  - `src/controller/viewer_controller.js`: `cancelPendingPostNavigation()`·`clearAutoOpenPollTimer()`·`postNavSeq`/`autoOpenPollSeq` 도입, `navigatePost()`/`openViewer()`(`length > 0` 확정 후)/`closeViewer()`/`startAutoOpenPolling()`/`pagehide` 수명주기 정리 연동
-  - `tests/post_navigation.test.js`: Test 10 (`DEFECT-04` 타이머 취소/Last-Wins/폴링 충돌/`pagehide` 회귀 테스트) 추가
-  - `content.js`, `disagall_viewer.user.js`: `npm run build` 번들 동기화
+  - `src/parser/post_navigator.js`: `createUnavailableResult()` 도입 및 `getAdjacentPostUrl()` 반환값을 `AdjacentPostResult`(`found` / `boundary` / `unavailable`: `no_list`·`current_not_found`·`unsafe_url`)로 통일
+  - `src/controller/viewer_controller.js`: `navigatePost()`를 `!result || !result.ok || result.status !== 'found'` 단일 가드로 정리(기존 토스트·URL 가드 보존)
+  - `tests/post_navigation.test.js`: Test 11 (`REFACTOR-05` `found`/`boundary`/`unavailable` 3종 및 `navigatePost` 연동 회귀 테스트) 추가 및 기존 Test 9 하위 호환 통과
+  - `docs/features/post-navigation/spec.md`, `decisions.md`: `AdjacentPostResult` 계약 및 `ADR-005` 명문화
+  - `content.js`, `disagall_viewer.user.js`, `safari_extension/.../Resources/`: `npm run build` 번들 동기화
 - **검증 완료된 테스트 실행 명령어**:
-  - `node tests/post_navigation.test.js`: 10/10 PASS (Test 4 선택적 `live_post.html` 미존재로 skip)
+  - `node tests/post_navigation.test.js`: 11/11 PASS (Test 4 선택적 `live_post.html` 미존재로 skip)
   - `npm test` && `node tests/immersion_e2e.test.js`: 5개 단위 스위트 전량 PASS & E2E 15/15 PASS
   - `npm run build` && `node --check`: PASS
 - **Recent Commits**:
+  - `849a3d4` - `refactor(post-navigation): return backward-compatible discriminated result from getAdjacentPostUrl`
+  - `d0bc853` - `test(post-navigation): add regression tests for REFACTOR-05 discriminated result contract`
   - `40ec587` - `fix(post-navigation): track and cancel navigation timeout and auto-open polling timers`
   - `f55f8b3` - `test(post-navigation): add regression tests for DEFECT-04 timer and polling conflicts`
   - `22a5e6d` - `fix(post-navigation): fix bottom boundary return, notice/ad filtering, and unsafe href schemes`
   - `a52567b` - `test(post-navigation): add regression tests for DEFECT-03 boundaries, filters, and URL sanitization`
-  - `0db8e14` - `fix(post-navigation): prevent no-photo notice keydown leak and input interception`
-  - `f97ae7a` - `test(post-navigation): add regression tests for DEFECT-02 notice lifecycle and key guards`
 - **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `post-navigation` 도메인 `DEFECT` 0건 (`REFACTOR-05` Nitpick 1건 잔여). 다음 포커스는 `modular-bundler-migration/DEFECT-01` 해결 또는 `post-navigation` QA/리팩토링 진행.
+  - `post-navigation` 도메인 미해결 `DEFECT` 0건 · `REFACTOR` 0건 달성. 다음 포커스는 `post-navigation` 도메인 동적 QA(`Happy Path` / `Boundary & Negative`) 검증 진행.

@@ -1,7 +1,7 @@
 # Verification & Defect Log - Post Navigation
 
-- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` — `DEFECT-01~04` 해결 완료, `REFACTOR-05` 1건 OPEN)
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
+- **검증 상태**: `🧪 QA Testing` (`0건 OPEN` — `DEFECT-01~04` 및 `REFACTOR-01~13` 전건 해결 완료, 동적 QA 검증 대기)
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -54,8 +54,12 @@
 - **현재 상태**: 🟢 RESOLVED — 프로젝트 내 로컬 픽스처 경로 및 안전 가드 적용 (`PASS`).
 
 ### [REFACTOR-05] `getAdjacentPostUrl`의 반환 타입 다형성(Discriminated Result 계약 불일치)
-- **심각도**: 🟢 Nitpick (사소함) | **위치**: [`src/parser/post_navigator.js#L117-L167`](../../../src/parser/post_navigator.js#L117-L167)
-- **현재 상태**: 🟡 OPEN (현재 인터페이스 호환성 유지 중)
+- **심각도**: 🟢 Nitpick (사소함) | **위치**: [`src/parser/post_navigator.js#L177-L248`](../../../src/parser/post_navigator.js#L177-L248), [`src/controller/viewer_controller.js#L206-L213`](../../../src/controller/viewer_controller.js#L206-L213)
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료 — Option A 하위 호환 Discriminated Result 적용)
+- **해결 내역**:
+  - **수정 파일**: [`src/parser/post_navigator.js`](../../../src/parser/post_navigator.js#L177-L248), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js#L206-L213), [`tests/post_navigation.test.js`](../../../tests/post_navigation.test.js#L1516-L1729), [`docs/features/post-navigation/spec.md`](./spec.md#L10-L50), [`docs/features/post-navigation/decisions.md`](./decisions.md#L33-L38)
+  - **원인 및 조치**: 기존 `getAdjacentPostUrl()`이 `null` / `{ error, message }` / `{ url, title, hasPhoto }` 3가지 형태로 다형 반환되던 계약을 사용자 컨펌(Option A)에 따라 단일 `AdjacentPostResult` Discriminated Result로 통일(`createUnavailableResult()` 헬퍼 도입: `no_list`/`current_not_found`/`unsafe_url` ➔ `{ ok: false, status: 'unavailable', error, message }`, 경계 ➔ `{ ok: false, status: 'boundary', error: 'top' | 'bottom', message }`, 성공 ➔ `{ ok: true, status: 'found', url, title, hasPhoto }`). `navigatePost()`는 `!result || !result.ok || result.status !== 'found'` 단일 가드로 정리했고, `Test 11` Red-to-Green 및 기존 `Test 9` 하위 호환성을 검증했으며 `npm run build`로 번들을 동기화함.
+  - **회귀 테스트 결과**: `node tests/post_navigation.test.js` (`11/11 PASS`), `npm test` (5개 스위트 전량 `PASS`), `node tests/immersion_e2e.test.js` (`15/15 PASS`), `npm run build` (`PASS`), `node --check` (`PASS`)
 
 ### [REFACTOR-06] `window.onmessage` 출처(Origin) 및 신뢰성 검증 부재 (보안 위생)
 - **현재 상태**: 🟢 RESOLVED — 동일 출처(`window.location.origin`) 및 로컬 테스트 페이지 허용 가드 적용 완료.

@@ -29,3 +29,10 @@
   - `getAdjacentPostUrl(direction, preferPhotos = true)`: 사진 글이 있을 경우 텍스트 글을 자동으로 스킵하고 다음 사진 글로 우선 이동. 사진 글이 없을 경우 일반 행으로 안전 폴백.
   - 연속 감상 중 사진이 없는 글에 도착한 경우: 뷰어가 조용히 종료되는 대신 상단 플로팅 배너(`disagall-no-photo-notice`)를 표시하고 키보드 `↑`/`↓`/`w`/`s` 및 버튼 액션을 유지하여 연속 감상 흐름을 끊김 없이 복구.
 - **영향**: 사진 탭이 존재하지 않는 모든 디시 갤러리에서도 끊김 없는 사진 연속 감상 경험 보장.
+
+### [ADR-005] `getAdjacentPostUrl` 하위 호환 확장형 Discriminated Result 계약 (Option A)
+- **배경**: 기존 `getAdjacentPostUrl()`은 목록 없음/현재 글 미발견 시 `null`, 경계 도달 시 `{ error, message }`, 성공 시 `{ url, title, hasPhoto }` 등 3가지 이질적 반환 타입을 사용해 호출부가 `if (!result)`와 `if (result.error)`를 이중 분기해야 했음(`REFACTOR-05`).
+- **결정**: 기존 테스트(`tests/post_navigation.test.js` Test 9의 `.error`/`.message`/`.url` 단언)와의 하위 호환성을 유지하면서 반환 타입 다형성을 제거하기 위해 **Option A(하위 호환 확장형 Discriminated Result)** 채택:
+  - `null` 반환을 제거하고 모든 분기에서 `ok: boolean` 및 `status: 'found' | 'boundary' | 'unavailable'` 판별자를 포함.
+  - 성공 시 `{ ok: true, status: 'found', url, title, hasPhoto }`, 경계 시 `{ ok: false, status: 'boundary', error: 'top' | 'bottom', message }`, 불가 시 `{ ok: false, status: 'unavailable', error: 'no_list' | 'current_not_found' | 'unsafe_url', message }` 반환.
+- **영향**: `viewer_controller.js`의 `navigatePost()`는 `!result || !result.ok || result.status !== 'found'` 단일 분기로 단순화되며, 기존 `.url`/`.error`/`.message` 호출 계약도 100% 보존됨.
