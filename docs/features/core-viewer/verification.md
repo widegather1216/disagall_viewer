@@ -1,8 +1,8 @@
 # 🧪 [core-viewer] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 2건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
+- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 1건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
 - **인수 조건 통과율**: `9 / 9 Scenarios PASS (100%)`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
 
 ---
 
@@ -125,7 +125,11 @@
   // 3. userscript.js controller 경유 위임(이미지 클릭 판별·isOverlayActive·isEditableTarget 재사용) 및 extension.js message 가드
   // 4. image_parser.js URL base/스킴 검증, getBestImgUrl/isDcIconOrUiAsset 평탄화 및 단일 패스 추출
   ```
-- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **해결 내역**:
+  - **수정 파일**: [`src/state.js`](../../../src/state.js#L31), [`src/controller/image_loader.js`](../../../src/controller/image_loader.js), [`src/controller/overlay_bindings.js`](../../../src/controller/overlay_bindings.js), [`src/controller/viewer_shortcuts.js`](../../../src/controller/viewer_shortcuts.js), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js), [`src/ui/overlay_template.js`](../../../src/ui/overlay_template.js), [`src/ui/overlay.js`](../../../src/ui/overlay.js), [`src/ui/zoom_pan.js`](../../../src/ui/zoom_pan.js), [`src/userscript.js`](../../../src/userscript.js), [`src/extension.js`](../../../src/extension.js), [`src/parser/image_parser.js`](../../../src/parser/image_parser.js), [`content.css`](../../../content.css)
+  - **원인 및 조치**: `viewer_controller.js`(267줄)에서 이미지 로더(`image_loader.js` 157줄)·단축키(`viewer_shortcuts.js` 83줄)·오버레이 컨트롤 바인딩(`overlay_bindings.js` 79줄)을 분리하고 기존 re-export 호환성 유지, `bindOverlayBackdrop`·`openViewer` null 가드, `contextmenu`/`resize`/`message` 멱등 가드, `state.quickLauncherTimer`·`pagehide` `flushPaddingSave()` 정리를 추가함. `overlay.js`(151줄) 마크업(`overlay_template.js` 116줄) 및 피팅 헬퍼 분할·`formatImageOrientationLabel()` 공용화·`zoom_pan.js`(159줄) `CONFIG.ZOOM_EPSILON`·중복 팬 초기화 제거·`content.css` 데드 규칙 정리를 반영함. `userscript.js`의 `state`/`image_parser` 직접 임포트 제거 및 `extension.js` `message` null 가드를 추가하고, `image_parser.js`(175줄) `http:`/`https:` 스킴·상대 URL·`javascript:` 앵커 차단, 단일 속성 패스·`DC_ICON_URL_SUBSTRINGS`·중첩 컨테이너 제외를 적용한 뒤 `npm run build`로 번들을 동기화함.
+  - **회귀 테스트 결과**: `npm run build` (`PASS`), `npm test` (`core_viewer` 8/8 포함 5개 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
 
 ### [REFACTOR-03] `tests/core_viewer.test.js` 줌 변환·가로 피팅·토스트 타이머 테스트 커버리지 보강 및 위생 정리
 - **심각도**: 🟡 Should Fix (권장 조치)

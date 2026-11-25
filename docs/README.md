@@ -4,11 +4,11 @@
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: `core-viewer` (`🩹 Debugging` — 잔여 3건 `REFACTOR` 티켓: 🟡 Should Fix 3건)
-- **현재 단계 (Stage)**: `🩹 Debugging` (전 도메인 미해결 티켓 `0 / 3`)
-- **직전 완료 작업**: 2026-11-25 `post-navigation` `REFACTOR-15` 해결 (`post_navigator.js` 방어·평탄화, `no_photo_notice.js`·`dom_guards.js`·`post_nav_controller.js` 단방향 분리 및 re-export 유지, `🟢 Sign-Off` 확정)
+- **Active 도메인**: `core-viewer` (`🩹 Debugging` — 잔여 1건 `REFACTOR` 티켓: 🟡 Should Fix 1건)
+- **현재 단계 (Stage)**: `🩹 Debugging` (전 도메인 미해결 티켓 `0 / 2`)
+- **직전 완료 작업**: 2026-11-25 `core-viewer` `REFACTOR-02` 해결 (`viewer_controller.js`·`overlay.js`·`zoom_pan.js` SRP 분리 및 라인 상한 준수, `userscript.js` 단방향 경유, `image_parser.js` 스킴/상대 URL/중복 정리 및 번들 동기화)
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `core-viewer` 도메인의 `REFACTOR-02` 티켓 해결해줘
+  > `core-viewer` 도메인의 `REFACTOR-03` 티켓 해결해줘
 
 ---
 
@@ -17,7 +17,7 @@
 | 도메인 (Bounded Context) | 생명주기 상태 | 구현 진척도 (Step 1~4) | QA 인수 통과율 | 미해결 티켓 (`🚨D` / `🧐R`) | 최근 작업 요약 |
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 테스트/컨트롤러/UI 목록 최신화 |
-| [`core-viewer`](./features/core-viewer/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 2` | `REFACTOR-01` 해결(예외/`rAF` 누수/`!active` 가드), `REFACTOR-02~03` 🟡 잔여 |
+| [`core-viewer`](./features/core-viewer/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 1` | `REFACTOR-02` 해결(SRP 분리·단방향 경유·파서 방어), `REFACTOR-03` 🟡 잔여 |
 | [`post-navigation`](./features/post-navigation/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `11/11 (100%)` | `0 / 0` | `REFACTOR-15` 해결(`no_photo_notice.js`·`post_nav_controller.js` 분리·방어 보강), `🟢 Sign-Off` 확정 |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `REFACTOR-02` 해결(`triggerPostRecommend` 분할·`findValidInSelector` 평탄화), `🟢 Sign-Off` 확정 |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 1` | 클린코드 감사(`REFACTOR-01` 🟡 `npm test` E2E 연동·스크래치 정리) 발행 |
@@ -29,6 +29,8 @@
 ---
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
+
+- **`[2026-11-25]` `[systematic-debugger]` [`core-viewer`]**: `REFACTOR-02` 해결 — `image_loader.js`(157줄)·`overlay_bindings.js`(79줄)·`viewer_shortcuts.js`(83줄)·`overlay_template.js`(116줄) 분리로 `viewer_controller.js`(267줄)·`overlay.js`(151줄)·`zoom_pan.js`(159줄) 라인 상한 준수 및 re-export 호환 유지, `userscript.js` controller 단방향 위임·`extension.js` `message` null 가드, `image_parser.js`(175줄) `http:`/`https:`·상대 URL·`javascript:` 앵커 차단·단일 패스·중첩 컨테이너 제외 적용 (`npm run build`·`npm test`·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS).
 
 - **`[2026-11-25]` `[systematic-debugger]` [`post-navigation`]**: `REFACTOR-15` 해결 — `post_navigator.js` `getClassNameString()`/`getTrimmedText()`/`queryPostTitleLink()`/`findTargetPostIndex()`/`buildFoundPostResult()` 추출 및 `SVGAnimatedString`/null/`direction` 방어, `no_photo_notice.js`(136줄)·`dom_guards.js`(34줄)·`post_nav_controller.js`(124줄) 단방향 분리(`overlay.js`/`viewer_controller.js` re-export 유지), `<svg class="icon_img">`·무콜백 단언 추가 및 `🟢 Sign-Off` 확정 (`npm run build`·`npm test`·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS).
 

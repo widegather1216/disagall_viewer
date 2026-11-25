@@ -33,11 +33,15 @@ flowchart TD
 - **파서 & 데이터 추출**:
   - `src/parser/image_parser.js`: 15종 컨테이너 탐색, 23종 비본문 제외, 디시콘 필터링, 다운스케일 쿼리 제거
 - **UI 및 제스처 엔진**:
-  - `src/ui/overlay.js`: 오버레이 DOM 빌더, 슬라이더/버튼/토스트 바인딩, 종횡비 피팅 계산
+  - `src/ui/overlay_template.js`: 오버레이 헤더/스테이지/푸터 HTML 템플릿 빌더 (`buildOverlayHeaderHtml`, `buildOverlayStageHtml`, `buildOverlayFooterHtml`, `buildOverlayHtml`)
+  - `src/ui/overlay.js`: 오버레이 DOM 캐시, 토스트 제어, 공용 방향 라벨 포맷터(`formatImageOrientationLabel`), 종횡비 피팅 계산
   - `src/ui/zoom_pan.js`: 1.0x~5.0x 마우스 휠 줌, 트랙패드 핀치, 드래그 팬, 더블클릭 리셋, RAF 렌더러
 - **컨트롤러 및 상태**:
-  - `src/controller/viewer_controller.js`: 뷰어 열기/닫기, 이전/다음 탐색, 리사이즈 디바운스, 단축키 처리
-  - `src/state.js`: 뷰어 런타임 상태(이미지 목록, 인덱스, 줌, DOM 캐시) 관리
+  - `src/controller/image_loader.js`: 본문 이미지 프리로드, 수집, 세대 토큰 기반 비동기 `showImage`/`navigate` 및 타깃 인덱스 탐색
+  - `src/controller/overlay_bindings.js`: 오버레이 버튼, 패딩 슬라이더, 백드롭 클릭 이벤트 바인딩
+  - `src/controller/viewer_shortcuts.js`: 뷰어 내 단축키(`handleKeyDown`) 및 전역 `V`/`KeyV` 단축키(`handleGlobalViewerShortcut`) 디스패치
+  - `src/controller/viewer_controller.js`: 뷰어 열기/닫기, 리사이즈 디바운스, `pagehide` 정리, 유저스크립트/컨텍스트 메뉴 진입 브릿지
+  - `src/state.js`: 뷰어 런타임 상태(이미지 목록, 인덱스, 줌, 타이머, DOM 캐시) 관리
   - `src/config.js`: 기본 패딩, 딜레이, 스토리지 키 관리
 
 ## 3. 타 도메인 참조 및 경계 계약 (Cross-Domain Dependencies)
