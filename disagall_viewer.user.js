@@ -1113,6 +1113,7 @@
   }
 
   // src/controller/immersion_controller.js
+  var FULLSCREEN_TRANSITION_MOUSE_GUARD_MS = 1e3;
   var isHeaderHovered = false;
   var isSliderInteracting = false;
   var isPaddingSavePending = false;
@@ -1127,6 +1128,11 @@
   var osFullscreenWanted = false;
   var hasObservedOsFullscreen = false;
   var hasUserToggledFullscreenInSession = false;
+  var fullscreenMouseGuardUntil = 0;
+  var lastPointerScreenX = null;
+  var lastPointerScreenY = null;
+  var lastPointerClientX = null;
+  var lastPointerClientY = null;
   var initialSettingsLoadSeq = 0;
   var hasLocalPaddingEditSinceLoad = false;
   var hasOnChangedSync = {
@@ -1143,11 +1149,25 @@
     clearTimeout(state.idleTimer);
     state.idleTimer = null;
   }
+  function armFullscreenMouseGuard() {
+    fullscreenMouseGuardUntil = Date.now() + FULLSCREEN_TRANSITION_MOUSE_GUARD_MS;
+  }
+  function clearFullscreenMouseGuard() {
+    fullscreenMouseGuardUntil = 0;
+  }
+  function resetLastPointerCoords() {
+    lastPointerScreenX = null;
+    lastPointerScreenY = null;
+    lastPointerClientX = null;
+    lastPointerClientY = null;
+  }
   function resetImmersionGuards() {
     isHeaderHovered = false;
     isSliderInteracting = false;
     isPaddingSavePending = false;
     pendingSelfPaddingWrites = [];
+    clearFullscreenMouseGuard();
+    resetLastPointerCoords();
   }
   function setPaddingSavePending(pending) {
     isPaddingSavePending = Boolean(pending);
@@ -1233,6 +1253,7 @@
     if (!isOverlayActive()) return false;
     const { overlayEl } = state.elements;
     if (isAnyUiHiddenClass(overlayEl)) {
+      clearFullscreenMouseGuard();
       showUi();
       resetIdleTimer();
       return false;
@@ -1265,8 +1286,12 @@
   function enterFullscreenVisualState() {
     if (!isOverlayActive()) return;
     const { overlayEl } = state.elements;
+    armFullscreenMouseGuard();
     if (state.isFullscreenMode && overlayEl.classList.contains("disagall-fullscreen")) {
       updateFullscreenButtonUi(true);
+      if (!isAnyUiHiddenClass(overlayEl)) {
+        hideUi(true);
+      }
       return;
     }
     state.isFullscreenMode = true;
@@ -1279,6 +1304,7 @@
     const wasActive = Boolean(
       state.isFullscreenMode || overlayEl && overlayEl.classList.contains("disagall-fullscreen")
     );
+    clearFullscreenMouseGuard();
     state.isFullscreenMode = false;
     if (overlayEl) {
       overlayEl.classList.remove("disagall-fullscreen");
@@ -1296,6 +1322,7 @@
     osFullscreenWanted = false;
     hasObservedOsFullscreen = false;
     hasUserToggledFullscreenInSession = false;
+    clearFullscreenMouseGuard();
     state.isFullscreenMode = false;
     const { overlayEl } = state.elements;
     if (overlayEl) {
@@ -1421,6 +1448,7 @@
     const seq = ++fullscreenTransitionSeq;
     inFlightRequestSeq = seq;
     osFullscreenWanted = true;
+    armFullscreenMouseGuard();
     try {
       const result = requestFn();
       if (result && typeof result.then === "function") {
@@ -1677,10 +1705,52 @@
       window.addEventListener("mouseup", endSliderInteraction);
     }
   }
+  function updateLastPointerCoords(e) {
+    if (!e) return;
+    if (Number.isFinite(e.screenX) && Number.isFinite(e.screenY)) {
+      lastPointerScreenX = e.screenX;
+      lastPointerScreenY = e.screenY;
+    }
+    if (Number.isFinite(e.clientX) && Number.isFinite(e.clientY)) {
+      lastPointerClientX = e.clientX;
+      lastPointerClientY = e.clientY;
+    }
+  }
+  function isStationarySyntheticMouseMove(e) {
+    if (!e) return false;
+    const hasMovement = Number.isFinite(e.movementX) && Number.isFinite(e.movementY);
+    if (hasMovement && (e.movementX !== 0 || e.movementY !== 0)) {
+      return false;
+    }
+    if (Number.isFinite(e.screenX) && Number.isFinite(e.screenY) && lastPointerScreenX !== null) {
+      return e.screenX === lastPointerScreenX && e.screenY === lastPointerScreenY;
+    }
+    if (Number.isFinite(e.clientX) && Number.isFinite(e.clientY) && lastPointerClientX !== null) {
+      return e.clientX === lastPointerClientX && e.clientY === lastPointerClientY;
+    }
+    return false;
+  }
+  function shouldSuppressMouseMoveOnHiddenUi(overlayEl, e) {
+    if (!isAnyUiHiddenClass(overlayEl)) return false;
+    const isFullscreenTransitioning = (state.isFullscreenMode || inFlightRequestSeq !== 0) && Date.now() < fullscreenMouseGuardUntil;
+    if (isFullscreenTransitioning) {
+      return true;
+    }
+    return isStationarySyntheticMouseMove(e);
+  }
+  function handleOverlayMouseMove(overlayEl, e) {
+    if (!isOverlayActive()) return;
+    if (shouldSuppressMouseMoveOnHiddenUi(overlayEl, e)) {
+      updateLastPointerCoords(e);
+      return;
+    }
+    updateLastPointerCoords(e);
+    resetIdleTimer();
+  }
   function bindImmersionEvents(overlayEl, sliderEl) {
     bindFullscreenChangeListener();
-    overlayEl.addEventListener("mousemove", () => {
-      resetIdleTimer();
+    overlayEl.addEventListener("mousemove", (e) => {
+      handleOverlayMouseMove(overlayEl, e);
     });
     bindHeaderHoverEvents(overlayEl);
     bindSliderInteractionEvents(sliderEl);
@@ -2037,8 +2107,12 @@
     }
     overlayEl.classList.add("active");
     document.body.style.overflow = "hidden";
-    showUi();
-    resetIdleTimer();
+    if (state.autoFullscreen) {
+      hideUi(true);
+    } else {
+      showUi();
+      resetIdleTimer();
+    }
     updateRecommendButtonUi();
     showImage(targetIndex);
     if (state.autoFullscreen) {

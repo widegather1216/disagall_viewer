@@ -462,8 +462,12 @@ export function openViewer(targetSrc, isAuto = false) {
   overlayEl.classList.add('active');
   document.body.style.overflow = 'hidden';
 
-  showUi();
-  resetIdleTimer();
+  if (state.autoFullscreen) {
+    hideUi(true);
+  } else {
+    showUi();
+    resetIdleTimer();
+  }
   updateRecommendButtonUi();
   showImage(targetIndex);
   if (state.autoFullscreen) {
