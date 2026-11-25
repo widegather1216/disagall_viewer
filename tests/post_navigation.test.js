@@ -362,6 +362,21 @@ async function runParserUnitTests() {
       false,
       '.icon_img.icon_txt must return false'
     );
+    assert.strictEqual(
+      hasPhotoAttachment(makeDesktopRow({ extraSelectorMatches: [{ selector: '.icon_img', el: { className: { baseVal: 'icon_img' } } }] })),
+      true,
+      'REFACTOR-15: SVG <svg class="icon_img"> (SVGAnimatedString) must not throw TypeError'
+    );
+    assert.strictEqual(
+      hasPhotoAttachment(makeDesktopRow({ subjectText: null })),
+      false,
+      'REFACTOR-15: null subjectText must safely return false'
+    );
+    assert.strictEqual(
+      isDesktopPostRowValid(makeDesktopRow({ numText: null, subjectText: null, hasCrtIcon: true }), '100'),
+      true,
+      'REFACTOR-15: null numText/subjectText on current row must not throw TypeError'
+    );
 
     const mixedBoardRoot = createRoot({
       desktopRows: [
@@ -680,6 +695,18 @@ async function runDefect02Tests() {
     assert.strictEqual(env.getKeyListenerCount(), 0, 'closeViewer() must remove notice keydown listener');
     assert.strictEqual(env.getActiveTimerCount(), 0, 'closeViewer() must clear notice timeout');
     assert.strictEqual(state.noPhotoNoticeTimer, null, 'closeViewer() must clear state.noPhotoNoticeTimer');
+
+    // REFACTOR-15: showNoPhotoNotice() without callback must not throw on click or keydown
+    showNoPhotoNotice();
+    const noCbNextBtn = env.doc.getElementById('disagall-no-photo-notice').querySelector('#disagall-notice-next');
+    noCbNextBtn.dispatchEvent({ type: 'click' });
+    assert.strictEqual(env.getBodyChildCount(), 0, 'REFACTOR-15: Notice without callback must dismiss on click without throwing');
+
+    showNoPhotoNotice();
+    const noCbKeyRes = env.win.dispatchKey({ key: 'w' });
+    assert.strictEqual(noCbKeyRes.prevented, true, 'REFACTOR-15: Notice without callback must handle keydown without throwing');
+    assert.strictEqual(env.getBodyChildCount(), 0, 'REFACTOR-15: Notice without callback must dismiss on keydown');
+
     dismissNoPhotoNotice();
 
     console.log('✅ Test 8: DEFECT-02 showNoPhotoNotice() cleanup & shortcut guardrails passed');
@@ -1666,6 +1693,14 @@ async function runRefactor05Tests() {
     assert.strictEqual(noListResult.status, 'unavailable', 'REFACTOR-05: empty board must return status: unavailable');
     assert.strictEqual(noListResult.error, 'no_list', 'REFACTOR-05: empty board must return error: no_list');
     assert.strictEqual(noListResult.message, '이동할 수 있는 게시글 목록을 찾을 수 없습니다.');
+
+    const invalidDirResult = getAdjacentPostUrl('left', true);
+    assert.deepStrictEqual(invalidDirResult, {
+      ok: false,
+      status: 'unavailable',
+      error: 'invalid_direction',
+      message: '이동할 수 있는 게시글 목록을 찾을 수 없습니다.',
+    });
 
     const nullRootResult = getAdjacentPostUrl('up', true, 'https://gall.dcinside.com/mgallery/board/view/?id=pic&no=100', null);
     assert.deepStrictEqual(nullRootResult, {
