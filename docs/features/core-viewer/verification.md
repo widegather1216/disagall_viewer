@@ -1,8 +1,8 @@
 # 🧪 [core-viewer] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 3건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
+- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 2건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
 - **인수 조건 통과율**: `9 / 9 Scenarios PASS (100%)`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 3건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건`
 
 ---
 
@@ -103,7 +103,11 @@
   // 2. state.resizeRafId 등록 + closeViewer() cancelAnimationFrame + rAF 콜백 내 isOverlayActive() 체크
   // 3. zoom_pan.js: transformRafId = null 초기화, !isOverlayActive() 가드, WeakSet(boundZoomEls) 중복 바인딩 방어
   ```
-- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **해결 내역**:
+  - **수정 파일**: [`src/state.js`](../../../src/state.js#L31), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js#L23-L580), [`src/ui/zoom_pan.js`](../../../src/ui/zoom_pan.js#L5-L170), [`tests/core_viewer.test.js`](../../../tests/core_viewer.test.js#L964-L1115)
+  - **원인 및 조치**: `persistPaddingSetting()`에 `catch` 블록을 추가하고 `closeViewer()`에서 `.active` 제거·`body.style.overflow` 복원 후 `cancelResizeRaf()`·`cancelZoomRaf()`로 `state.resizeRafId`/`state.zoom.transformRafId`를 전량 해제함. `zoom_pan.js`에 로컬 `isViewerActive()`·`cancelZoomRaf()`·`WeakSet` 중복 바인딩 가드를 적용하고 `resetZoom()`의 인라인 스타일 동기 초기화 및 `!isViewerActive()` 조기 리턴을 보강한 뒤 `npm run build`로 번들을 동기화함.
+  - **회귀 테스트 결과**: `npm run build` (`PASS`), `npm test` (`tests/core_viewer.test.js` 8/8 포함 전 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
 
 ### [REFACTOR-02] `viewer_controller.js`(610줄)·`overlay.js`(359줄) 책임 분리, `userscript.js` 계층 우회 및 `image_parser.js` 방어·중복 정리
 - **심각도**: 🟡 Should Fix (권장 조치)

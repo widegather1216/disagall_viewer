@@ -2,7 +2,7 @@
 
 - **현재 상태 (Lifecycle)**: `🩹 Debugging`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 3건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,12 +29,14 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-25 / `clean-code-auditor` / 전 도메인 클린코드 전수 감사 완료 — `core-viewer` [`REFACTOR-01`~`03`](./verification.md#4-코드-품질-감사-리포트-audit--refactoring-logs) 발행 및 `spec.md`/`architecture.md` 제외·블랙리스트 수치 역동기화 (`🩹 Debugging` 전환)
+- **직전 완료 작업**: 2026-11-25 / `systematic-debugger` / `core-viewer` [`REFACTOR-01`](./verification.md#refactor-01-closeviewer-동기-스토리지-예외-중단-resizerafidupdateimgtransform-raf-누수-및-active-가드-누락) 해결 (`closeViewer()` 스토리지 예외 내성, `state.resizeRafId`/`transformRafId` 취소, `zoom_pan.js` `!active`·`WeakSet` 가드 및 번들 동기화)
 - **생성/수정된 핵심 파일**:
-  - `docs/features/core-viewer/verification.md`: `REFACTOR-01` (🔴 Must Fix — `closeViewer()` 스토리지 예외 중단·`resizeRafId`/`updateImgTransform()` `rAF` 누수·`!active` 가드), `REFACTOR-02` (🟡 Should Fix — 컨트롤러/오버레이 분리·`userscript.js` 우회·`image_parser.js` URL 검증), `REFACTOR-03` (🟡 Should Fix — 줌 변환/가로 피팅/토스트 테스트 보강) 등록
-  - `docs/features/core-viewer/spec.md`, `architecture.md`: 제외 컨테이너 23종·블랙리스트 13종·빈 이미지 alert 문구 역동기화
+  - [`src/state.js`](../../../src/state.js): `state.resizeRafId: null` 등록
+  - [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js): `persistPaddingSetting()` `catch` 추가, `cancelResizeRaf()` 추출, `closeViewer()` `.active`/스크롤 복원 및 `cancelResizeRaf()`·`cancelZoomRaf()` 정리
+  - [`src/ui/zoom_pan.js`](../../../src/ui/zoom_pan.js): `isViewerActive()`, `cancelZoomRaf()`, `resetZoom()` 동기 스타일 초기화, `WeakSet` 중복 방지 및 `!active` 리스너 가드 추가
+  - [`tests/core_viewer.test.js`](../../../tests/core_viewer.test.js): Test 8 (`REFACTOR-01`) 회귀 테스트 추가 및 `content.js`/`disagall_viewer.user.js` 빌드 동기화
 - **검증 완료된 테스트 실행 명령어**:
-  - `npm test` (`5개 스위트 PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
-- **Working Tree State**: 🟡 Docs Modified (위키 감사 리포트/스펙 역동기화 반영 중)
+  - `npm run build` (`PASS`), `npm test` (`core_viewer` 8/8 포함 5개 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
+- **Working Tree State**: 🟡 Uncommitted Fix & Docs (`REFACTOR-01` 수정·테스트·번들·위키 반영 완료, 커밋 전)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - 최우선 해결 대상: `core-viewer` 도메인 [`REFACTOR-01`](./verification.md#refactor-01-closeviewer-동기-스토리지-예외-중단-resizerafidupdateimgtransform-raf-누수-및-active-가드-누락) (`systematic-debugger` 연결).
+  - `core-viewer` 잔여 티켓: [`REFACTOR-02`](./verification.md#refactor-02-viewer_controllerjs610줄overlayjs359줄-책임-분리-userscriptjs-계층-우회-및-image_parserjs-방어중복-정리) (🟡 Should Fix), [`REFACTOR-03`](./verification.md#refactor-03-testscore_viewertestjs-줌-변환가로-피팅토스트-타이머-테스트-커버리지-보강-및-위생-정리) (🟡 Should Fix). 전역 최우선 Must Fix는 `post-recommend` `REFACTOR-01` / `post-navigation` `REFACTOR-14`.

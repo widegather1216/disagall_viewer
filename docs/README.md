@@ -1,14 +1,14 @@
 # 🧭 Disagall Viewer Master Control Tower (Living Wiki Hub)
 
-> **최종 업데이트**: 2026-11-25 (by `clean-code-auditor`)
+> **최종 업데이트**: 2026-11-25 (by `systematic-debugger`)
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: `core-viewer` (`🩹 Debugging` — 5개 전 도메인 클린코드 전수 감사 완료, 총 9건 `REFACTOR` 티켓 발행: 🔴 Must Fix 3건 · 🟡 Should Fix 6건)
-- **현재 단계 (Stage)**: `🩹 Debugging` (전 도메인 미해결 티켓 `0 / 9`)
-- **직전 완료 작업**: 2026-11-25 전 도메인 4계층(`Core/Entry`, `Parsers`, `Controllers`, `UI/CSS/Tests`) 병렬 정적 감사 및 스펙 역동기화 완료 (`npm test` 5개 스위트 · `immersion_e2e` 16/16 · `post_navigation_e2e` 11/11 · `node --check` PASS)
+- **Active 도메인**: `post-recommend` (`🩹 Debugging` — 잔여 8건 `REFACTOR` 티켓: 🔴 Must Fix 2건 · 🟡 Should Fix 6건)
+- **현재 단계 (Stage)**: `🩹 Debugging` (전 도메인 미해결 티켓 `0 / 8`)
+- **직전 완료 작업**: 2026-11-25 `core-viewer` `REFACTOR-01` 해결 (`closeViewer()` 스토리지 예외 내성·`resizeRafId`/`transformRafId` 취소·`!active`/`WeakSet` 가드, `npm run build`·`npm test` 5개 스위트·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS)
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `core-viewer` 도메인의 `REFACTOR-01` 티켓 해결해줘
+  > `post-recommend` 도메인의 `REFACTOR-01` 티켓 해결해줘
 
 ---
 
@@ -17,7 +17,7 @@
 | 도메인 (Bounded Context) | 생명주기 상태 | 구현 진척도 (Step 1~4) | QA 인수 통과율 | 미해결 티켓 (`🚨D` / `🧐R`) | 최근 작업 요약 |
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 테스트/컨트롤러 목록 최신화 |
-| [`core-viewer`](./features/core-viewer/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 3` | 클린코드 감사(`REFACTOR-01` 🔴 `closeViewer()` 예외/`rAF` 누수, `02`~`03` 🟡) 발행 |
+| [`core-viewer`](./features/core-viewer/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 2` | `REFACTOR-01` 해결(예외/`rAF` 누수/`!active` 가드), `REFACTOR-02~03` 🟡 잔여 |
 | [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `11/11 (100%)` | `0 / 2` | 클린코드 감사(`REFACTOR-14` 🔴 `post_navigation.test.js` 실모듈 전환, `15` 🟡) 발행 |
 | [`post-recommend`](./features/post-recommend/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 2` | 클린코드 감사(`REFACTOR-01` 🔴 `!active` 가드·허수 테스트 해소, `02` 🟡) 발행 |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 1` | 클린코드 감사(`REFACTOR-01` 🟡 `npm test` E2E 연동·스크래치 정리) 발행 |
@@ -30,6 +30,7 @@
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
 
+- **`[2026-11-25]` `[systematic-debugger]` [`core-viewer`]**: `REFACTOR-01` 해결 — `persistPaddingSetting()` `catch` 방어, `state.resizeRafId`/`transformRafId` `closeViewer()` 취소 및 `zoom_pan.js` `!active`·`WeakSet` 가드 적용 (`core_viewer.test.js` 8/8·`npm test`·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`npm run build`·`node --check` PASS).
 - **`[2026-11-25]` `[clean-code-auditor]` [전 도메인]**: 4계층 병렬 정적 감사 및 스펙 역동기화 완료 — `core-viewer`(`REFACTOR-01~03`), `post-navigation`(`REFACTOR-14~15`), `post-recommend`(`REFACTOR-01~02`), `viewer-immersion`(`REFACTOR-04`), `modular-bundler-migration`(`REFACTOR-01`) 총 9건 발행 (`🔴 Must Fix` 3건, `🟡 Should Fix` 6건) 및 관제판 `🩹 Debugging` 전환.
 - **`[2026-11-25]` `[atomic-commit-crafter]` [`viewer-immersion`]**: `f8e8887` (`fix(immersion)` 전체화면 전환 `mousemove` 억제·정지 합성 이벤트 필터링·`autoFullscreen` 즉시 숨김), `9e6e693` (`test(immersion)` `Test 30`/`TC-BD-07`) 및 리빙 위키/관제탑 동기화 커밋 완료.
 
