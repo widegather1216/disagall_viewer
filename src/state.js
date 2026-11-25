@@ -34,6 +34,7 @@ export const state = {
 
   // Immersion & UI Auto-Hide
   idleTimer: null,
+  paddingSaveTimer: null,
   autoHideUi: true,
   autoFullscreen: false,
   isUiHidden: false,

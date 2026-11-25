@@ -12,16 +12,31 @@ const DEFAULT_SETTINGS = {
   [STORAGE_KEYS.AUTO_FULLSCREEN]: false,
 };
 
+const PADDING_MIN = 0;
+const PADDING_MAX = 100;
 const PADDING_SAVE_DEBOUNCE_MS = 250;
 
 /**
- * Parse a raw padding input string into an integer, or null if NaN.
+ * Normalize a raw padding value to a finite integer clamped within [0, 100], or null if invalid.
+ * @param {*} rawValue - Raw input or stored value
+ * @returns {number|null} Normalized integer padding or null
+ */
+function normalizePaddingValue(rawValue) {
+  if (rawValue === null || rawValue === undefined || typeof rawValue === 'boolean') return null;
+  if (typeof rawValue === 'string' && rawValue.trim() === '') return null;
+  if (typeof rawValue !== 'number' && typeof rawValue !== 'string') return null;
+  const num = Number(rawValue);
+  if (!Number.isFinite(num)) return null;
+  return Math.min(PADDING_MAX, Math.max(PADDING_MIN, Math.round(num)));
+}
+
+/**
+ * Parse a raw padding input string or number into a clamped finite integer, or null if invalid.
  * @param {string|number} rawValue - Raw input value
- * @returns {number|null} Parsed integer or null
+ * @returns {number|null} Normalized integer or null
  */
 function parsePaddingValue(rawValue) {
-  const parsed = parseInt(rawValue, 10);
-  return Number.isNaN(parsed) ? null : parsed;
+  return normalizePaddingValue(rawValue);
 }
 
 /**
@@ -46,8 +61,9 @@ function loadSettings(storage, callbacks = {}) {
   storage.get(DEFAULT_SETTINGS, (result) => {
     if (!result) return;
 
-    const padding = result[STORAGE_KEYS.PADDING];
-    if (typeof callbacks.onPaddingLoaded === 'function' && typeof padding === 'number' && !Number.isNaN(padding)) {
+    const rawPadding = result[STORAGE_KEYS.PADDING];
+    const padding = typeof rawPadding === 'number' ? normalizePaddingValue(rawPadding) : null;
+    if (typeof callbacks.onPaddingLoaded === 'function' && padding !== null) {
       callbacks.onPaddingLoaded(padding);
     }
 
@@ -96,9 +112,9 @@ function saveAutoFullscreen(storage, enabled, callback) {
  */
 function savePadding(storage, padding, callback) {
   if (!storage || typeof storage.set !== 'function') return;
-  const numericPadding = Number(padding);
-  if (Number.isNaN(numericPadding)) return;
-  storage.set({ [STORAGE_KEYS.PADDING]: numericPadding }, callback);
+  const normalized = normalizePaddingValue(padding);
+  if (normalized === null) return;
+  storage.set({ [STORAGE_KEYS.PADDING]: normalized }, callback);
 }
 
 /**
@@ -205,8 +221,11 @@ function handleStorageChange(changes, areaName, elements) {
   }
 
   const paddingChange = changes[STORAGE_KEYS.PADDING];
-  if (paddingChange && typeof paddingChange.newValue === 'number' && !Number.isNaN(paddingChange.newValue)) {
-    applyPaddingUi(slider, valDisplay, paddingChange.newValue);
+  if (paddingChange && typeof paddingChange.newValue === 'number') {
+    const normalized = normalizePaddingValue(paddingChange.newValue);
+    if (normalized !== null) {
+      applyPaddingUi(slider, valDisplay, normalized);
+    }
   }
 }
 
@@ -264,6 +283,8 @@ if (typeof module !== 'undefined' && module.exports) {
     STORAGE_KEYS,
     DEFAULT_SETTINGS,
     PADDING_SAVE_DEBOUNCE_MS,
+    normalizePaddingValue,
+    parsePaddingValue,
     loadSettings,
     saveAutoHideUi,
     saveAutoFullscreen,

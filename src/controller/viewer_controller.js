@@ -35,15 +35,20 @@ import {
   toggleFullscreen,
   enterAutoFullscreenOnOpen,
   resetFullscreenState,
-  setPaddingSavePending,
-  markLocalPaddingModified,
-  recordSelfPaddingWrite,
+  normalizePaddingValue,
   applyPaddingSetting,
   applyAutoHideUiSetting,
   applyAutoFullscreenSetting,
   initImmersionSettings,
   bindImmersionEvents
 } from './immersion_controller.js';
+import {
+  persistPaddingSetting,
+  clearPaddingSaveTimer,
+  schedulePaddingSave,
+  flushPaddingSave,
+  markLocalPaddingModified
+} from './storage_sync.js';
 
 export {
   isOverlayActive,
@@ -52,18 +57,18 @@ export {
   hideUi,
   resetIdleTimer,
   toggleUiManual,
+  getFullscreenElement,
   exitFullscreenSafely,
   toggleFullscreen,
   enterAutoFullscreenOnOpen,
   resetFullscreenState,
+  normalizePaddingValue,
   applyPaddingSetting,
   applyAutoHideUiSetting,
   applyAutoFullscreenSetting,
   initImmersionSettings
 };
 
-const PADDING_SAVE_DEBOUNCE_MS = 250;
-let paddingSaveTimer = null;
 let imageLoadSeq = 0;
 let renderedLoadSeq = -1;
 let postNavSeq = 0;
@@ -115,7 +120,7 @@ function updateNavAndCounterUi() {
 
 function handleMainImgLoad() {
   if (renderedLoadSeq !== imageLoadSeq || !isOverlayActive()) return;
-  if (state.zoom.scale <= 1.001) {
+  if (state.zoom.scale <= CONFIG.ZOOM_EPSILON) {
     applyFittingAndPadding();
   }
 }
@@ -136,7 +141,7 @@ function renderViewerImage(mainImgEl, loaderEl, src, alt, seq) {
   mainImgEl.alt = alt;
   if (loaderEl) loaderEl.style.display = 'none';
   mainImgEl.style.opacity = '1';
-  if (state.zoom.scale <= 1.001) {
+  if (state.zoom.scale <= CONFIG.ZOOM_EPSILON) {
     applyFittingAndPadding();
   }
 }
@@ -297,49 +302,6 @@ export function handleKeyDown(e) {
   }
 }
 
-function persistPaddingSetting() {
-  const valueToSave = state.currentPadding;
-  recordSelfPaddingWrite(valueToSave);
-  setPaddingSavePending(true);
-  try {
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync && typeof chrome.storage.sync.set === 'function') {
-      chrome.storage.sync.set({ [CONFIG.STORAGE_KEY_PADDING]: valueToSave });
-      return;
-    }
-    if (typeof GM_setValue === 'function') {
-      GM_setValue(CONFIG.STORAGE_KEY_PADDING, valueToSave);
-    }
-  } catch (err) {
-    // Non-fatal: Chrome extension context invalidated or storage write blocked
-  } finally {
-    setPaddingSavePending(false);
-  }
-}
-
-function clearPaddingSaveTimer() {
-  setPaddingSavePending(false);
-  if (!paddingSaveTimer) return false;
-  clearTimeout(paddingSaveTimer);
-  paddingSaveTimer = null;
-  return true;
-}
-
-function schedulePaddingSave() {
-  clearPaddingSaveTimer();
-  setPaddingSavePending(true);
-  paddingSaveTimer = setTimeout(() => {
-    paddingSaveTimer = null;
-    setPaddingSavePending(false);
-    persistPaddingSetting();
-  }, PADDING_SAVE_DEBOUNCE_MS);
-}
-
-function flushPaddingSave() {
-  if (clearPaddingSaveTimer()) {
-    persistPaddingSetting();
-  }
-}
-
 function bindStopPropagationClick(el, handler) {
   if (!el) return;
   el.addEventListener('click', (e) => {
@@ -361,9 +323,10 @@ function bindOverlayButtons() {
 }
 
 function applySliderPaddingInput(rawValue, sliderValEl) {
-  const nextPadding = parseInt(rawValue, 10);
-  if (Number.isNaN(nextPadding)) return null;
-  state.currentPadding = Math.min(100, Math.max(0, nextPadding));
+  const numeric = typeof rawValue === 'string' && rawValue.trim() !== '' ? Number(rawValue) : rawValue;
+  const nextPadding = normalizePaddingValue(numeric);
+  if (nextPadding === null) return null;
+  state.currentPadding = nextPadding;
   if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
   markLocalPaddingModified();
   applyFittingAndPadding();
