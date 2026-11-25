@@ -1,8 +1,8 @@
 # 🧪 [post-recommend] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 1건 OPEN REFACTOR` — `REFACTOR-01` 해결)
+- **검증 상태**: `🟢 Sign-Off` (`0건 OPEN DEFECT` · `🧐 0건 OPEN REFACTOR` — `REFACTOR-01~02` 해결 완료)
 - **인수 조건 통과율**: `4 / 4 (100%)` · 테스트 매트릭스 `6 / 6 PASS`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -70,15 +70,9 @@
   - **회귀 테스트 결과**: `npm run build` (`PASS`), `npm test` (5개 스위트·`recommend.test.js` 8/8 `PASS`), `node tests/immersion_e2e.test.js` (16/16 `PASS`), `node tests/post_navigation_e2e.test.js` (11/11 `PASS`), `node --check` (`PASS`)
 
 ### [REFACTOR-02] `triggerPostRecommend()`(105줄·7-depth) 분할 및 `recommend_parser.js` 방어·중첩 개선
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
 - **심각도**: 🟡 Should Fix (권장 조치)
-- **위치**: [`src/controller/recommend_controller.js#L58-L162`](../../../src/controller/recommend_controller.js#L58-L162), [`src/parser/recommend_parser.js#L64-L84`](../../../src/parser/recommend_parser.js#L64-L84), [`#L139-L143`](../../../src/parser/recommend_parser.js#L139-L143)
-- **위반 규칙**: 함수 길이(30줄)·중첩 깊이(3-depth) / 중복 로직 / 빈 `catch` 블록
-- **발견된 문제**:
-  - `triggerPostRecommend()`가 105줄·7-depth 중첩으로 비대하며 `midTimer`/`afterTimer` 간 `.voted` 상태 갱신 로직과 매직 넘버(`500`, `2500`)가 중복/산재됨.
-  - `recommend_parser.js`: `findFirstValidMatch()`가 5-depth 중첩이며 `dispatchRecommendClick()`에 빈 `catch (e) {}` 블록(`L142`)이 존재함.
-- **권장 개선안 (Suggested Diff)**:
-  ```text
-  // 1. recommend_controller.js: validateRecommendPreconditions(), markCurrentPostVoted(), scheduleRecommendSyncTimers(), releaseRecommendLockAsync() 분리
-  // 2. recommend_parser.js: findFirstValidMatch() 헬퍼 평탄화 및 dispatchRecommendClick() catch 폴백 사유 주석/로깅 정리
-  ```
-- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+- **해결 내역**:
+  - **수정 파일**: [`src/controller/recommend_controller.js`](../../../src/controller/recommend_controller.js#L15-L177), [`src/parser/recommend_parser.js`](../../../src/parser/recommend_parser.js#L64-L90) ([`L139-L166`](../../../src/parser/recommend_parser.js#L139-L166))
+  - **원인 및 조치**: `recommend_controller.js`에 모듈 상수 `RECOMMEND_UNLOCK_DELAY_MS = 500`·`RECOMMEND_LOCK_TOAST_DURATION_MS = 2500`을 추출하고, `triggerPostRecommend()`를 `markCurrentPostVoted(recommendBtnEl)`, `checkPreRecommendGuards(now, recommendBtnEl)`, `handleMidRecommendCheck(beforeCount)`, `handleAfterRecommendCheck(beforeCount, isLoggedIn)`, `scheduleRecommendSyncTimers(beforeCount, isLoggedIn)`, `finalizeRecommendLock(shouldUnlockAsync)` 헬퍼로 분할해 모든 함수가 30줄 이하·2-depth 이내를 준수하도록 개선함. `recommend_parser.js`에서는 `findFirstValidMatch(root, selectors)`를 `findValidInSelector(root, selector, hasQueryAll)`로 평탄화(최대 2-depth)하고 `dispatchRecommendClick()`의 `catch` 폴백 사유 주석을 명시함.
+  - **회귀 테스트 결과**: `npm run build` (`PASS`), `npm test` (5개 스위트 전량 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check src/controller/recommend_controller.js src/parser/recommend_parser.js` (`PASS`)

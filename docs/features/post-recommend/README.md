@@ -1,8 +1,8 @@
 # 📦 [post-recommend] 뷰어 내 개념글 추천 연동 (Post Recommend)
 
-- **현재 상태 (Lifecycle)**: `🩹 Debugging`
+- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,13 +29,13 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-25 / `systematic-debugger` / `post-recommend` `REFACTOR-01` 해결 — `triggerPostRecommend()` `!isOverlayActive()` 진입 가드·`isOverlayActive()` 통합·`resetRecommendSessionState()` export 및 `tests/recommend.test.js` Tests 1~8 실모듈 검증 전환
+- **직전 완료 작업**: 2026-11-25 / `systematic-debugger` / `post-recommend` `REFACTOR-02` 해결 — `triggerPostRecommend()` 29줄·2-depth 분할 및 상수 추출, `recommend_parser.js` `findValidInSelector()` 평탄화·`catch` 폴백 주석 보강 (`🟢 Sign-Off`)
 - **생성/수정된 핵심 파일**:
-  - `src/controller/recommend_controller.js`: `immersion_controller.js`의 `isOverlayActive()` import·중복 `isOverlayActiveNow()` 제거, `triggerPostRecommend()` 최상단 `!isOverlayActive() || isRecommending` 가드 추가, `resetRecommendSessionState()` export
-  - `tests/recommend.test.js`: 로컬 정규식/스텁 복제 제거 및 실모듈(`recommend_parser.js`, `recommend_controller.js`) 전수 검증(Tests 1~8), `AssertionError` 비삼킴, `dc_sample.html` 경로 독립 DOM 파싱 연동
+  - `src/controller/recommend_controller.js`: `RECOMMEND_UNLOCK_DELAY_MS = 500`, `RECOMMEND_LOCK_TOAST_DURATION_MS = 2500` 추출 및 `markCurrentPostVoted`, `checkPreRecommendGuards`, `handleMidRecommendCheck`, `handleAfterRecommendCheck`, `scheduleRecommendSyncTimers`, `finalizeRecommendLock` 분할
+  - `src/parser/recommend_parser.js`: `findValidInSelector()` 추출로 `findFirstValidMatch()` 2-depth 평탄화 및 `dispatchRecommendClick()` `catch` 폴백 주석 명시
   - `content.js`, `disagall_viewer.user.js`, `safari_extension/`: `npm run build` 번들 동기화
 - **검증 완료된 테스트 실행 명령어**:
-  - `npm run build` (`PASS`), `npm test` (5개 스위트·`recommend.test.js` 8/8 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check src/controller/recommend_controller.js tests/recommend.test.js` (`PASS`)
+  - `npm run build` (`PASS`), `npm test` (5개 스위트 전량 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check src/controller/recommend_controller.js src/parser/recommend_parser.js` (`PASS`)
 - **Working Tree State**: 🟡 Modified (Uncommitted — 부모 코디네이터 커밋 대기)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - 잔여 `post-recommend` 티켓: `REFACTOR-02` (`🟡 Should Fix` — `triggerPostRecommend()` 분할 및 `recommend_parser.js` 중첩/빈 `catch` 개선). 전체 우선순위상 다음 타깃은 `post-navigation` `REFACTOR-14` (`🔴 Must Fix`).
+  - `post-recommend` 도메인 모든 `DEFECT`/`REFACTOR` 티켓 해결 완료(`🟢 Sign-Off`). 전역 다음 타깃은 `viewer-immersion` `REFACTOR-04` (`🟡 Should Fix`).
