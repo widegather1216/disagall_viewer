@@ -4,11 +4,11 @@
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: `post-navigation` (`🩹 Debugging` — 잔여 7건 `REFACTOR` 티켓: 🔴 Must Fix 1건 · 🟡 Should Fix 6건)
-- **현재 단계 (Stage)**: `🩹 Debugging` (전 도메인 미해결 티켓 `0 / 7`)
-- **직전 완료 작업**: 2026-11-25 `post-recommend` `REFACTOR-01` 해결 (`triggerPostRecommend()` `!isOverlayActive()` 가드·`isOverlayActive()` 통합·`resetRecommendSessionState()` 추가 및 `tests/recommend.test.js` Tests 1~8 실모듈 검증 전환, `npm run build`·`npm test` 5개 스위트·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS)
+- **Active 도메인**: `post-recommend` (`🩹 Debugging` — 잔여 6건 `REFACTOR` 티켓: 🟡 Should Fix 6건)
+- **현재 단계 (Stage)**: `🩹 Debugging` (전 도메인 미해결 티켓 `0 / 6`)
+- **직전 완료 작업**: 2026-11-25 `post-navigation` `REFACTOR-14` 해결 (`tests/post_navigation.test.js` Tests 1–7 로컬 복제 스텁 제거·`src/parser/post_navigator.js` 실모듈 검증 전환, Test 4 `AssertionError` 비삼킴·`dc_sample.html` 경로 고정, `npm test` 5개 스위트·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS)
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `post-navigation` 도메인의 `REFACTOR-14` 티켓 해결해줘
+  > `post-recommend` 도메인의 `REFACTOR-02` 티켓 해결해줘
 
 ---
 
@@ -18,7 +18,7 @@
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 테스트/컨트롤러 목록 최신화 |
 | [`core-viewer`](./features/core-viewer/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 2` | `REFACTOR-01` 해결(예외/`rAF` 누수/`!active` 가드), `REFACTOR-02~03` 🟡 잔여 |
-| [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `11/11 (100%)` | `0 / 2` | 클린코드 감사(`REFACTOR-14` 🔴 `post_navigation.test.js` 실모듈 전환, `15` 🟡) 발행 |
+| [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `11/11 (100%)` | `0 / 1` | `REFACTOR-14` 해결(`post_navigation.test.js` 실모듈 전환), `REFACTOR-15` 🟡 잔여 |
 | [`post-recommend`](./features/post-recommend/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 1` | `REFACTOR-01` 해결(`!active` 가드·실모듈 테스트 전환), `REFACTOR-02` 🟡 잔여 |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 1` | 클린코드 감사(`REFACTOR-01` 🟡 `npm test` E2E 연동·스크래치 정리) 발행 |
 | [`viewer-immersion`](./features/viewer-immersion/README.md) | 🩹 Debugging | `[■■■■■■■■] 8/8` | `16/16 (100%)` | `0 / 1` | 클린코드 감사(`REFACTOR-04` 🟡 스토리지 분리·`popup.js` 정수 클램핑·버전 동기화) 발행 |
@@ -30,6 +30,7 @@
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
 
+- **`[2026-11-25]` `[systematic-debugger]` [`post-navigation`]**: `REFACTOR-14` 해결 — `tests/post_navigation.test.js` 로컬 복제 함수(`extractPostNo`/`hasPhotoAttachment`/`parseRows`/`parseHtmlRows`) 제거 및 `src/parser/post_navigator.js` 실모듈 기반 Tests 1–7 재작성, Test 4 `AssertionError` 비삼킴·`dc_sample.html` 경로 고정 (`post_navigation.test.js` 11/11·`npm test` 5개 스위트·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS).
 - **`[2026-11-25]` `[systematic-debugger]` [`post-recommend`]**: `REFACTOR-01` 해결 — `triggerPostRecommend()` `!isOverlayActive()` 진입 가드 및 `isOverlayActive()` 통합, `resetRecommendSessionState()` export, `tests/recommend.test.js` Tests 1~8 실모듈 검증 전환 (`recommend.test.js` 8/8·`npm test` 5개 스위트·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`npm run build`·`node --check` PASS).
 - **`[2026-11-25]` `[systematic-debugger]` [`core-viewer`]**: `REFACTOR-01` 해결 — `persistPaddingSetting()` `catch` 방어, `state.resizeRafId`/`transformRafId` `closeViewer()` 취소 및 `zoom_pan.js` `!active`·`WeakSet` 가드 적용 (`core_viewer.test.js` 8/8·`npm test`·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`npm run build`·`node --check` PASS).
 - **`[2026-11-25]` `[clean-code-auditor]` [전 도메인]**: 4계층 병렬 정적 감사 및 스펙 역동기화 완료 — `core-viewer`(`REFACTOR-01~03`), `post-navigation`(`REFACTOR-14~15`), `post-recommend`(`REFACTOR-01~02`), `viewer-immersion`(`REFACTOR-04`), `modular-bundler-migration`(`REFACTOR-01`) 총 9건 발행 (`🔴 Must Fix` 3건, `🟡 Should Fix` 6건) 및 관제판 `🩹 Debugging` 전환.

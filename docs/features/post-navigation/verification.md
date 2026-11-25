@@ -1,8 +1,8 @@
 # 🧪 [post-navigation] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`Happy Path 4/4 + Boundary & Negative 7/7 PASS` · `0건 OPEN DEFECT` · `🧐 2건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
+- **검증 상태**: `🩹 Debugging` (`Happy Path 4/4 + Boundary & Negative 7/7 PASS` · `0건 OPEN DEFECT` · `🧐 1건 OPEN REFACTOR` — `REFACTOR-14` 해결)
 - **인수 조건 통과율**: `11 / 11 Scenarios PASS (100%)`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
 
 ---
 
@@ -107,18 +107,12 @@
 - **현재 상태**: 🟢 RESOLVED — `buildOverlayHtml`, `cacheOverlayElements`, `bindOverlayButtons` 등으로 책임 분리 완료.
 
 ### [REFACTOR-14] `tests/post_navigation.test.js` Tests 1–7 로컬 복제 모의 함수 제거 및 실모듈 검증 전환
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
 - **심각도**: 🔴 Must Fix (즉시 조치·릴리즈 차단)
-- **위치**: [`tests/post_navigation.test.js#L7-L164`](../../../tests/post_navigation.test.js#L7-L164), [`#L169-L343`](../../../tests/post_navigation.test.js#L169-L343), [`#L262-L270`](../../../tests/post_navigation.test.js#L262-L270), [`#L908`](../../../tests/post_navigation.test.js#L908)
-- **위반 규칙**: 단위 테스트 실효성 (자체 복제 스텁 허수 테스트 금지)
-- **발견된 문제**:
-  - `tests/post_navigation.test.js` Tests 1–7이 `src/parser/post_navigator.js`를 임포트하지 않고 파일 상단의 로컬 정규식 복제 함수(`extractPostNo`, `hasPhotoAttachment`, `parseRows`)만 검증함(실모듈 테스트는 Test 8부터 시작).
-  - Test 4의 `catch (e)`가 `AssertionError`까지 삼키며, `dc_sample.html` 존재 확인(`L270, L908`)이 실행 CWD에 의존함.
-- **권장 개선안 (Suggested Diff)**:
-  ```text
-  // Tests 1~7을 src/parser/post_navigator.js 실제 export 호출(경량 DOM 목업)로 전환하고,
-  // catch에서 ENOENT만 스킵하며 path.join(__dirname, '..', 'dc_sample.html') 사용
-  ```
-- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+- **해결 내역**:
+  - **수정 파일**: [`tests/post_navigation.test.js`](../../../tests/post_navigation.test.js#L1-L406), [`tests/post_navigation.test.js#L977-L980`](../../../tests/post_navigation.test.js#L977-L980)
+  - **원인 및 조치**: `tests/post_navigation.test.js` 상단의 로컬 정규식/스텁 복제 함수(`extractPostNo`, `hasPhotoAttachment`, `parseRows`, `parseHtmlRows`)를 제거하고, `createPostNavMockDom()` 경량 DOM 목업 및 `parseHtmlRowsToMockDom()` 픽스처 파서를 도입해 Tests 1–7이 `src/parser/post_navigator.js`의 실제 export(`extractPostNo`, `isDesktopPostRowValid`, `isMobilePostItemValid`, `getValidPostRows`, `findCurrentPostRowIndex`, `hasPhotoAttachment`, `getAdjacentPostUrl`)를 직접 검증하도록 전환함. 또한 Test 4의 `catch (e)`가 `ENOENT`/`EACCES` 외 `AssertionError`를 삼키지 않도록 수정하고, `dc_sample.html` 경로를 `path.join(__dirname, '..', 'dc_sample.html')`로 통일함.
+  - **회귀 테스트 결과**: `node --check tests/post_navigation.test.js` (`PASS`), `npm test` (5개 스위트·`post_navigation.test.js` 11/11 `PASS`), `node tests/immersion_e2e.test.js` (16/16 `PASS`), `node tests/post_navigation_e2e.test.js` (11/11 `PASS`)
 
 ### [REFACTOR-15] `post_navigator.js`·`showNoPhotoNotice()`·`startAutoOpenPolling()` 복잡도/방어 코드 개선 및 탐색 컨트롤러 분리
 - **심각도**: 🟡 Should Fix (권장 조치)

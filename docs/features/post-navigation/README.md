@@ -2,7 +2,7 @@
 
 - **현재 상태 (Lifecycle)**: `🩹 Debugging`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,12 +29,13 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-25 / `clean-code-auditor` / 전 도메인 클린코드 전수 감사 완료 — `post-navigation` `REFACTOR-14`(🔴 Must Fix)·`REFACTOR-15`(🟡 Should Fix) 발행 및 `spec.md` 셀렉터 역동기화 (`🩹 Debugging` 전환)
+- **직전 완료 작업**: 2026-11-25 / `systematic-debugger` / `post-navigation` `REFACTOR-14` 해결 (`tests/post_navigation.test.js` Tests 1–7 로컬 복제 스텁 제거 및 `src/parser/post_navigator.js` 실모듈 검증 전환, Test 4 `AssertionError` 비삼킴 및 `dc_sample.html` 경로 고정)
 - **생성/수정된 핵심 파일**:
-  - `docs/features/post-navigation/verification.md`: `REFACTOR-14` (`tests/post_navigation.test.js` Tests 1~7 로컬 복제 스텁 제거 및 실모듈 검증 전환), `REFACTOR-15` (`post_navigator.js` SVG `className` 가드·함수 길이/중첩 정리, `showNoPhotoNotice` 분리, `post_nav_controller.js` 분리) 등록
-  - `docs/features/post-navigation/spec.md`: `.gall_listwrap`·`.gall-thum-btm li`·사진 아이콘 셀렉터 역동기화
+  - `tests/post_navigation.test.js`: 로컬 복제 함수(`extractPostNo`/`hasPhotoAttachment`/`parseRows`/`parseHtmlRows`) 제거, `createPostNavMockDom()`·`parseHtmlRowsToMockDom()` 기반 Tests 1–7 실모듈(`src/parser/post_navigator.js`) 전환, `ENOENT`/`EACCES` 전용 스킵 및 `DC_SAMPLE_PATH` 통일
+  - `docs/features/post-navigation/verification.md`: `REFACTOR-14` `🟢 RESOLVED` 처리 (잔여 `REFACTOR: 1건`)
+  - `docs/features/post-navigation/README.md`, `docs/README.md`: 미해결 카운트(`0 / 1`) 및 관제탑 동기화
 - **검증 완료된 테스트 실행 명령어**:
-  - `npm test` (`5개 스위트 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node --check` (`PASS`)
-- **Working Tree State**: 🟡 Docs Modified (위키 감사 리포트/스펙 역동기화 반영 중)
+  - `node --check tests/post_navigation.test.js` (`PASS`), `npm test` (`5개 스위트 PASS` · `post_navigation.test.js` 11/11 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`)
+- **Working Tree State**: 🟡 Modified (미커밋: `REFACTOR-14` 테스트 실모듈 전환 및 위키 동기화)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - 최우선 해결 대상: `post-navigation` 도메인 `REFACTOR-14` (`tests/post_navigation.test.js` Tests 1~7 실모듈 검증 전환, `systematic-debugger` 연결).
+  - 잔여 `🟡 Should Fix` 티켓: `post-navigation` 도메인 `REFACTOR-15` (`post_navigator.js`·`showNoPhotoNotice()`·`startAutoOpenPolling()` 복잡도/방어 코드 개선 및 `post_nav_controller.js` 분리).
