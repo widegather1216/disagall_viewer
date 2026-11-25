@@ -898,8 +898,12 @@ async function run() {
     'hideUi',
     'resetIdleTimer',
     'toggleUiManual',
+    'getFullscreenElement',
+    'resetFullscreenState',
     'exitFullscreenSafely',
     'toggleFullscreen',
+    'enterAutoFullscreenOnOpen',
+    'normalizePaddingValue',
     'applyPaddingSetting',
     'applyAutoHideUiSetting',
     'initImmersionSettings',
@@ -1979,6 +1983,60 @@ async function run() {
     });
   });
   console.log('✅ Test 30: Fullscreen transition mousemove guard, stationary event defense & autoFullscreen no-flash verified');
+
+  // 31. REFACTOR-04: popup.js finite integer clamping (0~100), popup.html v1.1.0 parity & controller modular line caps
+  assert.strictEqual(popup.normalizePaddingValue(-10), 0, 'popup.normalizePaddingValue must clamp -10 to 0');
+  assert.strictEqual(popup.normalizePaddingValue(999), 100, 'popup.normalizePaddingValue must clamp 999 to 100');
+  assert.strictEqual(popup.normalizePaddingValue(12.7), 13, 'popup.normalizePaddingValue must round 12.7 to 13');
+  assert.strictEqual(popup.normalizePaddingValue('-10'), 0, 'popup.normalizePaddingValue must clamp "-10" to 0');
+  assert.strictEqual(popup.normalizePaddingValue('999'), 100, 'popup.normalizePaddingValue must clamp "999" to 100');
+  assert.strictEqual(popup.normalizePaddingValue('12.7'), 13, 'popup.normalizePaddingValue must round "12.7" to 13');
+  for (const invalidVal of [Infinity, -Infinity, Number.NaN, null, undefined, true, false, '']) {
+    assert.strictEqual(
+      popup.normalizePaddingValue(invalidVal),
+      null,
+      `popup.normalizePaddingValue must reject ${String(invalidVal)}`
+    );
+  }
+
+  const clampStorage = createMockStorage({ defaultPadding: 24 });
+  popup.savePadding(clampStorage, -10);
+  assert.strictEqual(clampStorage.store.defaultPadding, 0, 'savePadding must clamp -10 to 0');
+  popup.savePadding(clampStorage, 999);
+  assert.strictEqual(clampStorage.store.defaultPadding, 100, 'savePadding must clamp 999 to 100');
+  popup.savePadding(clampStorage, 12.7);
+  assert.strictEqual(clampStorage.store.defaultPadding, 13, 'savePadding must round 12.7 to 13');
+  popup.savePadding(clampStorage, Infinity);
+  popup.savePadding(clampStorage, Number.NaN);
+  assert.strictEqual(clampStorage.store.defaultPadding, 13, 'savePadding must reject Infinity and NaN');
+
+  const clampSlider = createMockElement('padding-slider', { value: '24' });
+  const clampValDisplay = createMockElement('padding-val', { textContent: '24px' });
+  popup.handleStorageChange({ defaultPadding: { newValue: -10 } }, 'sync', { slider: clampSlider, valDisplay: clampValDisplay });
+  assert.strictEqual(clampSlider.value, 0);
+  assert.strictEqual(clampValDisplay.textContent, '0px');
+  popup.handleStorageChange({ defaultPadding: { newValue: 999 } }, 'sync', { slider: clampSlider, valDisplay: clampValDisplay });
+  assert.strictEqual(clampSlider.value, 100);
+  assert.strictEqual(clampValDisplay.textContent, '100px');
+  popup.handleStorageChange({ defaultPadding: { newValue: 12.7 } }, 'sync', { slider: clampSlider, valDisplay: clampValDisplay });
+  assert.strictEqual(clampSlider.value, 13);
+  assert.strictEqual(clampValDisplay.textContent, '13px');
+  popup.handleStorageChange({ defaultPadding: { newValue: Infinity } }, 'sync', { slider: clampSlider, valDisplay: clampValDisplay });
+  popup.handleStorageChange({ defaultPadding: { newValue: Number.NaN } }, 'sync', { slider: clampSlider, valDisplay: clampValDisplay });
+  assert.strictEqual(clampSlider.value, 13, 'handleStorageChange must ignore Infinity and NaN');
+  assert.strictEqual(clampValDisplay.textContent, '13px');
+
+  assert(popupHtml.includes('Disagall Viewer v1.1.0'), 'popup.html footer must match manifest.json v1.1.0');
+
+  for (const relPath of [
+    '../src/controller/immersion_controller.js',
+    '../src/controller/storage_sync.js',
+    '../src/controller/fullscreen_controller.js',
+  ]) {
+    const lineCount = fs.readFileSync(path.join(__dirname, relPath), 'utf8').trimEnd().split('\n').length;
+    assert(lineCount <= 300, `${relPath} must stay <= 300 lines (actual: ${lineCount})`);
+  }
+  console.log('✅ Test 31: REFACTOR-04 popup finite clamping, popup.html v1.1.0 & controller line caps verified');
 
   console.log('\n🎉 ALL VIEWER IMMERSION UNIT TESTS PASSED! 🎉');
 }
