@@ -959,6 +959,160 @@ async function run() {
     }
   }
 
+  // Test 8 (REFACTOR-01): closeViewer() storage exception resilience, rAF lifecycle cancellation,
+  // inactive zoom event guards, and duplicate setupZoomEvents() idempotency
+  {
+    const dom = createMockDom();
+    const writeDiv = dom.createElement('div', '', ['write_div']);
+    const img1 = dom.createElement('img');
+    img1.src = 'https://dcimg7.dcinside.co.kr/viewimage.php?id=test&no=501';
+    writeDiv.appendChild(img1);
+    dom.body.appendChild(writeDiv);
+    dom.body.style.overflow = 'auto';
+
+    const origWindow = global.window;
+    const origDocument = global.document;
+    const origImage = global.Image;
+    const origEvent = global.Event;
+    const origRAF = global.requestAnimationFrame;
+    const origCAF = global.cancelAnimationFrame;
+    const origChrome = global.chrome;
+
+    const rafQueue = new Map();
+    const cancelledRafIds = [];
+    let nextRafId = 100;
+
+    global.window = dom.win;
+    global.document = dom.doc;
+    global.Event = class { constructor(type) { this.type = type; } };
+    global.requestAnimationFrame = (cb) => {
+      const id = nextRafId++;
+      rafQueue.set(id, cb);
+      return id;
+    };
+    global.cancelAnimationFrame = (id) => {
+      cancelledRafIds.push(id);
+      rafQueue.delete(id);
+    };
+    global.Image = class {
+      set src(v) {
+        this._src = v;
+        if (typeof this.onload === 'function') this.onload();
+      }
+      get src() { return this._src; }
+    };
+    global.chrome = {
+      storage: {
+        sync: {
+          set: () => {
+            throw new Error('Extension context invalidated');
+          },
+        },
+      },
+    };
+
+    try {
+      const { state } = await import('../src/state.js');
+      Object.keys(state.elements).forEach((k) => { state.elements[k] = null; });
+      state.previousBodyOverflow = '';
+      state.postImages = [];
+      state.currentIndex = 0;
+      state.resizeRafId = null;
+      state.zoom.scale = 1.0;
+      state.zoom.panX = 0;
+      state.zoom.panY = 0;
+      state.zoom.isDragging = false;
+      state.zoom.pendingDragRelease = false;
+      state.zoom.transformRafId = null;
+
+      const controller = await import('../src/controller/viewer_controller.js');
+      const { setupZoomEvents } = await import('../src/ui/zoom_pan.js');
+      controller.initViewerBase();
+      controller.openViewer();
+
+      const overlay = dom.doc.getElementById('disagall-viewer-overlay');
+      const slider = dom.doc.getElementById('disagall-slider');
+      const mainImg = dom.doc.getElementById('disagall-main-img');
+      const infoBadge = dom.doc.getElementById('disagall-info-badge');
+      assert.strictEqual(overlay.classList.contains('active'), true);
+      assert.strictEqual(dom.body.style.overflow, 'hidden');
+
+      // (a) Trigger debounced padding save so closeViewer() flushes into throwing chrome.storage.sync.set
+      slider.dispatchEvent({ type: 'input', target: { value: '48' } });
+
+      // (b) Queue both resize rAF and zoom transform rAF before closing
+      dom.win.dispatchEvent({ type: 'resize' });
+      assert.notStrictEqual(state.resizeRafId, null, 'REFACTOR-01: resize must register state.resizeRafId');
+
+      mainImg.dispatchEvent({ type: 'wheel', deltaY: -120, preventDefault() {} });
+      assert.notStrictEqual(state.zoom.transformRafId, null, 'REFACTOR-01: zoom must register state.zoom.transformRafId');
+      assert(state.zoom.scale > 1.0);
+
+      const capturedResizeRafId = state.resizeRafId;
+      const capturedTransformRafId = state.zoom.transformRafId;
+      const staleCallbacks = Array.from(rafQueue.values());
+
+      // closeViewer() must survive storage exception, remove .active, restore overflow, and cancel both rAFs
+      controller.closeViewer();
+      assert.strictEqual(overlay.classList.contains('active'), false, 'REFACTOR-01: .active must be removed despite storage error');
+      assert.strictEqual(dom.body.style.overflow, 'auto', 'REFACTOR-01: body.style.overflow must be restored despite storage error');
+      assert.strictEqual(state.resizeRafId, null, 'REFACTOR-01: closeViewer() must cancel and null state.resizeRafId');
+      assert.strictEqual(state.zoom.transformRafId, null, 'REFACTOR-01: closeViewer() must cancel and null state.zoom.transformRafId');
+      assert(cancelledRafIds.includes(capturedResizeRafId), 'REFACTOR-01: cancelAnimationFrame must be called for resizeRafId');
+      assert(cancelledRafIds.includes(capturedTransformRafId), 'REFACTOR-01: cancelAnimationFrame must be called for transformRafId');
+      assert.strictEqual(rafQueue.size, 0, 'REFACTOR-01: no pending rAF may survive closeViewer()');
+      assert.strictEqual(mainImg.style.transform, 'translate(0px, 0px) scale(1)');
+      assert.strictEqual(mainImg.style.cursor, 'default');
+
+      // Invoking stale captured rAF callbacks on closed DOM must be a complete no-op
+      mainImg.style.transform = 'sentinel-transform';
+      mainImg.style.maxWidth = 'sentinel-width';
+      infoBadge.textContent = 'sentinel-badge';
+      staleCallbacks.forEach((cb) => cb());
+      assert.strictEqual(mainImg.style.transform, 'sentinel-transform', 'REFACTOR-01: stale zoom rAF must not touch closed DOM');
+      assert.strictEqual(mainImg.style.maxWidth, 'sentinel-width', 'REFACTOR-01: stale resize rAF must not touch closed DOM');
+      assert.strictEqual(infoBadge.textContent, 'sentinel-badge', 'REFACTOR-01: stale rAF must not mutate badge on closed DOM');
+
+      // (c) setupZoomEvents must ignore wheel/mousedown/dblclick while !active
+      state.zoom.scale = 1.0;
+      mainImg.dispatchEvent({ type: 'wheel', deltaY: -120, preventDefault() {} });
+      assert.strictEqual(state.zoom.scale, 1.0, 'REFACTOR-01: wheel must be ignored when overlay is inactive');
+      assert.strictEqual(rafQueue.size, 0);
+
+      mainImg.dispatchEvent({ type: 'dblclick', preventDefault() {} });
+      assert.strictEqual(state.zoom.scale, 1.0, 'REFACTOR-01: dblclick must be ignored when overlay is inactive');
+      assert.strictEqual(rafQueue.size, 0);
+
+      state.zoom.scale = 2.0;
+      mainImg.dispatchEvent({ type: 'mousedown', button: 0, clientX: 10, clientY: 10, preventDefault() {} });
+      assert.strictEqual(state.zoom.isDragging, false, 'REFACTOR-01: mousedown must be ignored when overlay is inactive');
+      state.zoom.scale = 1.0;
+
+      // Duplicate setupZoomEvents(mainImg) must be guarded by WeakSet (wheel delta applies only once)
+      setupZoomEvents(null);
+      setupZoomEvents(mainImg);
+      setupZoomEvents(mainImg);
+      overlay.classList.add('active');
+      mainImg.dispatchEvent({ type: 'wheel', deltaY: -120, preventDefault() {} });
+      assert.strictEqual(
+        Number(state.zoom.scale.toFixed(2)),
+        1.15,
+        'REFACTOR-01: duplicate setupZoomEvents(mainImg) must not attach duplicate wheel listeners'
+      );
+      controller.closeViewer();
+
+      console.log('✅ Test 8: REFACTOR-01 storage fault tolerance, rAF cleanup, !active guard & WeakSet idempotency verified');
+    } finally {
+      global.window = origWindow;
+      global.document = origDocument;
+      global.Image = origImage;
+      global.Event = origEvent;
+      global.requestAnimationFrame = origRAF;
+      global.cancelAnimationFrame = origCAF;
+      global.chrome = origChrome;
+    }
+  }
+
   console.log('\n🎉 ALL CORE VIEWER TESTS PASSED SUCCESSFULLY! 🎉');
 }
 
