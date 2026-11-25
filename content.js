@@ -50,6 +50,7 @@
     noPhotoNoticeTimer: null,
     postNavTimer: null,
     autoOpenPollTimer: null,
+    quickLauncherTimer: null,
     resizeRafId: null,
     recommendTimers: [],
     recommendUnlockTimer: null,
@@ -118,85 +119,131 @@
     ".view_content",
     ".contents"
   ].join(", ");
-  function getCleanOriginalUrl(url, baseProtocol = typeof window !== "undefined" ? window.location?.protocol : "https:") {
-    if (!url) return "";
-    if (url.startsWith("//")) {
-      url = (baseProtocol || "https:") + url;
+  var DEFAULT_ORIGIN = "https://gall.dcinside.com";
+  var LAZY_ATTRS = ["data-original", "data-src", "data-url", "data-lazy-src"];
+  var LAZY_DATASET_KEYS = ["original", "src", "url"];
+  var PLACEHOLDER_URL_SUBSTRINGS = ["gallview_loading", "loading", "blank.gif", "nstatic.dcinside.com"];
+  var DC_ICON_URL_SUBSTRINGS = [
+    "/dcicon/",
+    "/emoticon/",
+    "/dccon",
+    "dccon.php",
+    "nik.gif",
+    "fix_nik.gif",
+    "bestcon",
+    "/btn_",
+    "icon_",
+    "logo",
+    "banner",
+    "gallview_loading",
+    "nstatic.dcinside.com"
+  ];
+  var IMAGE_EXT_REGEX = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i;
+  function resolveBaseOrigin() {
+    const origin = typeof window !== "undefined" ? window.location?.origin : "";
+    if (origin && origin !== "null" && (origin.startsWith("http://") || origin.startsWith("https://"))) {
+      return origin;
     }
+    return DEFAULT_ORIGIN;
+  }
+  function getCleanOriginalUrl(url, baseProtocol = typeof window !== "undefined" ? window.location?.protocol : "https:") {
+    if (typeof url !== "string" || !url.trim()) return "";
+    const trimmed = url.trim();
+    const normalized = trimmed.startsWith("//") ? `${baseProtocol || "https:"}${trimmed}` : trimmed;
     try {
-      const parsed = new URL(url);
+      const parsed = new URL(normalized, resolveBaseOrigin());
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
       parsed.searchParams.delete("s");
       parsed.searchParams.delete("type");
       return parsed.toString();
     } catch (e) {
-      return url;
+      return "";
     }
+  }
+  function isPlaceholderImageUrl(url) {
+    return !url || PLACEHOLDER_URL_SUBSTRINGS.some((sub) => url.includes(sub));
+  }
+  function isImageCandidateUrl(url) {
+    return Boolean(url && (url.includes("viewimage.php") || url.includes("dcimg") || url.includes("image") || IMAGE_EXT_REGEX.test(url)));
+  }
+  function collectImgUrlCandidates(img) {
+    const candidates = [];
+    for (const attr of LAZY_ATTRS) {
+      const val = img.getAttribute?.(attr);
+      if (val) candidates.push(val);
+    }
+    if (img.dataset) {
+      for (const key of LAZY_DATASET_KEYS) {
+        if (img.dataset[key]) candidates.push(img.dataset[key]);
+      }
+    }
+    if (img.src) candidates.push(img.src);
+    return candidates;
+  }
+  function getAnchorImageUrl(img) {
+    const parentAnchor = img.closest ? img.closest("a") : null;
+    if (!parentAnchor || !parentAnchor.href) return "";
+    const cleanHref = getCleanOriginalUrl(parentAnchor.href);
+    return isImageCandidateUrl(cleanHref) ? cleanHref : "";
   }
   function getBestImgUrl(img) {
     if (!img) return "";
-    let rawUrl = img.getAttribute?.("data-original") || img.getAttribute?.("data-src") || img.getAttribute?.("data-url") || img.getAttribute?.("data-lazy-src") || (img.dataset ? img.dataset.original || img.dataset.src || img.dataset.url : "") || img.src || "";
-    if (!rawUrl || rawUrl.includes("gallview_loading") || rawUrl.includes("loading") || rawUrl.includes("blank.gif") || rawUrl.includes("nstatic.dcinside.com")) {
-      const dataOrig = img.getAttribute?.("data-original") || img.getAttribute?.("data-src") || (img.dataset ? img.dataset.original || img.dataset.src : "");
-      if (dataOrig && !dataOrig.includes("loading")) {
-        rawUrl = dataOrig;
-      } else {
-        const parentAnchor = img.closest ? img.closest("a") : null;
-        if (parentAnchor && parentAnchor.href) {
-          const anchorHref = parentAnchor.href;
-          if (anchorHref.includes("viewimage.php") || anchorHref.includes("dcimg") || anchorHref.includes("image") || anchorHref.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i)) {
-            rawUrl = anchorHref;
-          }
-        }
-      }
-    }
-    return getCleanOriginalUrl(rawUrl);
+    const cleaned = collectImgUrlCandidates(img).map((raw) => getCleanOriginalUrl(raw)).filter(Boolean);
+    const validUrl = cleaned.find((u) => !isPlaceholderImageUrl(u));
+    if (validUrl) return validUrl;
+    const anchorUrl = getAnchorImageUrl(img);
+    if (anchorUrl) return anchorUrl;
+    return cleaned[0] || "";
+  }
+  function hasDcIconAttributes(img) {
+    if (!img) return false;
+    return Boolean(
+      img.classList?.contains("written_dccon") || img.classList?.contains("dccon") || img.hasAttribute?.("conalt") || img.hasAttribute?.("detail") || img.dataset?.dcconoverstatus !== void 0 || img.title?.includes("\uAC24\uB85C\uADF8")
+    );
   }
   function isDcIconOrUiAsset(img, url) {
     if (!url) return true;
-    if (url.includes("/dcicon/") || url.includes("/emoticon/") || url.includes("/dccon") || url.includes("dccon.php") || url.includes("nik.gif") || url.includes("fix_nik.gif") || url.includes("bestcon") || url.includes("/btn_") || url.includes("icon_") || url.includes("logo") || url.includes("banner") || url.includes("gallview_loading") || url.includes("nstatic.dcinside.com")) {
-      return true;
-    }
-    if (img) {
-      if (img.classList?.contains("written_dccon") || img.classList?.contains("dccon") || img.hasAttribute?.("conalt") || img.hasAttribute?.("detail") || img.dataset && img.dataset.dcconoverstatus !== void 0 || img.title && img.title.includes("\uAC24\uB85C\uADF8")) {
-        return true;
-      }
-    }
-    return false;
+    if (DC_ICON_URL_SUBSTRINGS.some((sub) => url.includes(sub))) return true;
+    return hasDcIconAttributes(img);
   }
-  function isPostBodyImage(img) {
+  function isPostBodyImage(img, resolvedUrl = null) {
     if (!img || img.tagName !== "IMG") return false;
     if (img.closest && img.closest(EXCLUDED_CONTAINER_SELECTORS)) return false;
-    const url = getBestImgUrl(img);
+    const url = resolvedUrl ?? getBestImgUrl(img);
     if (isDcIconOrUiAsset(img, url)) return false;
     if (img.closest && img.closest(POST_BODY_CONTAINER_SELECTORS)) return true;
-    const isKnownPhotoUrl = url.includes("viewimage.php") || url.includes("dcimg") || url.includes("dccdn") || url.includes("upload") || url.includes("image.dcinside") || url.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i);
-    return !!isKnownPhotoUrl;
+    return Boolean(
+      url.includes("viewimage.php") || url.includes("dcimg") || url.includes("dccdn") || url.includes("upload") || url.includes("image.dcinside") || IMAGE_EXT_REGEX.test(url)
+    );
   }
-  function extractImagesFromElements(imageElements, seenUrls) {
+  function extractImagesFromElements(imageElements = [], seenUrls = /* @__PURE__ */ new Set()) {
     const results = [];
-    imageElements.forEach((img) => {
-      if (!isPostBodyImage(img)) return;
+    for (const img of imageElements) {
       const cleanUrl = getBestImgUrl(img);
-      if (cleanUrl && !seenUrls.has(cleanUrl)) {
-        seenUrls.add(cleanUrl);
-        results.push({
-          url: cleanUrl,
-          element: img,
-          alt: img.alt || "\uB514\uC2DC \uAC24\uB7EC\uB9AC \uBCF8\uBB38 \uC774\uBBF8\uC9C0"
-        });
-      }
-    });
+      if (!cleanUrl || seenUrls.has(cleanUrl) || !isPostBodyImage(img, cleanUrl)) continue;
+      seenUrls.add(cleanUrl);
+      results.push({ url: cleanUrl, element: img, alt: img.alt || "\uB514\uC2DC \uAC24\uB7EC\uB9AC \uBCF8\uBB38 \uC774\uBBF8\uC9C0" });
+    }
     return results;
+  }
+  function isNestedContainer(container, containerSet) {
+    let parent = container.parentElement;
+    while (parent) {
+      if (containerSet.has(parent)) return true;
+      parent = parent.parentElement;
+    }
+    return false;
   }
   function extractPostImages(root = typeof document !== "undefined" ? document : null) {
     if (!root || !root.querySelectorAll) return [];
     const seenUrls = /* @__PURE__ */ new Set();
     const collected = [];
-    let containers = Array.from(root.querySelectorAll(POST_BODY_CONTAINER_SELECTORS));
-    containers = containers.filter((c) => !c.closest || !c.closest(EXCLUDED_CONTAINER_SELECTORS));
-    containers.forEach((container) => {
+    const rawContainers = Array.from(root.querySelectorAll(POST_BODY_CONTAINER_SELECTORS)).filter((c) => !c.closest || !c.closest(EXCLUDED_CONTAINER_SELECTORS));
+    const containerSet = new Set(rawContainers);
+    const containers = rawContainers.filter((c) => !isNestedContainer(c, containerSet));
+    for (const container of containers) {
       collected.push(...extractImagesFromElements(container.querySelectorAll("img"), seenUrls));
-    });
+    }
     if (collected.length === 0) {
       collected.push(...extractImagesFromElements(root.querySelectorAll("img"), seenUrls));
     }
@@ -349,10 +396,9 @@
     scheduleNoPhotoNoticeTimer(dismissNotice);
   }
 
-  // src/ui/overlay.js
-  function buildOverlayHtml() {
+  // src/ui/overlay_template.js
+  function buildHeaderLeftHtml() {
     return `
-    <div class="disagall-header">
       <div class="disagall-header-left">
         <div class="disagall-title">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -364,8 +410,10 @@
         </div>
         <div class="disagall-counter" id="disagall-counter">1 / 1</div>
         <div class="disagall-info-badge" id="disagall-info-badge">\uD654\uBA74 \uB9DE\uCDA4</div>
-      </div>
-
+      </div>`;
+  }
+  function buildHeaderCenterHtml() {
+    return `
       <div class="disagall-header-center">
         <div class="disagall-padding-control">
           <span class="disagall-slider-label">
@@ -378,8 +426,10 @@
           <input type="range" class="disagall-slider" id="disagall-slider" min="0" max="100" value="${state.currentPadding}">
           <span class="disagall-padding-val" id="disagall-slider-val">${state.currentPadding}px</span>
         </div>
-      </div>
-
+      </div>`;
+  }
+  function buildHeaderRightHtml() {
+    return `
       <div class="disagall-header-right">
         <button class="disagall-btn disagall-btn-recommend" id="disagall-btn-recommend" title="\uAC1C\uB150\uAE00 \uCD94\uCC9C (\uB2E8\uCD95\uD0A4: R)">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -397,9 +447,18 @@
           <span>\uC804\uCCB4\uD654\uBA74</span>
         </button>
         <button class="disagall-btn disagall-btn-close" id="disagall-close-btn" title="\uB2EB\uAE30 (ESC)">\u2715 \uB2EB\uAE30</button>
-      </div>
-    </div>
-
+      </div>`;
+  }
+  function buildOverlayHeaderHtml() {
+    return `
+    <div class="disagall-header">
+${buildHeaderLeftHtml()}
+${buildHeaderCenterHtml()}
+${buildHeaderRightHtml()}
+    </div>`;
+  }
+  function buildOverlayStageHtml() {
+    return `
     <div class="disagall-stage" id="disagall-stage">
       <div class="disagall-nav-btn disagall-nav-btn-prev" id="disagall-prev-btn" title="\uC774\uC804 \uC774\uBBF8\uC9C0 (\u2190)">
         <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
@@ -419,10 +478,10 @@
         <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
         <span class="disagall-nav-hint">\u2192</span>
       </div>
-    </div>
-
-    <div class="disagall-toast" id="disagall-toast"></div>
-
+    </div>`;
+  }
+  function buildOverlayFooterHtml() {
+    return `
     <div class="disagall-footer">
       <div class="disagall-keyhints">
         <div class="disagall-keyhint"><span class="disagall-kbd">R</span> \uAC1C\uCD94</div>
@@ -435,8 +494,23 @@
         <div class="disagall-keyhint"><span class="disagall-kbd">F</span> \uC804\uCCB4\uD654\uBA74</div>
         <div class="disagall-keyhint"><span class="disagall-kbd">ESC</span> \uB2EB\uAE30</div>
       </div>
-    </div>
+    </div>`;
+  }
+  function buildOverlayHtml() {
+    return `${buildOverlayHeaderHtml()}
+${buildOverlayStageHtml()}
+
+    <div class="disagall-toast" id="disagall-toast"></div>
+${buildOverlayFooterHtml()}
   `;
+  }
+
+  // src/ui/overlay.js
+  var MIN_VIEWPORT_SIZE = 100;
+  var DEFAULT_HEADER_HEIGHT = 52;
+  var DEFAULT_FOOTER_HEIGHT = 38;
+  function formatImageOrientationLabel(nw, nh) {
+    return nh >= nw ? `\uC138\uB85C \uC0AC\uC9C4 (${nw}x${nh})` : `\uAC00\uB85C \uC0AC\uC9C4 (${nw}x${nh})`;
   }
   function cacheOverlayElements() {
     state.elements.overlayEl = document.getElementById("disagall-viewer-overlay");
@@ -466,8 +540,8 @@
     const headerEl = hasQuery ? overlayEl.querySelector(".disagall-header") : null;
     const footerEl = hasQuery ? overlayEl.querySelector(".disagall-footer") : null;
     return {
-      headerHeight: headerEl && headerEl.offsetHeight ? headerEl.offsetHeight : 52,
-      footerHeight: footerEl && footerEl.offsetHeight ? footerEl.offsetHeight : 38
+      headerHeight: headerEl && headerEl.offsetHeight ? headerEl.offsetHeight : DEFAULT_HEADER_HEIGHT,
+      footerHeight: footerEl && footerEl.offsetHeight ? footerEl.offsetHeight : DEFAULT_FOOTER_HEIGHT
     };
   }
   function resolveStageElement(overlayEl) {
@@ -477,41 +551,41 @@
     }
     return typeof document !== "undefined" ? document.getElementById("disagall-stage") : null;
   }
+  function applyStageChromePadding(overlayEl) {
+    const heights = getOverlayChromeHeights(overlayEl);
+    const stageEl = resolveStageElement(overlayEl);
+    if (stageEl && stageEl.style) {
+      stageEl.style.paddingTop = `${heights.headerHeight}px`;
+      stageEl.style.paddingBottom = `${heights.footerHeight}px`;
+    }
+    return heights;
+  }
+  function applyFittedImageDimensions(mainImgEl, nw, nh, headerHeight, footerHeight) {
+    const effectivePadding = state.isFullscreenMode ? 0 : state.currentPadding;
+    const availableHeight = Math.max(MIN_VIEWPORT_SIZE, window.innerHeight - headerHeight - footerHeight - effectivePadding * 2);
+    const availableWidth = Math.max(MIN_VIEWPORT_SIZE, window.innerWidth - effectivePadding * 2);
+    const scale = Math.min(availableWidth / nw, availableHeight / nh);
+    mainImgEl.style.maxWidth = `${Math.round(nw * scale)}px`;
+    mainImgEl.style.maxHeight = `${Math.round(nh * scale)}px`;
+    mainImgEl.style.width = "100%";
+    mainImgEl.style.height = "100%";
+  }
+  function updateOrientationUi(mainImgEl, infoBadgeEl, nw, nh) {
+    const isPortrait = nh >= nw;
+    if (infoBadgeEl) {
+      infoBadgeEl.textContent = formatImageOrientationLabel(nw, nh);
+    }
+    mainImgEl.classList.toggle("portrait", isPortrait);
+    mainImgEl.classList.toggle("landscape", !isPortrait);
+  }
   function applyFittingAndPadding() {
     const { mainImgEl, overlayEl, infoBadgeEl } = state.elements;
     if (!mainImgEl || !mainImgEl.naturalWidth || !mainImgEl.naturalHeight) return;
     const nw = mainImgEl.naturalWidth;
     const nh = mainImgEl.naturalHeight;
-    const isPortrait = nh >= nw;
-    const { headerHeight, footerHeight } = getOverlayChromeHeights(overlayEl);
-    const stageEl = resolveStageElement(overlayEl);
-    if (stageEl && stageEl.style) {
-      stageEl.style.paddingTop = `${headerHeight}px`;
-      stageEl.style.paddingBottom = `${footerHeight}px`;
-    }
-    const effectivePadding = state.isFullscreenMode ? 0 : state.currentPadding;
-    const availableHeight = Math.max(100, window.innerHeight - headerHeight - footerHeight - effectivePadding * 2);
-    const availableWidth = Math.max(100, window.innerWidth - effectivePadding * 2);
-    const widthRatio = availableWidth / nw;
-    const heightRatio = availableHeight / nh;
-    const scale = Math.min(widthRatio, heightRatio);
-    const targetWidth = Math.round(nw * scale);
-    const targetHeight = Math.round(nh * scale);
-    mainImgEl.style.maxWidth = `${targetWidth}px`;
-    mainImgEl.style.maxHeight = `${targetHeight}px`;
-    mainImgEl.style.width = "100%";
-    mainImgEl.style.height = "100%";
-    const orientationText = isPortrait ? `\uC138\uB85C \uC0AC\uC9C4 (${nw}x${nh})` : `\uAC00\uB85C \uC0AC\uC9C4 (${nw}x${nh})`;
-    if (infoBadgeEl) {
-      infoBadgeEl.textContent = orientationText;
-    }
-    if (isPortrait) {
-      mainImgEl.classList.add("portrait");
-      mainImgEl.classList.remove("landscape");
-    } else {
-      mainImgEl.classList.add("landscape");
-      mainImgEl.classList.remove("portrait");
-    }
+    const { headerHeight, footerHeight } = applyStageChromePadding(overlayEl);
+    applyFittedImageDimensions(mainImgEl, nw, nh, headerHeight, footerHeight);
+    updateOrientationUi(mainImgEl, infoBadgeEl, nw, nh);
   }
   var toastSeq = 0;
   function dismissViewerToast() {
@@ -820,23 +894,22 @@
   }
 
   // src/ui/zoom_pan.js
+  var ZOOM_MIN = 1;
+  var ZOOM_MAX = 5;
+  var ZOOM_STEP = 0.15;
+  var ZOOM_DBLCLICK_SCALE = 2;
   var boundZoomImgEls = /* @__PURE__ */ new WeakSet();
-  function isViewerActive() {
-    const { overlayEl } = state.elements;
-    return Boolean(overlayEl && overlayEl.classList && overlayEl.classList.contains("active"));
-  }
+  var isViewerActive = () => Boolean(state.elements.overlayEl?.classList?.contains("active"));
   function cancelZoomRaf() {
-    if (state.zoom.transformRafId !== null) {
-      cancelAnimationFrame(state.zoom.transformRafId);
-      state.zoom.transformRafId = null;
-    }
+    if (state.zoom.transformRafId === null) return;
+    cancelAnimationFrame(state.zoom.transformRafId);
+    state.zoom.transformRafId = null;
   }
   function clearSuppressBackdropClick() {
     state.zoom.suppressNextBackdropClick = false;
-    if (state.zoom.suppressClickTimer !== null) {
-      clearTimeout(state.zoom.suppressClickTimer);
-      state.zoom.suppressClickTimer = null;
-    }
+    if (state.zoom.suppressClickTimer === null) return;
+    clearTimeout(state.zoom.suppressClickTimer);
+    state.zoom.suppressClickTimer = null;
   }
   function armSuppressBackdropClick() {
     clearSuppressBackdropClick();
@@ -851,6 +924,15 @@
     clearSuppressBackdropClick();
     return true;
   }
+  function clearWindowDragListeners(includeMouseUp = true) {
+    window.removeEventListener("mousemove", onWindowMouseMove);
+    if (includeMouseUp) window.removeEventListener("mouseup", onWindowMouseUp);
+  }
+  function resetMainImgStyle(mainImgEl) {
+    if (!mainImgEl) return;
+    mainImgEl.style.transform = "translate(0px, 0px) scale(1)";
+    mainImgEl.style.cursor = "default";
+  }
   function onWindowMouseMove(e) {
     if (!state.zoom.isDragging) return;
     state.zoom.panX = e.clientX - state.zoom.startX;
@@ -864,117 +946,90 @@
     state.zoom.isDragging = false;
     state.zoom.pendingDragRelease = false;
     armSuppressBackdropClick();
-    window.removeEventListener("mousemove", onWindowMouseMove);
-    window.removeEventListener("mouseup", onWindowMouseUp);
-    if (wasDragging) {
-      updateImgTransform();
+    clearWindowDragListeners(true);
+    if (wasDragging) updateImgTransform();
+  }
+  function applyZoomBadgeAndStyle(mainImgEl, infoBadgeEl) {
+    if (state.zoom.scale <= CONFIG.ZOOM_EPSILON) {
+      Object.assign(state.zoom, { scale: ZOOM_MIN, panX: 0, panY: 0 });
+      resetMainImgStyle(mainImgEl);
+      if (infoBadgeEl && mainImgEl.naturalWidth) {
+        infoBadgeEl.textContent = formatImageOrientationLabel(mainImgEl.naturalWidth, mainImgEl.naturalHeight);
+      }
+      return;
+    }
+    mainImgEl.style.cursor = state.zoom.isDragging ? "grabbing" : "grab";
+    mainImgEl.style.transform = `translate(${state.zoom.panX}px, ${state.zoom.panY}px) scale(${state.zoom.scale.toFixed(2)})`;
+    if (infoBadgeEl) {
+      infoBadgeEl.textContent = `\u{1F50D} \uD655\uB300: ${(state.zoom.scale * 100).toFixed(0)}% (\uB4DC\uB798\uADF8\uB85C \uC774\uB3D9 / \uB354\uBE14\uD074\uB9AD \uCD08\uAE30\uD654)`;
     }
   }
   function updateImgTransform() {
     const { mainImgEl, infoBadgeEl } = state.elements;
     if (!mainImgEl) return;
-    if (!isViewerActive()) {
-      cancelZoomRaf();
-      return;
-    }
+    if (!isViewerActive()) return cancelZoomRaf();
     cancelZoomRaf();
     let fired = false;
     const rafId = requestAnimationFrame(() => {
       fired = true;
       state.zoom.transformRafId = null;
-      if (!isViewerActive()) return;
-      if (state.zoom.scale <= 1.001) {
-        state.zoom.scale = 1;
-        state.zoom.panX = 0;
-        state.zoom.panY = 0;
-        mainImgEl.style.transform = `translate(0px, 0px) scale(1)`;
-        mainImgEl.style.cursor = "default";
-        if (infoBadgeEl && mainImgEl.naturalWidth) {
-          const isPortrait = mainImgEl.naturalHeight >= mainImgEl.naturalWidth;
-          infoBadgeEl.textContent = isPortrait ? `\uC138\uB85C \uC0AC\uC9C4 (${mainImgEl.naturalWidth}x${mainImgEl.naturalHeight})` : `\uAC00\uB85C \uC0AC\uC9C4 (${mainImgEl.naturalWidth}x${mainImgEl.naturalHeight})`;
-        }
-      } else {
-        mainImgEl.style.cursor = state.zoom.isDragging ? "grabbing" : "grab";
-        mainImgEl.style.transform = `translate(${state.zoom.panX}px, ${state.zoom.panY}px) scale(${state.zoom.scale.toFixed(2)})`;
-        if (infoBadgeEl) {
-          infoBadgeEl.textContent = `\u{1F50D} \uD655\uB300: ${(state.zoom.scale * 100).toFixed(0)}% (\uB4DC\uB798\uADF8\uB85C \uC774\uB3D9 / \uB354\uBE14\uD074\uB9AD \uCD08\uAE30\uD654)`;
-        }
-      }
+      if (isViewerActive()) applyZoomBadgeAndStyle(mainImgEl, infoBadgeEl);
     });
     state.zoom.transformRafId = fired ? null : rafId;
   }
+  function clearDragState(preservePendingRelease) {
+    if (!state.zoom.isDragging && !state.zoom.pendingDragRelease) return;
+    const keepPending = preservePendingRelease && state.zoom.isDragging;
+    state.zoom.isDragging = false;
+    state.zoom.pendingDragRelease = keepPending;
+    clearWindowDragListeners(!keepPending);
+  }
   function resetZoom(preservePendingRelease = false) {
-    state.zoom.scale = 1;
-    state.zoom.panX = 0;
-    state.zoom.panY = 0;
+    Object.assign(state.zoom, { scale: ZOOM_MIN, panX: 0, panY: 0 });
     clearSuppressBackdropClick();
-    if (preservePendingRelease && state.zoom.isDragging) {
-      state.zoom.isDragging = false;
-      state.zoom.pendingDragRelease = true;
-      window.removeEventListener("mousemove", onWindowMouseMove);
-    } else if (state.zoom.isDragging || state.zoom.pendingDragRelease) {
-      state.zoom.isDragging = false;
-      state.zoom.pendingDragRelease = false;
-      window.removeEventListener("mousemove", onWindowMouseMove);
-      window.removeEventListener("mouseup", onWindowMouseUp);
-    }
-    if (state.elements.mainImgEl) {
-      state.elements.mainImgEl.style.transform = "translate(0px, 0px) scale(1)";
-      state.elements.mainImgEl.style.cursor = "default";
-    }
+    clearDragState(preservePendingRelease);
+    resetMainImgStyle(state.elements.mainImgEl);
     updateImgTransform();
     applyFittingAndPadding();
+  }
+  function handleZoomWheel(e) {
+    if (!isViewerActive()) return;
+    e.preventDefault();
+    const oldScale = state.zoom.scale;
+    state.zoom.scale = Math.min(Math.max(ZOOM_MIN, state.zoom.scale + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)), ZOOM_MAX);
+    if (state.zoom.scale === ZOOM_MIN || oldScale === ZOOM_MIN) {
+      state.zoom.panX = 0;
+      state.zoom.panY = 0;
+    }
+    updateImgTransform();
+    if (oldScale > CONFIG.ZOOM_EPSILON && state.zoom.scale <= CONFIG.ZOOM_EPSILON) {
+      state.zoom.scale = ZOOM_MIN;
+      applyFittingAndPadding();
+    }
+  }
+  function handleZoomMouseDown(e) {
+    if (!isViewerActive() || state.zoom.scale <= ZOOM_MIN || e.button !== 0) return;
+    e.preventDefault();
+    clearSuppressBackdropClick();
+    Object.assign(state.zoom, { pendingDragRelease: false, isDragging: true, startX: e.clientX - state.zoom.panX, startY: e.clientY - state.zoom.panY });
+    clearWindowDragListeners(true);
+    window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
+    updateImgTransform();
+  }
+  function handleZoomDblClick(e) {
+    if (!isViewerActive()) return;
+    e.preventDefault();
+    if (state.zoom.scale > ZOOM_MIN) return resetZoom();
+    Object.assign(state.zoom, { scale: ZOOM_DBLCLICK_SCALE, panX: 0, panY: 0 });
+    updateImgTransform();
   }
   function setupZoomEvents(mainImgEl) {
     if (!mainImgEl || boundZoomImgEls.has(mainImgEl)) return;
     boundZoomImgEls.add(mainImgEl);
-    mainImgEl.addEventListener("wheel", (e) => {
-      if (!isViewerActive()) return;
-      e.preventDefault();
-      const zoomDelta = e.deltaY < 0 ? 0.15 : -0.15;
-      const oldScale = state.zoom.scale;
-      state.zoom.scale = Math.min(Math.max(1, state.zoom.scale + zoomDelta), 5);
-      if (state.zoom.scale === 1) {
-        state.zoom.panX = 0;
-        state.zoom.panY = 0;
-      } else if (oldScale === 1 && state.zoom.scale > 1) {
-        state.zoom.panX = 0;
-        state.zoom.panY = 0;
-      }
-      updateImgTransform();
-      if (oldScale > 1.001 && state.zoom.scale <= 1.001) {
-        state.zoom.scale = 1;
-        applyFittingAndPadding();
-      }
-    }, { passive: false });
-    mainImgEl.addEventListener("mousedown", (e) => {
-      if (!isViewerActive()) return;
-      if (state.zoom.scale > 1 && e.button === 0) {
-        e.preventDefault();
-        clearSuppressBackdropClick();
-        state.zoom.pendingDragRelease = false;
-        state.zoom.isDragging = true;
-        state.zoom.startX = e.clientX - state.zoom.panX;
-        state.zoom.startY = e.clientY - state.zoom.panY;
-        window.removeEventListener("mousemove", onWindowMouseMove);
-        window.removeEventListener("mouseup", onWindowMouseUp);
-        window.addEventListener("mousemove", onWindowMouseMove);
-        window.addEventListener("mouseup", onWindowMouseUp);
-        updateImgTransform();
-      }
-    });
-    mainImgEl.addEventListener("dblclick", (e) => {
-      if (!isViewerActive()) return;
-      e.preventDefault();
-      if (state.zoom.scale > 1) {
-        resetZoom();
-      } else {
-        state.zoom.scale = 2;
-        state.zoom.panX = 0;
-        state.zoom.panY = 0;
-        updateImgTransform();
-      }
-    });
+    mainImgEl.addEventListener("wheel", handleZoomWheel, { passive: false });
+    mainImgEl.addEventListener("mousedown", handleZoomMouseDown);
+    mainImgEl.addEventListener("dblclick", handleZoomDblClick);
   }
 
   // src/parser/recommend_parser.js
@@ -1899,28 +1954,32 @@
     }
   }
 
-  // src/controller/viewer_controller.js
+  // src/controller/image_loader.js
   var imageLoadSeq = 0;
   var renderedLoadSeq = -1;
-  var boundPageHideWin = null;
   var boundMainImgEls = /* @__PURE__ */ new WeakSet();
+  function resetImageLoadSeq() {
+    imageLoadSeq += 1;
+    renderedLoadSeq = -1;
+  }
   function resolveLazyOriginalUrl(img) {
     const attrUrl = img.getAttribute("data-original") || img.getAttribute("data-src") || img.getAttribute("data-url");
     if (attrUrl) return attrUrl;
     if (!img.dataset) return null;
     return img.dataset.original || img.dataset.src || img.dataset.url || null;
   }
+  function preloadSinglePostImage(img) {
+    if (!isPostBodyImage(img)) return;
+    const orig = resolveLazyOriginalUrl(img);
+    const needsPreload = img.src.includes("loading") || img.src.includes("blank.gif") || img.classList.contains("lazy");
+    if (orig && needsPreload) {
+      img.src = orig;
+      img.classList.remove("lazy");
+    }
+  }
   function forcePreloadPostImages() {
     const imgs = document.querySelectorAll(`${POST_BODY_CONTAINER_SELECTORS} img, img`);
-    imgs.forEach((img) => {
-      if (!isPostBodyImage(img)) return;
-      const orig = resolveLazyOriginalUrl(img);
-      const needsPreload = img.src.includes("loading") || img.src.includes("blank.gif") || img.classList.contains("lazy");
-      if (orig && needsPreload) {
-        img.src = orig;
-        img.classList.remove("lazy");
-      }
-    });
+    imgs.forEach(preloadSinglePostImage);
     try {
       window.dispatchEvent(new Event("scroll"));
       window.dispatchEvent(new Event("resize"));
@@ -1965,20 +2024,16 @@
       applyFittingAndPadding();
     }
   }
-  function showImage(index) {
-    if (state.postImages.length === 0) return;
-    const seq = ++imageLoadSeq;
-    renderedLoadSeq = -1;
-    resetZoom(true);
-    state.currentIndex = (index + state.postImages.length) % state.postImages.length;
-    updateNavAndCounterUi();
-    const imgData = state.postImages[state.currentIndex];
+  function prepareImageLoadingUi() {
     const { loaderEl, mainImgEl } = state.elements;
     if (loaderEl) loaderEl.style.display = "flex";
     if (mainImgEl) {
       mainImgEl.style.opacity = "0";
       mainImgEl.referrerPolicy = "no-referrer-when-downgrade";
     }
+    return { loaderEl, mainImgEl };
+  }
+  function attachTempImageHandlers(imgData, mainImgEl, loaderEl, seq) {
     const tempImg = new Image();
     tempImg.referrerPolicy = "no-referrer-when-downgrade";
     tempImg.onload = () => {
@@ -1996,17 +2051,109 @@
     };
     tempImg.src = imgData.url;
   }
+  function showImage(index) {
+    if (state.postImages.length === 0) return;
+    const seq = ++imageLoadSeq;
+    renderedLoadSeq = -1;
+    resetZoom(true);
+    state.currentIndex = (index + state.postImages.length) % state.postImages.length;
+    updateNavAndCounterUi();
+    const imgData = state.postImages[state.currentIndex];
+    const { loaderEl, mainImgEl } = prepareImageLoadingUi();
+    attachTempImageHandlers(imgData, mainImgEl, loaderEl, seq);
+  }
   function navigate(direction) {
     showImage(state.currentIndex + direction);
   }
-  var KEY_ACTIONS = {
-    "Escape": () => {
-      if (getFullscreenElement()) {
-        exitFullscreenSafely();
-        return;
+  function findImageIndexByUrl(searchUrl) {
+    if (!searchUrl) return -1;
+    return state.postImages.findIndex(
+      (item) => item.url === searchUrl || searchUrl.includes(item.url) || item.url.includes(searchUrl)
+    );
+  }
+  function findTargetImageIndex(targetSrc) {
+    if (targetSrc) {
+      const directIdx = findImageIndexByUrl(getCleanOriginalUrl(targetSrc));
+      if (directIdx !== -1) return directIdx;
+    }
+    const fallbackIdx = findImageIndexByUrl(state.lastRightClickedImgSrc);
+    return fallbackIdx !== -1 ? fallbackIdx : 0;
+  }
+
+  // src/controller/overlay_bindings.js
+  function bindStopPropagationClick(el, handler) {
+    if (!el) return;
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handler();
+    });
+  }
+  function bindOverlayButtons(onCloseViewer) {
+    const { prevBtnEl, nextBtnEl, recommendBtnEl, fullscreenBtnEl } = state.elements;
+    const closeBtnEl = document.getElementById("disagall-close-btn");
+    if (closeBtnEl) closeBtnEl.addEventListener("click", onCloseViewer);
+    bindStopPropagationClick(recommendBtnEl, triggerPostRecommend);
+    bindStopPropagationClick(fullscreenBtnEl, toggleFullscreen);
+    bindStopPropagationClick(prevBtnEl, () => navigate(-1));
+    bindStopPropagationClick(nextBtnEl, () => navigate(1));
+  }
+  function applySliderPaddingInput(rawValue, sliderValEl) {
+    const numeric = typeof rawValue === "string" && rawValue.trim() !== "" ? Number(rawValue) : rawValue;
+    const nextPadding = normalizePaddingValue(numeric);
+    if (nextPadding === null) return null;
+    state.currentPadding = nextPadding;
+    if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
+    markLocalPaddingModified();
+    applyFittingAndPadding();
+    return state.currentPadding;
+  }
+  function bindPaddingSlider(sliderEl, sliderValEl) {
+    if (!sliderEl) return;
+    sliderEl.addEventListener("input", (e) => {
+      if (applySliderPaddingInput(e.target.value, sliderValEl) === null) return;
+      resetIdleTimer();
+      schedulePaddingSave();
+    });
+    sliderEl.addEventListener("change", (e) => {
+      if (e?.target?.value !== void 0) {
+        applySliderPaddingInput(e.target.value, sliderValEl);
+      } else {
+        markLocalPaddingModified();
       }
-      closeViewer();
+      clearPaddingSaveTimer();
+      persistPaddingSetting();
+    });
+  }
+  function bindOverlayBackdrop(overlayEl, onCloseViewer) {
+    if (!overlayEl) return;
+    overlayEl.addEventListener("click", (e) => {
+      if (consumeSuppressedBackdropClick()) return;
+      const target = e?.target;
+      if (!target) return;
+      if (target === overlayEl || target.id === "disagall-stage" || target.id === "disagall-img-wrapper") {
+        onCloseViewer();
+      }
+    });
+  }
+  function bindOverlayControls(onCloseViewer) {
+    const { overlayEl, sliderEl, sliderValEl } = state.elements;
+    bindOverlayButtons(onCloseViewer);
+    bindPaddingSlider(sliderEl, sliderValEl);
+    bindOverlayBackdrop(overlayEl, onCloseViewer);
+  }
+
+  // src/controller/viewer_shortcuts.js
+  var shortcutCallbacks = {
+    onOpenViewer: () => {
     },
+    onCloseViewer: () => {
+    }
+  };
+  function setViewerShortcutCallbacks(callbacks = {}) {
+    shortcutCallbacks = { ...shortcutCallbacks, ...callbacks };
+  }
+  var KEY_ACTIONS = {
+    "Escape": () => getFullscreenElement() ? exitFullscreenSafely() : shortcutCallbacks.onCloseViewer(),
     "ArrowLeft": () => navigate(-1),
     "a": () => navigate(-1),
     "A": () => navigate(-1),
@@ -2039,76 +2186,25 @@
     "KeyF": () => toggleFullscreen()
   };
   function handleKeyDown(e) {
-    if (!isOverlayActive()) return;
-    if (!e || e.repeat) return;
+    if (!isOverlayActive() || !e || e.repeat) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (isEditableTarget(e.target)) {
-      if (e.key === "Escape" && typeof e.target.blur === "function") {
-        e.target.blur();
-      }
+      if (e.key === "Escape" && typeof e.target.blur === "function") e.target.blur();
       return;
     }
     if (isExternalModalOpen()) return;
     const action = KEY_ACTIONS[e.key] || (e.code ? CODE_ACTIONS[e.code] : null);
-    if (action) {
-      if (typeof e.preventDefault === "function") e.preventDefault();
-      if (typeof e.stopPropagation === "function") e.stopPropagation();
-      action();
-    }
+    if (!action) return;
+    if (typeof e.preventDefault === "function") e.preventDefault();
+    if (typeof e.stopPropagation === "function") e.stopPropagation();
+    action();
   }
-  function bindStopPropagationClick(el, handler) {
-    if (!el) return;
-    el.addEventListener("click", (e) => {
-      e.stopPropagation();
-      handler();
-    });
-  }
-  function bindOverlayButtons() {
-    const { prevBtnEl, nextBtnEl, recommendBtnEl, fullscreenBtnEl } = state.elements;
-    const closeBtnEl = document.getElementById("disagall-close-btn");
-    if (closeBtnEl) {
-      closeBtnEl.addEventListener("click", closeViewer);
-    }
-    bindStopPropagationClick(recommendBtnEl, triggerPostRecommend);
-    bindStopPropagationClick(fullscreenBtnEl, toggleFullscreen);
-    bindStopPropagationClick(prevBtnEl, () => navigate(-1));
-    bindStopPropagationClick(nextBtnEl, () => navigate(1));
-  }
-  function applySliderPaddingInput(rawValue, sliderValEl) {
-    const numeric = typeof rawValue === "string" && rawValue.trim() !== "" ? Number(rawValue) : rawValue;
-    const nextPadding = normalizePaddingValue(numeric);
-    if (nextPadding === null) return null;
-    state.currentPadding = nextPadding;
-    if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
-    markLocalPaddingModified();
-    applyFittingAndPadding();
-    return state.currentPadding;
-  }
-  function bindPaddingSlider(sliderEl, sliderValEl) {
-    if (!sliderEl) return;
-    sliderEl.addEventListener("input", (e) => {
-      if (applySliderPaddingInput(e.target.value, sliderValEl) === null) return;
-      resetIdleTimer();
-      schedulePaddingSave();
-    });
-    sliderEl.addEventListener("change", (e) => {
-      if (e && e.target && e.target.value !== void 0) {
-        applySliderPaddingInput(e.target.value, sliderValEl);
-      } else {
-        markLocalPaddingModified();
-      }
-      clearPaddingSaveTimer();
-      persistPaddingSetting();
-    });
-  }
-  function bindOverlayBackdrop(overlayEl) {
-    overlayEl.addEventListener("click", (e) => {
-      if (consumeSuppressedBackdropClick()) return;
-      if (e.target === overlayEl || e.target.id === "disagall-stage" || e.target.id === "disagall-img-wrapper") {
-        closeViewer();
-      }
-    });
-  }
+
+  // src/controller/viewer_controller.js
+  var boundPageHideWin = null;
+  var boundContextMenuDoc = null;
+  var boundResizeWin = null;
+  var boundMessageWin = null;
   function createOverlay() {
     if (state.elements.overlayEl) return;
     const overlay = document.createElement("div");
@@ -2116,47 +2212,19 @@
     overlay.innerHTML = buildOverlayHtml();
     document.body.appendChild(overlay);
     cacheOverlayElements();
-    const { overlayEl, mainImgEl, sliderEl, sliderValEl } = state.elements;
-    bindOverlayButtons();
-    bindPaddingSlider(sliderEl, sliderValEl);
-    bindOverlayBackdrop(overlayEl);
+    const { overlayEl, mainImgEl, sliderEl } = state.elements;
+    bindOverlayControls(closeViewer);
     bindImmersionEvents(overlayEl, sliderEl);
     ensureMainImgLoadListener(mainImgEl);
     setupZoomEvents(mainImgEl);
     window.addEventListener("keydown", handleKeyDown, true);
   }
-  function findImageIndexByUrl(searchUrl) {
-    if (!searchUrl) return -1;
-    return state.postImages.findIndex(
-      (item) => item.url === searchUrl || searchUrl.includes(item.url) || item.url.includes(searchUrl)
-    );
+  function blurActiveEditable() {
+    const activeEl = typeof document !== "undefined" ? document.activeElement : null;
+    if (isEditableTarget(activeEl) && typeof activeEl.blur === "function") activeEl.blur();
   }
-  function findTargetImageIndex(targetSrc) {
-    if (targetSrc) {
-      const directIdx = findImageIndexByUrl(getCleanOriginalUrl(targetSrc));
-      if (directIdx !== -1) return directIdx;
-    }
-    const fallbackIdx = findImageIndexByUrl(state.lastRightClickedImgSrc);
-    return fallbackIdx !== -1 ? fallbackIdx : 0;
-  }
-  function openViewer(targetSrc, isAuto = false) {
-    forcePreloadPostImages();
-    collectPostImages();
-    if (state.postImages.length === 0) {
-      if (!isAuto) {
-        alert("\uB514\uC2DC \uC0AC\uC9C4 \uBDF0\uC5B4: \uAC8C\uC2DC\uAE00 \uBCF8\uBB38\uC5D0\uC11C \uAC10\uC0C1 \uAC00\uB2A5\uD55C \uC774\uBBF8\uC9C0\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
-      }
-      return;
-    }
-    cancelPendingPostNavigation();
-    clearAutoOpenPollTimer();
-    dismissNoPhotoNotice();
-    createOverlay();
-    const targetIndex = findTargetImageIndex(targetSrc);
-    const { overlayEl } = state.elements;
-    if (typeof document !== "undefined" && isEditableTarget(document.activeElement) && typeof document.activeElement.blur === "function") {
-      document.activeElement.blur();
-    }
+  function activateOverlayDom(overlayEl) {
+    blurActiveEditable();
     const wasActive = isOverlayActive();
     if (!wasActive) {
       resetFullscreenState();
@@ -2164,23 +2232,39 @@
     }
     overlayEl.classList.add("active");
     document.body.style.overflow = "hidden";
+    return wasActive;
+  }
+  function syncInitialViewerMode(overlayEl, wasActive) {
     if (state.autoFullscreen) {
       hideUi(true);
-    } else {
-      showUi();
-      resetIdleTimer();
+      enterAutoFullscreenOnOpen();
+      return;
     }
+    showUi();
+    resetIdleTimer();
+    if (!wasActive && getFullscreenElement() === overlayEl) exitFullscreenSafely();
+  }
+  function openViewer(targetSrc, isAuto = false) {
+    forcePreloadPostImages();
+    collectPostImages();
+    if (state.postImages.length === 0) {
+      if (!isAuto) alert("\uB514\uC2DC \uC0AC\uC9C4 \uBDF0\uC5B4: \uAC8C\uC2DC\uAE00 \uBCF8\uBB38\uC5D0\uC11C \uAC10\uC0C1 \uAC00\uB2A5\uD55C \uC774\uBBF8\uC9C0\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+      return;
+    }
+    cancelPendingPostNavigation();
+    clearAutoOpenPollTimer();
+    dismissNoPhotoNotice();
+    createOverlay();
+    const { overlayEl } = state.elements;
+    if (!overlayEl) return;
+    const targetIndex = findTargetImageIndex(targetSrc);
+    const wasActive = activateOverlayDom(overlayEl);
     updateRecommendButtonUi();
     showImage(targetIndex);
-    if (state.autoFullscreen) {
-      enterAutoFullscreenOnOpen();
-    } else if (!wasActive && getFullscreenElement() === overlayEl) {
-      exitFullscreenSafely();
-    }
+    syncInitialViewerMode(overlayEl, wasActive);
   }
   function closeViewer() {
-    imageLoadSeq += 1;
-    renderedLoadSeq = -1;
+    resetImageLoadSeq();
     cancelPendingPostNavigation();
     clearAutoOpenPollTimer();
     dismissNoPhotoNotice();
@@ -2210,14 +2294,22 @@
       return state.postImages;
     }
   });
+  setViewerShortcutCallbacks({
+    onOpenViewer: () => openViewer(),
+    onCloseViewer: () => closeViewer()
+  });
+  function clearQuickLauncherTimer() {
+    if (state.quickLauncherTimer === null) return;
+    clearTimeout(state.quickLauncherTimer);
+    state.quickLauncherTimer = null;
+  }
   function bindContextMenuTracker() {
+    if (typeof document === "undefined" || typeof document.addEventListener !== "function") return;
+    if (boundContextMenuDoc === document) return;
+    boundContextMenuDoc = document;
     document.addEventListener("contextmenu", (e) => {
       const target = e.target;
-      if (target && target.tagName === "IMG" && isPostBodyImage(target)) {
-        state.lastRightClickedImgSrc = getBestImgUrl(target);
-        return;
-      }
-      state.lastRightClickedImgSrc = null;
+      state.lastRightClickedImgSrc = target && target.tagName === "IMG" && isPostBodyImage(target) ? getBestImgUrl(target) : null;
     }, true);
   }
   function cancelResizeRaf() {
@@ -2226,6 +2318,9 @@
     state.resizeRafId = null;
   }
   function bindResizeHandler() {
+    if (typeof window === "undefined" || typeof window.addEventListener !== "function") return;
+    if (boundResizeWin === window) return;
+    boundResizeWin = window;
     window.addEventListener("resize", () => {
       if (!isOverlayActive()) return;
       cancelResizeRaf();
@@ -2233,30 +2328,25 @@
       const rafId = requestAnimationFrame(() => {
         fired = true;
         state.resizeRafId = null;
-        if (!isOverlayActive()) return;
-        applyFittingAndPadding();
+        if (isOverlayActive()) applyFittingAndPadding();
       });
       state.resizeRafId = fired ? null : rafId;
     });
   }
   function bindTestOpenListener() {
+    if (typeof window === "undefined" || typeof window.addEventListener !== "function") return;
+    if (boundMessageWin === window) return;
+    boundMessageWin = window;
     window.addEventListener("message", (event) => {
       if (event.origin && event.origin !== window.location.origin && window.location.origin !== "null") return;
-      if (event.data && event.data.action === "disagall_test_open") {
-        openViewer();
-      }
+      if (event.data && event.data.action === "disagall_test_open") openViewer();
     });
-  }
-  function bindAutoOpenTrigger() {
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", checkAutoOpen);
-      return;
-    }
-    checkAutoOpen();
   }
   function handlePageHideCleanup() {
     cancelPendingPostNavigation();
     clearAutoOpenPollTimer();
+    clearQuickLauncherTimer();
+    flushPaddingSave();
   }
   function bindPageHideCleanup() {
     if (typeof window === "undefined" || typeof window.addEventListener !== "function") return;
@@ -2270,7 +2360,11 @@
     bindResizeHandler();
     bindTestOpenListener();
     bindPageHideCleanup();
-    bindAutoOpenTrigger();
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", checkAutoOpen);
+    } else {
+      checkAutoOpen();
+    }
   }
 
   // src/extension.js
@@ -2278,7 +2372,7 @@
     "use strict";
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
       chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message.action === "open_viewer") {
+        if (message && message.action === "open_viewer") {
           openViewer(message.srcUrl);
           sendResponse({ success: true });
         }

@@ -265,18 +265,7 @@
   will-change: transform, max-width, max-height;
 }
 
-/* Orientation Specific Fitting Helper Classes */
-.disagall-img.portrait {
-  /* Vertical photo: strictly fit height, horizontal padding automatic */
-  height: 100%;
-  width: auto;
-}
-
-.disagall-img.landscape {
-  /* Horizontal photo: strictly fit width, vertical padding automatic */
-  width: 100%;
-  height: auto;
-}
+/* Portrait/landscape fitting dimensions are applied inline via applyFittingAndPadding() */
 
 /* Navigation Arrow Buttons */
 .disagall-nav-btn {

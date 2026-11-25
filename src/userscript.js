@@ -1,7 +1,12 @@
 // Disagall Viewer - Safari / Tampermonkey Userscript Entry
-import { state } from './state.js';
-import { isPostBodyImage, getBestImgUrl } from './parser/image_parser.js';
-import { openViewer, initViewerBase, isOverlayActive } from './controller/viewer_controller.js';
+import {
+  openViewer,
+  initViewerBase,
+  hasPostBodyContainer,
+  openViewerForImageTarget,
+  handleGlobalViewerShortcut,
+  scheduleQuickLauncherFallback
+} from './controller/viewer_controller.js';
 
 (function () {
   'use strict';
@@ -19,9 +24,7 @@ import { openViewer, initViewerBase, isOverlayActive } from './controller/viewer
 
   // Floating Quick Launcher Button
   function initQuickLauncher() {
-    const isPostPage = document.querySelector('.writing_view_box, .thum-txtin, .usertxt, .gallview_contents, #dc_contents');
-    if (!isPostPage) return;
-
+    if (!hasPostBodyContainer()) return;
     if (document.getElementById('disagall-quick-launcher')) return;
 
     const launcher = document.createElement('button');
@@ -39,31 +42,11 @@ import { openViewer, initViewerBase, isOverlayActive } from './controller/viewer
   }
 
   // Press V key to open viewer
-  window.addEventListener('keydown', (e) => {
-    const activeEl = document.activeElement;
-    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
-      return;
-    }
-    if ((e.key === 'v' || e.key === 'V' || e.code === 'KeyV') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const { overlayEl } = state.elements;
-      if (!overlayEl || !overlayEl.classList.contains('active')) {
-        openViewer();
-      }
-    }
-  });
+  window.addEventListener('keydown', handleGlobalViewerShortcut);
 
   // Direct image click listener
   document.addEventListener('click', (e) => {
-    if (isOverlayActive()) return;
-    const target = e?.target;
-    if (!target || typeof target.closest !== 'function') return;
-    if (target.closest('#disagall-viewer-overlay')) return;
-
-    const img = target.closest('img');
-    if (img && isPostBodyImage(img)) {
-      const url = getBestImgUrl(img);
-      openViewer(url);
-    }
+    openViewerForImageTarget(e?.target);
   }, true);
 
   // GM Menu Command
@@ -71,8 +54,12 @@ import { openViewer, initViewerBase, isOverlayActive } from './controller/viewer
     GM_registerMenuCommand('📷 디시 사진 뷰어 실행', () => openViewer());
   }
 
-  window.addEventListener('DOMContentLoaded', initQuickLauncher);
-  setTimeout(initQuickLauncher, 1000);
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', initQuickLauncher);
+  } else {
+    initQuickLauncher();
+  }
+  scheduleQuickLauncherFallback(initQuickLauncher, 1000);
 
   // Initialize base listeners and auto-open
   initViewerBase();

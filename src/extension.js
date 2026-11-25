@@ -7,7 +7,7 @@ import { openViewer, initViewerBase } from './controller/viewer_controller.js';
   // Listen for messages from background script (Context Menu)
   if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.action === 'open_viewer') {
+      if (message && message.action === 'open_viewer') {
         openViewer(message.srcUrl);
         sendResponse({ success: true });
       }
