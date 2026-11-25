@@ -1,8 +1,8 @@
 # 🧪 [post-navigation] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`Happy Path 4/4 + Boundary & Negative 7/7 PASS` · `0건 OPEN DEFECT` · `🧐 1건 OPEN REFACTOR` — `REFACTOR-14` 해결)
+- **검증 상태**: `🟢 Sign-Off` (`Happy Path 4/4 + Boundary & Negative 7/7 PASS` · `0건 OPEN DEFECT` · `🧐 0건 OPEN REFACTOR` — `REFACTOR-15` 해결)
 - **인수 조건 통과율**: `11 / 11 Scenarios PASS (100%)`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -115,17 +115,9 @@
   - **회귀 테스트 결과**: `node --check tests/post_navigation.test.js` (`PASS`), `npm test` (5개 스위트·`post_navigation.test.js` 11/11 `PASS`), `node tests/immersion_e2e.test.js` (16/16 `PASS`), `node tests/post_navigation_e2e.test.js` (11/11 `PASS`)
 
 ### [REFACTOR-15] `post_navigator.js`·`showNoPhotoNotice()`·`startAutoOpenPolling()` 복잡도/방어 코드 개선 및 탐색 컨트롤러 분리
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
 - **심각도**: 🟡 Should Fix (권장 조치)
-- **위치**: [`src/parser/post_navigator.js#L81-L248`](../../../src/parser/post_navigator.js#L81-L248), [`src/ui/overlay.js#L270-L359`](../../../src/ui/overlay.js#L270-L359), [`src/controller/viewer_controller.js#L186-L246`](../../../src/controller/viewer_controller.js#L186-L246), [`#L504-L537`](../../../src/controller/viewer_controller.js#L504-L537)
-- **위반 규칙**: 방어 코드 / 함수 길이(30줄)·중첩 깊이(3-depth) / 컨트롤러 SRP 분리
-- **발견된 문제**:
-  - `post_navigator.js#L167-L171`: `anyImgIcon.className`에 `typeof === 'string'` 가드가 없어 SVG(`SVGAnimatedString`)일 때 `TypeError` 위험, `L81/108/136/151` `textContent` null 가드 및 `direction` 유효성 검증 누락, `hasPhotoAttachment`(31줄)·`getAdjacentPostUrl`(61줄·3-depth·중복 `hasPhotoAttachment`/제목 셀렉터 조회) 초과.
-  - `overlay.js#L270-L359`: `showNoPhotoNotice`(90줄·3-depth)에 `typeof onNavigatePost === 'function'`, `window`/`document.body` null 가드 및 타이머 `fired` 가드 누락.
-  - `viewer_controller.js`: `navigatePost`/`startAutoOpenPolling`(34줄·4-depth)을 전용 탐색 하위 컨트롤러(예: `post_nav_controller.js`)로 분리 필요(`viewer_controller.js` re-export 호환 유지).
-- **권장 개선안 (Suggested Diff)**:
-  ```text
-  // 1. post_navigator.js: getElementClassName() 헬퍼 + findTargetPostIndex()/selectAdjacentTarget() 추출로 30줄 이하 평탄화
-  // 2. overlay.js: showNoPhotoNotice 내부 핸들러/마크업/타이머 가드 분리
-  // 3. src/controller/post_nav_controller.js 분리 및 viewer_controller.js re-export 유지
-  ```
-- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+- **해결 내역**:
+  - **수정·신규 파일**: [`src/parser/post_navigator.js`](../../../src/parser/post_navigator.js#L1-L210), [`src/ui/dom_guards.js`](../../../src/ui/dom_guards.js#L1-L34), [`src/ui/no_photo_notice.js`](../../../src/ui/no_photo_notice.js#L1-L136), [`src/ui/overlay.js`](../../../src/ui/overlay.js#L1-L225), [`src/controller/post_nav_controller.js`](../../../src/controller/post_nav_controller.js#L1-L125), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js#L1-L502), [`tests/post_navigation.test.js`](../../../tests/post_navigation.test.js#L365-L379)
+  - **원인 및 조치**: `post_navigator.js`에 `getClassNameString()`/`getTrimmedText()`/`queryPostTitleLink()`/`findTargetPostIndex()`/`buildFoundPostResult()` 및 `direction` 유효성 가드를 도입해 `SVGAnimatedString` `TypeError`·`textContent` null 위험·중복 조회를 제거하고 함수를 28줄 이하로 평탄화함. 공용 가드(`dom_guards.js`)와 `no_photo_notice.js`(136줄·함수 28줄 이하·2-depth)를 단방향 분리하고 콜백/`document.body`/`window.addEventListener`/동기 `fired` 타이머 가드를 보강했으며(`overlay.js` re-export 유지), `post_nav_controller.js`(125줄 이하)를 분리해 `runAutoOpenPollTick()` 평탄화 및 `setPostNavCallbacks()` 단방향 주입(`viewer_controller.js` re-export 유지)을 적용함. `tests/post_navigation.test.js`에 `<svg class="icon_img">`, null 텍스트, 무콜백 `showNoPhotoNotice()`, 비정상 `direction` 회귀 단언을 추가하고 번들을 재빌드함.
+  - **회귀 테스트 결과**: `node --check` (`PASS`), `npm run build` (`PASS`), `npm test` (5개 스위트·`post_navigation.test.js` 11/11 `PASS`), `node tests/immersion_e2e.test.js` (16/16 `PASS`), `node tests/post_navigation_e2e.test.js` (11/11 `PASS`)

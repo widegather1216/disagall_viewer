@@ -4,11 +4,11 @@
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: `post-navigation` (`🩹 Debugging` — 잔여 4건 `REFACTOR` 티켓: 🟡 Should Fix 4건)
-- **현재 단계 (Stage)**: `🩹 Debugging` (전 도메인 미해결 티켓 `0 / 4`)
-- **직전 완료 작업**: 2026-11-25 `viewer-immersion` `REFACTOR-04` 해결 (`storage_sync.js` 249줄·`fullscreen_controller.js` 268줄 분리 및 `immersion_controller.js` 258줄 슬림화, `popup.js` 유한 정수 클램핑, `popup.html` `v1.1.0` 동기화, `🟢 Sign-Off` 확정)
+- **Active 도메인**: `core-viewer` (`🩹 Debugging` — 잔여 3건 `REFACTOR` 티켓: 🟡 Should Fix 3건)
+- **현재 단계 (Stage)**: `🩹 Debugging` (전 도메인 미해결 티켓 `0 / 3`)
+- **직전 완료 작업**: 2026-11-25 `post-navigation` `REFACTOR-15` 해결 (`post_navigator.js` 방어·평탄화, `no_photo_notice.js`·`dom_guards.js`·`post_nav_controller.js` 단방향 분리 및 re-export 유지, `🟢 Sign-Off` 확정)
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `post-navigation` 도메인의 `REFACTOR-15` 티켓 해결해줘
+  > `core-viewer` 도메인의 `REFACTOR-02` 티켓 해결해줘
 
 ---
 
@@ -16,9 +16,9 @@
 
 | 도메인 (Bounded Context) | 생명주기 상태 | 구현 진척도 (Step 1~4) | QA 인수 통과율 | 미해결 티켓 (`🚨D` / `🧐R`) | 최근 작업 요약 |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 테스트/컨트롤러 목록 최신화 |
+| [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 테스트/컨트롤러/UI 목록 최신화 |
 | [`core-viewer`](./features/core-viewer/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 2` | `REFACTOR-01` 해결(예외/`rAF` 누수/`!active` 가드), `REFACTOR-02~03` 🟡 잔여 |
-| [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `11/11 (100%)` | `0 / 1` | `REFACTOR-14` 해결(`post_navigation.test.js` 실모듈 전환), `REFACTOR-15` 🟡 잔여 |
+| [`post-navigation`](./features/post-navigation/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `11/11 (100%)` | `0 / 0` | `REFACTOR-15` 해결(`no_photo_notice.js`·`post_nav_controller.js` 분리·방어 보강), `🟢 Sign-Off` 확정 |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `REFACTOR-02` 해결(`triggerPostRecommend` 분할·`findValidInSelector` 평탄화), `🟢 Sign-Off` 확정 |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 1` | 클린코드 감사(`REFACTOR-01` 🟡 `npm test` E2E 연동·스크래치 정리) 발행 |
 | [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■■■■■] 8/8` | `16/16 (100%)` | `0 / 0` | `REFACTOR-04` 해결(`storage_sync.js`·`fullscreen_controller.js` 분리·`popup.js` 클램핑·`v1.1.0` 동기화), `🟢 Sign-Off` 확정 |
@@ -29,6 +29,8 @@
 ---
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
+
+- **`[2026-11-25]` `[systematic-debugger]` [`post-navigation`]**: `REFACTOR-15` 해결 — `post_navigator.js` `getClassNameString()`/`getTrimmedText()`/`queryPostTitleLink()`/`findTargetPostIndex()`/`buildFoundPostResult()` 추출 및 `SVGAnimatedString`/null/`direction` 방어, `no_photo_notice.js`(136줄)·`dom_guards.js`(34줄)·`post_nav_controller.js`(124줄) 단방향 분리(`overlay.js`/`viewer_controller.js` re-export 유지), `<svg class="icon_img">`·무콜백 단언 추가 및 `🟢 Sign-Off` 확정 (`npm run build`·`npm test`·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS).
 
 - **`[2026-11-25]` `[systematic-debugger]` [`viewer-immersion`]**: `REFACTOR-04` 해결 — `CONFIG` 상수(`PADDING_MIN`/`PADDING_MAX`/`PADDING_SAVE_DEBOUNCE_MS`/`ZOOM_EPSILON`)·`state.paddingSaveTimer` 추가, `storage_sync.js`(249줄)·`fullscreen_controller.js`(268줄) 분리 및 `immersion_controller.js`(258줄) 슬림화(크로스 컨트롤러 브릿지/동기 플래그 제거·동일 참조 re-export 유지), `popup.js` `normalizePaddingValue` 클램핑·`popup.html` `v1.1.0` 정합화, `🟢 Sign-Off` 확정 (`npm run build`·`npm test`·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS).
 - **`[2026-11-25]` `[systematic-debugger]` [`post-recommend`]**: `REFACTOR-02` 해결 — `recommend_controller.js` 상수(`RECOMMEND_UNLOCK_DELAY_MS`, `RECOMMEND_LOCK_TOAST_DURATION_MS`) 추출 및 `triggerPostRecommend()` 29줄·2-depth 헬퍼 6종 분할, `recommend_parser.js` `findValidInSelector()` 2-depth 평탄화 및 `dispatchRecommendClick()` `catch` 주석 보강, `🟢 Sign-Off` 확정 (`npm run build`·`npm test` 5개 스위트·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS).
