@@ -20,7 +20,7 @@ import {
   isEditableTarget,
   isExternalModalOpen
 } from '../ui/overlay.js';
-import { resetZoom, setupZoomEvents, consumeSuppressedBackdropClick } from '../ui/zoom_pan.js';
+import { resetZoom, setupZoomEvents, consumeSuppressedBackdropClick, cancelZoomRaf } from '../ui/zoom_pan.js';
 import { triggerPostRecommend, updateRecommendButtonUi, clearRecommendTimers } from './recommend_controller.js';
 import {
   isOverlayActive,
@@ -309,6 +309,8 @@ function persistPaddingSetting() {
     if (typeof GM_setValue === 'function') {
       GM_setValue(CONFIG.STORAGE_KEY_PADDING, valueToSave);
     }
+  } catch (err) {
+    // Non-fatal: Chrome extension context invalidated or storage write blocked
   } finally {
     setPaddingSavePending(false);
   }
@@ -486,17 +488,21 @@ export function closeViewer() {
   dismissViewerToast();
   clearRecommendTimers();
   clearIdleTimer();
-  flushPaddingSave();
-  resetImmersionGuards();
-  resetFullscreenState();
-  showUi();
-  resetZoom();
+  cancelResizeRaf();
 
   const { overlayEl } = state.elements;
   if (overlayEl) {
     overlayEl.classList.remove('active');
     document.body.style.overflow = state.previousBodyOverflow;
   }
+
+  flushPaddingSave();
+  resetImmersionGuards();
+  resetFullscreenState();
+  showUi();
+  resetZoom();
+  cancelZoomRaf();
+  cancelResizeRaf();
 
   exitFullscreenSafely();
 }
@@ -558,16 +564,24 @@ function bindContextMenuTracker() {
   }, true);
 }
 
+function cancelResizeRaf() {
+  if (state.resizeRafId === null) return;
+  cancelAnimationFrame(state.resizeRafId);
+  state.resizeRafId = null;
+}
+
 function bindResizeHandler() {
-  let resizeRafId = null;
   window.addEventListener('resize', () => {
-    const { overlayEl } = state.elements;
-    if (!overlayEl || !overlayEl.classList.contains('active')) return;
-    if (resizeRafId) cancelAnimationFrame(resizeRafId);
-    resizeRafId = requestAnimationFrame(() => {
+    if (!isOverlayActive()) return;
+    cancelResizeRaf();
+    let fired = false;
+    const rafId = requestAnimationFrame(() => {
+      fired = true;
+      state.resizeRafId = null;
+      if (!isOverlayActive()) return;
       applyFittingAndPadding();
-      resizeRafId = null;
     });
+    state.resizeRafId = fired ? null : rafId;
   });
 }
 

@@ -46,6 +46,7 @@
     noPhotoNoticeTimer: null,
     postNavTimer: null,
     autoOpenPollTimer: null,
+    resizeRafId: null,
     recommendTimers: [],
     recommendUnlockTimer: null,
     // Immersion & UI Auto-Hide
@@ -708,6 +709,17 @@
   }
 
   // src/ui/zoom_pan.js
+  var boundZoomImgEls = /* @__PURE__ */ new WeakSet();
+  function isViewerActive() {
+    const { overlayEl } = state.elements;
+    return Boolean(overlayEl && overlayEl.classList && overlayEl.classList.contains("active"));
+  }
+  function cancelZoomRaf() {
+    if (state.zoom.transformRafId !== null) {
+      cancelAnimationFrame(state.zoom.transformRafId);
+      state.zoom.transformRafId = null;
+    }
+  }
   function clearSuppressBackdropClick() {
     state.zoom.suppressNextBackdropClick = false;
     if (state.zoom.suppressClickTimer !== null) {
@@ -750,8 +762,16 @@
   function updateImgTransform() {
     const { mainImgEl, infoBadgeEl } = state.elements;
     if (!mainImgEl) return;
-    if (state.zoom.transformRafId) cancelAnimationFrame(state.zoom.transformRafId);
-    state.zoom.transformRafId = requestAnimationFrame(() => {
+    if (!isViewerActive()) {
+      cancelZoomRaf();
+      return;
+    }
+    cancelZoomRaf();
+    let fired = false;
+    const rafId = requestAnimationFrame(() => {
+      fired = true;
+      state.zoom.transformRafId = null;
+      if (!isViewerActive()) return;
       if (state.zoom.scale <= 1.001) {
         state.zoom.scale = 1;
         state.zoom.panX = 0;
@@ -770,6 +790,7 @@
         }
       }
     });
+    state.zoom.transformRafId = fired ? null : rafId;
   }
   function resetZoom(preservePendingRelease = false) {
     state.zoom.scale = 1;
@@ -786,12 +807,18 @@
       window.removeEventListener("mousemove", onWindowMouseMove);
       window.removeEventListener("mouseup", onWindowMouseUp);
     }
+    if (state.elements.mainImgEl) {
+      state.elements.mainImgEl.style.transform = "translate(0px, 0px) scale(1)";
+      state.elements.mainImgEl.style.cursor = "default";
+    }
     updateImgTransform();
     applyFittingAndPadding();
   }
   function setupZoomEvents(mainImgEl) {
-    if (!mainImgEl) return;
+    if (!mainImgEl || boundZoomImgEls.has(mainImgEl)) return;
+    boundZoomImgEls.add(mainImgEl);
     mainImgEl.addEventListener("wheel", (e) => {
+      if (!isViewerActive()) return;
       e.preventDefault();
       const zoomDelta = e.deltaY < 0 ? 0.15 : -0.15;
       const oldScale = state.zoom.scale;
@@ -810,6 +837,7 @@
       }
     }, { passive: false });
     mainImgEl.addEventListener("mousedown", (e) => {
+      if (!isViewerActive()) return;
       if (state.zoom.scale > 1 && e.button === 0) {
         e.preventDefault();
         clearSuppressBackdropClick();
@@ -825,6 +853,7 @@
       }
     });
     mainImgEl.addEventListener("dblclick", (e) => {
+      if (!isViewerActive()) return;
       e.preventDefault();
       if (state.zoom.scale > 1) {
         resetZoom();
@@ -1962,6 +1991,7 @@
       if (typeof GM_setValue === "function") {
         GM_setValue(CONFIG.STORAGE_KEY_PADDING, valueToSave);
       }
+    } catch (err) {
     } finally {
       setPaddingSavePending(false);
     }
@@ -2117,16 +2147,19 @@
     dismissViewerToast();
     clearRecommendTimers();
     clearIdleTimer();
-    flushPaddingSave();
-    resetImmersionGuards();
-    resetFullscreenState();
-    showUi();
-    resetZoom();
+    cancelResizeRaf();
     const { overlayEl } = state.elements;
     if (overlayEl) {
       overlayEl.classList.remove("active");
       document.body.style.overflow = state.previousBodyOverflow;
     }
+    flushPaddingSave();
+    resetImmersionGuards();
+    resetFullscreenState();
+    showUi();
+    resetZoom();
+    cancelZoomRaf();
+    cancelResizeRaf();
     exitFullscreenSafely();
   }
   function startAutoOpenPolling() {
@@ -2179,16 +2212,23 @@
       state.lastRightClickedImgSrc = null;
     }, true);
   }
+  function cancelResizeRaf() {
+    if (state.resizeRafId === null) return;
+    cancelAnimationFrame(state.resizeRafId);
+    state.resizeRafId = null;
+  }
   function bindResizeHandler() {
-    let resizeRafId = null;
     window.addEventListener("resize", () => {
-      const { overlayEl } = state.elements;
-      if (!overlayEl || !overlayEl.classList.contains("active")) return;
-      if (resizeRafId) cancelAnimationFrame(resizeRafId);
-      resizeRafId = requestAnimationFrame(() => {
+      if (!isOverlayActive()) return;
+      cancelResizeRaf();
+      let fired = false;
+      const rafId = requestAnimationFrame(() => {
+        fired = true;
+        state.resizeRafId = null;
+        if (!isOverlayActive()) return;
         applyFittingAndPadding();
-        resizeRafId = null;
       });
+      state.resizeRafId = fired ? null : rafId;
     });
   }
   function bindTestOpenListener() {

@@ -28,6 +28,7 @@ export const state = {
   noPhotoNoticeTimer: null,
   postNavTimer: null,
   autoOpenPollTimer: null,
+  resizeRafId: null,
   recommendTimers: [],
   recommendUnlockTimer: null,
 

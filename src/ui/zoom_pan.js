@@ -2,6 +2,20 @@
 import { state } from '../state.js';
 import { applyFittingAndPadding } from './overlay.js';
 
+const boundZoomImgEls = new WeakSet();
+
+function isViewerActive() {
+  const { overlayEl } = state.elements;
+  return Boolean(overlayEl && overlayEl.classList && overlayEl.classList.contains('active'));
+}
+
+export function cancelZoomRaf() {
+  if (state.zoom.transformRafId !== null) {
+    cancelAnimationFrame(state.zoom.transformRafId);
+    state.zoom.transformRafId = null;
+  }
+}
+
 function clearSuppressBackdropClick() {
   state.zoom.suppressNextBackdropClick = false;
   if (state.zoom.suppressClickTimer !== null) {
@@ -50,9 +64,17 @@ export function onWindowMouseUp(e) {
 export function updateImgTransform() {
   const { mainImgEl, infoBadgeEl } = state.elements;
   if (!mainImgEl) return;
-  if (state.zoom.transformRafId) cancelAnimationFrame(state.zoom.transformRafId);
+  if (!isViewerActive()) {
+    cancelZoomRaf();
+    return;
+  }
+  cancelZoomRaf();
 
-  state.zoom.transformRafId = requestAnimationFrame(() => {
+  let fired = false;
+  const rafId = requestAnimationFrame(() => {
+    fired = true;
+    state.zoom.transformRafId = null;
+    if (!isViewerActive()) return;
     if (state.zoom.scale <= 1.001) {
       state.zoom.scale = 1.0;
       state.zoom.panX = 0;
@@ -73,6 +95,7 @@ export function updateImgTransform() {
       }
     }
   });
+  state.zoom.transformRafId = fired ? null : rafId;
 }
 
 export function resetZoom(preservePendingRelease = false) {
@@ -90,14 +113,20 @@ export function resetZoom(preservePendingRelease = false) {
     window.removeEventListener('mousemove', onWindowMouseMove);
     window.removeEventListener('mouseup', onWindowMouseUp);
   }
+  if (state.elements.mainImgEl) {
+    state.elements.mainImgEl.style.transform = 'translate(0px, 0px) scale(1)';
+    state.elements.mainImgEl.style.cursor = 'default';
+  }
   updateImgTransform();
   applyFittingAndPadding();
 }
 
 export function setupZoomEvents(mainImgEl) {
-  if (!mainImgEl) return;
+  if (!mainImgEl || boundZoomImgEls.has(mainImgEl)) return;
+  boundZoomImgEls.add(mainImgEl);
 
   mainImgEl.addEventListener('wheel', (e) => {
+    if (!isViewerActive()) return;
     e.preventDefault();
     const zoomDelta = e.deltaY < 0 ? 0.15 : -0.15;
     const oldScale = state.zoom.scale;
@@ -119,6 +148,7 @@ export function setupZoomEvents(mainImgEl) {
   }, { passive: false });
 
   mainImgEl.addEventListener('mousedown', (e) => {
+    if (!isViewerActive()) return;
     if (state.zoom.scale > 1.0 && e.button === 0) {
       e.preventDefault();
       clearSuppressBackdropClick();
@@ -136,6 +166,7 @@ export function setupZoomEvents(mainImgEl) {
   });
 
   mainImgEl.addEventListener('dblclick', (e) => {
+    if (!isViewerActive()) return;
     e.preventDefault();
     if (state.zoom.scale > 1.0) {
       resetZoom();
