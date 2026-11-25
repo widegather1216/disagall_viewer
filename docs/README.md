@@ -1,14 +1,14 @@
 # 🧭 Disagall Viewer Master Control Tower (Living Wiki Hub)
 
-> **최종 업데이트**: 2026-11-25 (by `systematic-debugger`)
+> **최종 업데이트**: 2026-11-25 (by `atomic-commit-crafter`)
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: 전체 도메인 `🟢 Sign-Off` (릴리스 준비 완료 / 신규 기능 기획 대기)
+- **Active 도메인**: 전체 도메인 `🟢 Sign-Off` (9개 `REFACTOR` 티켓 전건 해결 · 원자적 커밋 완료 · 릴리스 준비 완료)
 - **현재 단계 (Stage)**: `🟢 Sign-Off` (전 도메인 미해결 티켓 `0 / 0`)
-- **직전 완료 작업**: 2026-11-25 `modular-bundler-migration` `REFACTOR-01` 해결 (`tests/helpers/fake_timer_env.js` 공용화·스크래치 테스트 2종 삭제·`build.js` 헬퍼 분할·`npm test` 7개 스위트 연동, `modular-bundler-migration` `🟢 Sign-Off` 확정)
+- **직전 완료 작업**: 2026-11-25 전 도메인 클린코드 감사 티켓 9건(`REFACTOR-01~03` · `14~15` · `01~02` · `04` · `01`) 순차 해결, `npm run pack`(`disagall_viewer.zip` & Safari 9종 동기화) 및 `npm test` 7개 스위트 통과 후 원자적 커밋(`f09ddb9`~`c70cc78`) 완료
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > 변경사항 커밋해줘 (또는 신규 기능 기획: "새 기능 기획하고 싶어")
+  > 모든 도메인 `🟢 Sign-Off` 및 커밋 완료! 신규 기능 기획(`기획해줘`) 또는 릴리즈 검증 진행해줘
 
 ---
 

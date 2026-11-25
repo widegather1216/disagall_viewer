@@ -52,11 +52,17 @@
   - `src/config.js`, `src/state.js`: `PADDING_MIN`/`PADDING_MAX`/`PADDING_SAVE_DEBOUNCE_MS`/`ZOOM_EPSILON` 및 `state.paddingSaveTimer` 추가
   - `src/controller/storage_sync.js`, `src/controller/fullscreen_controller.js`, `src/controller/immersion_controller.js`, `src/controller/viewer_controller.js`: 스토리지 동기화(249줄)·전체화면 상태 머신(268줄) 분리, `immersion_controller.js`(258줄) 슬림화 및 동일 참조 re-export 유지
   - `popup.js`, `popup.html`, `tests/immersion.test.js`, `content.js`, `disagall_viewer.user.js`: `normalizePaddingValue` 클램핑 통합, `v1.1.0` 푸터 동기화, Test 31 추가 및 번들 재빌드
-- **Working Tree State**: 🟡 Modified (커밋 대기 — `REFACTOR-04` 코드/테스트/번들/위키 반영 완료)
+- **Recent Commits**:
+  - `ac95f7c` - `docs(immersion): mark REFACTOR-04 resolved and sign off viewer-immersion`
+  - `b551422` - `test(immersion): verify popup finite integer clamping and controller modularization`
+  - `241c9d2` - `refactor(immersion): extract storage_sync and fullscreen_controller and clamp popup padding`
+  - `9e6e693` - `test(immersion): add unit and E2E tests for fullscreen transition mouse guard`
+  - `f8e8887` - `fix(immersion): suppress mousemove UI wake flicker during fullscreen transition`
+- **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **실행 검증 명령 및 결과**:
-  - `npm run build` (`PASS`), `npm test` (5개 테스트 스위트·`immersion.test.js` 31/31 `PASS`)
+  - `npm run build` (`PASS`), `npm test` (7개 테스트 스위트·`immersion.test.js` 31/31 `PASS`)
   - `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
   - 미해결 티켓 (`0 / 0` — `🚨 DEFECT: 0건`, `🧐 REFACTOR: 0건`)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `viewer-immersion` 도메인은 전 구현/QA/감사 티켓 `0건`으로 `🟢 Sign-Off` 확정 상태. 다음 우선순위는 `post-navigation` `REFACTOR-15`.
+  - `viewer-immersion` 포함 전 도메인 구현/QA/감사 티켓 `0건`으로 `🟢 Sign-Off` 확정 상태.
   - 참고: 실제 오버레이 패딩 슬라이더의 DOM ID는 `#disagall-slider`(스펙 표기 `#disagall-padding-slider` 대신 실제 마크업 `src/ui/overlay.js#L30`)임.

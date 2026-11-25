@@ -33,7 +33,12 @@
 - **생성/수정된 핵심 파일**:
   - [`tests/core_viewer.test.js`](../../../tests/core_viewer.test.js): Test 3 미사용 변수(`openCount`, `origSetAttr`, `origSrcDesc`) 제거 및 Test 9 추가
 - **검증 완료된 테스트 실행 명령어**:
-  - `node --check tests/core_viewer.test.js` (`PASS`), `npm test` (`core_viewer` 9/9 포함 5개 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`)
-- **Working Tree State**: 🟡 Uncommitted Fix & Docs (`REFACTOR-02~03` 수정·테스트·위키 반영 완료, 커밋 전)
+  - `node --check tests/core_viewer.test.js` (`PASS`), `npm test` (`core_viewer` 9/9 포함 7개 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`)
+- **Recent Commits**:
+  - `ae8d950` - `test(core-viewer): add zoom transform, landscape fitting, toast timer, and URL guard tests`
+  - `db8ed4b` - `refactor(core-viewer): modularize overlay and viewer_controller and enforce entry and URL guards`
+  - `1e4dd24` - `test(core-viewer): add regression tests for REFACTOR-01 closeViewer and zoom rAF guards`
+  - `f09ddb9` - `refactor(core-viewer): guard closeViewer storage errors and cancel pending rAFs`
+- **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `core-viewer` 잔여 티켓 0건 (`🟢 Sign-Off` 확정). 전역 잔여 티켓은 `modular-bundler-migration` `REFACTOR-01`.
+  - `core-viewer` 포함 전 도메인 잔여 티켓 0건 (`🟢 Sign-Off` 확정).

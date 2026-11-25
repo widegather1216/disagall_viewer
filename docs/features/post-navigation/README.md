@@ -37,7 +37,12 @@
   - `tests/post_navigation.test.js`, `content.js`, `disagall_viewer.user.js`, Safari Resources: `<svg class="icon_img">`·null 텍스트·무콜백 알림 바·비정상 방향 단언 추가 및 번들 동기화
   - `docs/features/post-navigation/architecture.md`, `verification.md`, `README.md`, `00_core_foundation/architecture.md`, `docs/README.md`: `REFACTOR-15` `🟢 RESOLVED` 및 **`🟢 Sign-Off`** 반영
 - **검증 완료된 테스트 실행 명령어**:
-  - `node --check` (`PASS`), `npm run build` (`PASS`), `npm test` (`5개 스위트 PASS` · `post_navigation.test.js` 11/11 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`)
-- **Working Tree State**: 🟡 Modified (미커밋: `REFACTOR-15` 리팩토링·테스트·번들·위키 동기화, 커밋은 부모 코디네이터가 수행)
+  - `node --check` (`PASS`), `npm run build` (`PASS`), `npm test` (`7개 스위트 PASS` · `post_navigation.test.js` 11/11 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`)
+- **Recent Commits**:
+  - `103f1e6` - `docs(post-navigation): mark REFACTOR-15 resolved and sign off post-navigation`
+  - `abb2105` - `test(post-navigation): cover SVG className safety and notice callback guards`
+  - `678e77a` - `refactor(post-navigation): harden post_navigator guards and extract notice and nav modules`
+  - `116790b` - `test(post-navigation): replace local mock copies in Tests 1-7 with real post_navigator imports`
+- **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `post-navigation` 도메인은 `0 DEFECT / 0 REFACTOR` **`🟢 Sign-Off`** 상태입니다. 잔여 전체 도메인 우선순위는 `core-viewer` `REFACTOR-02`입니다.
+  - `post-navigation` 포함 전 도메인 `0 DEFECT / 0 REFACTOR` **`🟢 Sign-Off`** 상태입니다.

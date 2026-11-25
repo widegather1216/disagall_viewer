@@ -35,7 +35,12 @@
   - `src/parser/recommend_parser.js`: `findValidInSelector()` 추출로 `findFirstValidMatch()` 2-depth 평탄화 및 `dispatchRecommendClick()` `catch` 폴백 주석 명시
   - `content.js`, `disagall_viewer.user.js`, `safari_extension/`: `npm run build` 번들 동기화
 - **검증 완료된 테스트 실행 명령어**:
-  - `npm run build` (`PASS`), `npm test` (5개 스위트 전량 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check src/controller/recommend_controller.js src/parser/recommend_parser.js` (`PASS`)
-- **Working Tree State**: 🟡 Modified (Uncommitted — 부모 코디네이터 커밋 대기)
+  - `npm run build` (`PASS`), `npm test` (7개 스위트 전량 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check src/controller/recommend_controller.js src/parser/recommend_parser.js` (`PASS`)
+- **Recent Commits**:
+  - `e2eaf0f` - `docs(post-recommend): mark REFACTOR-02 resolved and sign off post-recommend`
+  - `f89849a` - `refactor(post-recommend): decompose triggerPostRecommend and flatten selector matching`
+  - `1211ee3` - `test(post-recommend): migrate Tests 1-7 to real parser and controller modules`
+  - `5daf09e` - `refactor(post-recommend): enforce active overlay guard in triggerPostRecommend`
+- **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `post-recommend` 도메인 모든 `DEFECT`/`REFACTOR` 티켓 해결 완료(`🟢 Sign-Off`). 전역 다음 타깃은 `viewer-immersion` `REFACTOR-04` (`🟡 Should Fix`).
+  - `post-recommend` 포함 전 도메인 모든 `DEFECT`/`REFACTOR` 티켓 해결 완료(`🟢 Sign-Off`).

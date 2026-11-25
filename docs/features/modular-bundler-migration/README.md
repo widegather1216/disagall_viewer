@@ -37,6 +37,10 @@
   - `package.json`, `docs/features/modular-bundler-migration/spec.md`: `npm test` 7개 스위트 연동 및 문서 동기화
 - **검증 완료된 테스트 실행 명령어**:
   - `npm run pack` (`PASS`), `npm test` (`7개 스위트 전량 PASS`), `for f in src/*.js src/*/*.js popup.js background.js build.js; do node --check "$f"; done` (`PASS`)
-- **Working Tree State**: 🟡 Modified (커밋 대기 — 모든 검증 통과 및 `🟢 Sign-Off` 확정)
+- **Recent Commits**:
+  - `c70cc78` - `docs(bundler): mark REFACTOR-01 resolved and sign off all domains`
+  - `bfc05ff` - `test(e2e): wire E2E suites into npm test, share fake timer env, and remove scratch scripts`
+  - `ad9dc77` - `refactor(bundler): modularize build steps and update release bundle artifacts`
+- **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - 잔여 미해결 티켓 없음(`0건`). 커밋 진행 가능.
+  - 전 도메인 잔여 미해결 티켓 없음(`0건`). 릴리즈 배포 준비 완료.
