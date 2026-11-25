@@ -377,7 +377,6 @@ async function run() {
     dom.body.appendChild(writeDiv);
     dom.body.style.overflow = 'scroll';
 
-    let openCount = 0;
     const sandbox = {
       window: dom.win,
       document: dom.doc,
@@ -419,13 +418,7 @@ async function run() {
     // Track if showImage/loader resets on re-click inside overlay
     const loader = dom.doc.getElementById('disagall-loader');
     loader.style.display = 'none';
-    const origSetAttr = mainImg.style;
     let srcWrites = 0;
-    const origSrcDesc = Object.getOwnPropertyDescriptor(mainImg, 'src') || {
-      value: mainImg.src,
-      writable: true,
-      configurable: true,
-    };
     let currentSrcVal = mainImg.src;
     Object.defineProperty(mainImg, 'src', {
       get: () => currentSrcVal,
@@ -1110,6 +1103,237 @@ async function run() {
       global.requestAnimationFrame = origRAF;
       global.cancelAnimationFrame = origCAF;
       global.chrome = origChrome;
+    }
+  }
+
+  // Test 9 (REFACTOR-03): Zoom upper clamp (5.0x), pan drag transform/cursor/badge with flushing rAF,
+  // landscape image fitting, showViewerToast/dismissViewerToast timer race, and image_parser relative/javascript: URLs
+  {
+    const dom = createMockDom();
+    const writeDiv = dom.createElement('div', '', ['write_div']);
+    const landscapeImg = dom.createElement('img');
+    landscapeImg.src = '/viewimage.php?id=hit&no=1&s=thumb';
+    landscapeImg.alt = 'Landscape Photo';
+    writeDiv.appendChild(landscapeImg);
+
+    const jsAnchor = dom.createElement('a');
+    jsAnchor.href = 'javascript:void(0)';
+    const jsAnchorImg = dom.createElement('img');
+    jsAnchorImg.src = 'https://nstatic.dcinside.com/dc/w/images/gallview_loading_ori.gif';
+    jsAnchor.appendChild(jsAnchorImg);
+    writeDiv.appendChild(jsAnchor);
+
+    const jsDirectAnchor = dom.createElement('a');
+    jsDirectAnchor.href = 'javascript:alert(1)';
+    const jsDirectImg = dom.createElement('img');
+    jsDirectImg.src = 'javascript:alert(2)';
+    jsDirectAnchor.appendChild(jsDirectImg);
+    writeDiv.appendChild(jsDirectAnchor);
+
+    dom.body.appendChild(writeDiv);
+
+    const origWindow = global.window;
+    const origDocument = global.document;
+    const origImage = global.Image;
+    const origEvent = global.Event;
+    const origRAF = global.requestAnimationFrame;
+    const origCAF = global.cancelAnimationFrame;
+    const origSetTimeout = global.setTimeout;
+    const origClearTimeout = global.clearTimeout;
+
+    const rafQueue = new Map();
+    let nextRafId = 1;
+    const flushRaf = () => {
+      while (rafQueue.size > 0) {
+        const entries = Array.from(rafQueue.entries());
+        rafQueue.clear();
+        for (const [, cb] of entries) {
+          cb(0);
+        }
+      }
+    };
+
+    let fakeNow = 0;
+    let nextTimerId = 1;
+    const fakeTimers = new Map();
+    const advanceTimersBy = (ms) => {
+      const targetTime = fakeNow + ms;
+      while (true) {
+        let nextEntry = null;
+        for (const entry of fakeTimers.values()) {
+          if (entry.fireAt <= targetTime && (!nextEntry || entry.fireAt < nextEntry.fireAt || (entry.fireAt === nextEntry.fireAt && entry.id < nextEntry.id))) {
+            nextEntry = entry;
+          }
+        }
+        if (!nextEntry) break;
+        fakeTimers.delete(nextEntry.id);
+        fakeNow = nextEntry.fireAt;
+        nextEntry.cb();
+      }
+      fakeNow = targetTime;
+    };
+
+    global.window = dom.win;
+    global.document = dom.doc;
+    global.Event = class { constructor(type) { this.type = type; } };
+    global.requestAnimationFrame = (cb) => {
+      const id = nextRafId++;
+      rafQueue.set(id, cb);
+      return id;
+    };
+    global.cancelAnimationFrame = (id) => {
+      rafQueue.delete(id);
+    };
+    global.setTimeout = (cb, delay = 0) => {
+      const id = nextTimerId++;
+      fakeTimers.set(id, { id, cb, fireAt: fakeNow + Math.max(0, Number(delay) || 0) });
+      return id;
+    };
+    global.clearTimeout = (id) => {
+      fakeTimers.delete(id);
+    };
+    global.Image = class {
+      set src(v) {
+        this._src = v;
+        if (typeof this.onload === 'function') this.onload();
+      }
+      get src() { return this._src; }
+    };
+
+    try {
+      const { CONFIG } = await import('../src/config.js');
+      const { state } = await import('../src/state.js');
+      const imageParser = await import('../src/parser/image_parser.js');
+      const overlayUi = await import('../src/ui/overlay.js');
+      const controller = await import('../src/controller/viewer_controller.js');
+
+      Object.keys(state.elements).forEach((k) => { state.elements[k] = null; });
+      state.previousBodyOverflow = '';
+      state.postImages = [];
+      state.currentIndex = 0;
+      state.currentPadding = CONFIG.DEFAULT_PADDING;
+      state.isFullscreenMode = false;
+      state.isUiHidden = false;
+      state.resizeRafId = null;
+      state.toastTimer = null;
+      state.zoom.scale = 1.0;
+      state.zoom.panX = 0;
+      state.zoom.panY = 0;
+      state.zoom.isDragging = false;
+      state.zoom.pendingDragRelease = false;
+      state.zoom.transformRafId = null;
+      state.zoom.suppressNextBackdropClick = false;
+      state.zoom.suppressClickTimer = null;
+
+      // (a) image_parser.js relative URL resolution & javascript: anchor rejection
+      assert.strictEqual(
+        imageParser.getCleanOriginalUrl('/viewimage.php?id=hit&no=1&s=thumb'),
+        'https://gall.dcinside.com/viewimage.php?id=hit&no=1',
+        'REFACTOR-03: relative URL must resolve against origin and strip thumb query params'
+      );
+      assert.strictEqual(
+        imageParser.getBestImgUrl(landscapeImg),
+        'https://gall.dcinside.com/viewimage.php?id=hit&no=1'
+      );
+      assert.strictEqual(imageParser.isPostBodyImage(landscapeImg), true);
+
+      assert.strictEqual(imageParser.getCleanOriginalUrl('javascript:void(0)'), '');
+      assert.strictEqual(imageParser.isPostBodyImage(jsAnchorImg), false);
+      assert.strictEqual(imageParser.getBestImgUrl(jsDirectImg), '');
+      assert.strictEqual(imageParser.isPostBodyImage(jsDirectImg), false);
+
+      const extracted = imageParser.extractPostImages(dom.doc);
+      assert.strictEqual(extracted.length, 1);
+      assert.strictEqual(extracted[0].url, 'https://gall.dcinside.com/viewimage.php?id=hit&no=1');
+
+      // (b) Landscape image fitting (1600x900)
+      controller.createOverlay();
+      state.elements.mainImgEl.naturalWidth = 1600;
+      state.elements.mainImgEl.naturalHeight = 900;
+      controller.openViewer();
+      flushRaf();
+
+      const { mainImgEl, infoBadgeEl, toastEl } = state.elements;
+      assert.strictEqual(mainImgEl.classList.contains('landscape'), true);
+      assert.strictEqual(mainImgEl.classList.contains('portrait'), false);
+      assert.strictEqual(infoBadgeEl.textContent, '가로 사진 (1600x900)');
+
+      // (c) Wheel zoom upper clamp (5.0x) & pan drag transform/cursor/badge via flushing rAF
+      for (let i = 0; i < 35; i++) {
+        mainImgEl.dispatchEvent({ type: 'wheel', deltaY: -120, preventDefault() {} });
+      }
+      flushRaf();
+      assert.strictEqual(state.zoom.scale, 5.0);
+      assert.strictEqual(mainImgEl.style.cursor, 'grab');
+      assert.strictEqual(mainImgEl.style.transform, 'translate(0px, 0px) scale(5.00)');
+      assert(infoBadgeEl.textContent.startsWith('🔍 확대: 500%'));
+
+      mainImgEl.dispatchEvent({ type: 'mousedown', button: 0, clientX: 100, clientY: 100, preventDefault() {} });
+      flushRaf();
+      assert.strictEqual(state.zoom.isDragging, true);
+      assert.strictEqual(mainImgEl.style.cursor, 'grabbing');
+
+      dom.win.dispatchEvent({ type: 'mousemove', clientX: 160, clientY: 140 });
+      flushRaf();
+      assert.strictEqual(state.zoom.panX, 60);
+      assert.strictEqual(state.zoom.panY, 40);
+      assert.strictEqual(mainImgEl.style.transform, 'translate(60px, 40px) scale(5.00)');
+      assert.strictEqual(mainImgEl.style.cursor, 'grabbing');
+
+      dom.win.dispatchEvent({ type: 'mouseup', button: 0, clientX: 160, clientY: 140 });
+      flushRaf();
+      assert.strictEqual(state.zoom.isDragging, false);
+      assert.strictEqual(mainImgEl.style.cursor, 'grab');
+      assert.strictEqual(mainImgEl.style.transform, 'translate(60px, 40px) scale(5.00)');
+      assert(infoBadgeEl.textContent.startsWith('🔍 확대: 500%'));
+
+      // (d) showViewerToast auto-hide after CONFIG.TOAST_DURATION (1800ms) & dismissViewerToast race invalidation
+      assert.strictEqual(CONFIG.TOAST_DURATION, 1800);
+      overlayUi.showViewerToast('첫 번째 토스트');
+      assert.strictEqual(toastEl.textContent, '첫 번째 토스트');
+      assert.strictEqual(toastEl.classList.contains('show'), true);
+      const staleToastTimer = Array.from(fakeTimers.values()).find((t) => t.fireAt === fakeNow + CONFIG.TOAST_DURATION);
+      assert(staleToastTimer, 'Toast timer must be scheduled for CONFIG.TOAST_DURATION (1800ms)');
+
+      advanceTimersBy(CONFIG.TOAST_DURATION - 1);
+      assert.strictEqual(toastEl.classList.contains('show'), true, 'Toast must stay visible before 1800ms elapses');
+      advanceTimersBy(1);
+      assert.strictEqual(toastEl.classList.contains('show'), false, 'Toast must auto-hide after 1800ms');
+      assert.strictEqual(state.toastTimer, null);
+
+      overlayUi.showViewerToast('경합 토스트');
+      const raceTimerEntry = Array.from(fakeTimers.values()).find((t) => t.fireAt === fakeNow + CONFIG.TOAST_DURATION);
+      assert(raceTimerEntry);
+      overlayUi.dismissViewerToast();
+      assert.strictEqual(toastEl.classList.contains('show'), false);
+      assert.strictEqual(state.toastTimer, null);
+
+      overlayUi.showViewerToast('새 토스트');
+      assert.strictEqual(toastEl.classList.contains('show'), true);
+      assert.strictEqual(toastEl.textContent, '새 토스트');
+      // Even if a stale pre-dismiss callback executes out-of-order, toastSeq invalidation must keep the new toast visible
+      raceTimerEntry.cb();
+      assert.strictEqual(toastEl.classList.contains('show'), true, 'dismissViewerToast must invalidate stale toast callbacks');
+      assert.notStrictEqual(state.toastTimer, null);
+
+      advanceTimersBy(CONFIG.TOAST_DURATION);
+      assert.strictEqual(toastEl.classList.contains('show'), false);
+      assert.strictEqual(state.toastTimer, null);
+
+      controller.closeViewer();
+      flushRaf();
+      advanceTimersBy(0);
+
+      console.log('✅ Test 9: REFACTOR-03 zoom clamp/pan rAF, landscape fit, toast timer race & relative/javascript: URLs verified');
+    } finally {
+      global.window = origWindow;
+      global.document = origDocument;
+      global.Image = origImage;
+      global.Event = origEvent;
+      global.requestAnimationFrame = origRAF;
+      global.cancelAnimationFrame = origCAF;
+      global.setTimeout = origSetTimeout;
+      global.clearTimeout = origClearTimeout;
     }
   }
 
