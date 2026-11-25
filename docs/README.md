@@ -4,11 +4,11 @@
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: `modular-bundler-migration` (`🩹 Debugging` — 잔여 1건 `REFACTOR` 티켓: 🟡 Should Fix 1건)
-- **현재 단계 (Stage)`: `🩹 Debugging` (전 도메인 미해결 티켓 `0 / 1`)
-- **직전 완료 작업**: 2026-11-25 `core-viewer` `REFACTOR-03` 해결 (`tests/core_viewer.test.js` 미사용 변수 제거 및 flushing rAF·fake timer 기반 Test 9 줌 상한/팬/가로 피팅/토스트 타이머/상대 URL 검증 보강, `core-viewer` `🟢 Sign-Off` 확정)
+- **Active 도메인**: 전체 도메인 `🟢 Sign-Off` (릴리스 준비 완료 / 신규 기능 기획 대기)
+- **현재 단계 (Stage)**: `🟢 Sign-Off` (전 도메인 미해결 티켓 `0 / 0`)
+- **직전 완료 작업**: 2026-11-25 `modular-bundler-migration` `REFACTOR-01` 해결 (`tests/helpers/fake_timer_env.js` 공용화·스크래치 테스트 2종 삭제·`build.js` 헬퍼 분할·`npm test` 7개 스위트 연동, `modular-bundler-migration` `🟢 Sign-Off` 확정)
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `modular-bundler-migration` 도메인의 `REFACTOR-01` 티켓 해결해줘
+  > 변경사항 커밋해줘 (또는 신규 기능 기획: "새 기능 기획하고 싶어")
 
 ---
 
@@ -20,7 +20,7 @@
 | [`core-viewer`](./features/core-viewer/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 0` | `REFACTOR-03` 해결(`tests/core_viewer.test.js` Test 9 줌/가로 피팅/토스트/상대 URL 보강·위생 정리), `🟢 Sign-Off` 확정 |
 | [`post-navigation`](./features/post-navigation/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `11/11 (100%)` | `0 / 0` | `REFACTOR-15` 해결(`no_photo_notice.js`·`post_nav_controller.js` 분리·방어 보강), `🟢 Sign-Off` 확정 |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `REFACTOR-02` 해결(`triggerPostRecommend` 분할·`findValidInSelector` 평탄화), `🟢 Sign-Off` 확정 |
-| [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 1` | 클린코드 감사(`REFACTOR-01` 🟡 `npm test` E2E 연동·스크래치 정리) 발행 |
+| [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 0` | `REFACTOR-01` 해결(`npm test` 7개 스위트 연동·`fake_timer_env.js` 공용화·스크래치 2종 삭제·`build.js` 분할), `🟢 Sign-Off` 확정 |
 | [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■■■■■] 8/8` | `16/16 (100%)` | `0 / 0` | `REFACTOR-04` 해결(`storage_sync.js`·`fullscreen_controller.js` 분리·`popup.js` 클램핑·`v1.1.0` 동기화), `🟢 Sign-Off` 확정 |
 
 *(※ 상태 범례: `📐 Planning` | `🛠️ Implementing` | `🧐 Auditing` | `🧪 QA Testing` | `🩹 Debugging` | `🟢 Sign-Off`)*
@@ -29,6 +29,8 @@
 ---
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
+
+- **`[2026-11-25]` `[systematic-debugger]` [`modular-bundler-migration`]**: `REFACTOR-01` 해결 — `tests/helpers/fake_timer_env.js`로 `createFakeTimerEnv()` 공용화, 무단언 스크래치 `tests/test_dc_sample.js`·`tests/test_rows_dc.js` 제거, `build.js` `buildExtensionBundle`/`buildUserscriptBundle`/`build`(각 `<= 25`줄) 분할, `package.json` `npm test` 7개 스위트(단위 5+E2E 2) 연동 및 `🟢 Sign-Off` 확정 (`npm run pack`·`npm test` 7개 스위트·`node --check` PASS).
 
 - **`[2026-11-25]` `[systematic-debugger]` [`core-viewer`]**: `REFACTOR-03` 해결 — `tests/core_viewer.test.js` 미사용 변수(`openCount`, `origSetAttr`, `origSrcDesc`) 제거 및 flushing `requestAnimationFrame`·fake timer 기반 Test 9(`5.0x` 줌 클램프·드래그 팬·`1600x900` 가로 피팅·`showViewerToast`/`dismissViewerToast` 타이머 경합·상대/`javascript:` URL) 추가, `🟢 Sign-Off` 확정 (`node --check`·`npm test` 5개 스위트·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11 PASS).
 

@@ -37,7 +37,7 @@
 ## 4. 빌드 및 패키징 스크립트 규격
 - **`npm run build`**: `node build.js` 실행, 100ms 이내 번들 생성 완료
 - **`npm run pack`**: 빌드 후 Chrome 웹스토어 업로드용 `disagall_viewer.zip` 자동 생성 (manifest, background, content.js, content.css, popup, icon 일체 패키징)
-- **`npm test`**: `node tests/module_import.test.js && node tests/core_viewer.test.js && node tests/post_navigation.test.js && node tests/recommend.test.js && node tests/immersion.test.js` 순차 실행
+- **`npm test`**: `node tests/module_import.test.js && node tests/core_viewer.test.js && node tests/post_navigation.test.js && node tests/recommend.test.js && node tests/immersion.test.js && node tests/immersion_e2e.test.js && node tests/post_navigation_e2e.test.js` 순차 실행
 
 ## 5. 예외 처리 및 엣지 케이스 정책 (Edge Cases & Fallbacks)
 - **`content.css` 부재 시 방어**: CSS 파일이 없을 경우 빈 문자열(`''`)로 폴백하여 빌드 크래시 방지

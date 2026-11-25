@@ -1,8 +1,8 @@
 # 📦 [modular-bundler-migration] 모듈화 및 esbuild 번들러 파이프라인 (Modular Bundler)
 
-- **현재 상태 (Lifecycle)**: `🩹 Debugging`
+- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,12 +29,14 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-25 / `clean-code-auditor` / 전 도메인 클린코드 전수 감사 완료 — `modular-bundler-migration` `REFACTOR-01`(🟡 Should Fix) 발행 및 `spec.md`/`architecture.md` 역동기화 (`🩹 Debugging` 전환)
-- **생성/수정된 핵심 파일**:
-  - `docs/features/modular-bundler-migration/verification.md`: `REFACTOR-01` (`npm test` E2E 스위트 연동, 무단언 스크래치 `test_dc_sample.js`/`test_rows_dc.js` 정리, E2E `createFakeTimerEnv()` 공용화 및 `build.js` 헬퍼 분리) 등록
-  - `docs/features/modular-bundler-migration/spec.md`, `architecture.md`: 5개 `npm test` 스위트 및 Safari 9종 동기화 대상 역동기화
+- **직전 완료 작업**: 2026-11-25 / `systematic-debugger` / `REFACTOR-01` 해결 — `tests/helpers/fake_timer_env.js` 공용화, 무단언 스크래치 2종 삭제, `build.js` 헬퍼 분리(`<= 25`줄), `package.json` `npm test` 7개 스위트(단위 5+E2E 2) 연동 및 `🟢 Sign-Off` 확정
+- **생성/수정/삭제된 핵심 파일**:
+  - `tests/helpers/fake_timer_env.js` (신규), `tests/immersion_e2e.test.js`, `tests/post_navigation_e2e.test.js`: `createFakeTimerEnv()` 공용화
+  - `tests/test_dc_sample.js`, `tests/test_rows_dc.js`: 삭제
+  - `build.js`: `buildExtensionBundle()`, `buildUserscriptBundle()`, `build()` 각 `<= 25`줄 분리
+  - `package.json`, `docs/features/modular-bundler-migration/spec.md`: `npm test` 7개 스위트 연동 및 문서 동기화
 - **검증 완료된 테스트 실행 명령어**:
-  - `npm test` (`5개 스위트 PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
-- **Working Tree State**: 🟡 Docs Modified (위키 감사 리포트/스펙 역동기화 반영 중)
+  - `npm run pack` (`PASS`), `npm test` (`7개 스위트 전량 PASS`), `for f in src/*.js src/*/*.js popup.js background.js build.js; do node --check "$f"; done` (`PASS`)
+- **Working Tree State**: 🟡 Modified (커밋 대기 — 모든 검증 통과 및 `🟢 Sign-Off` 확정)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - 최우선 해결 대상: `modular-bundler-migration` 도메인 `REFACTOR-01` (`systematic-debugger` 연결).
+  - 잔여 미해결 티켓 없음(`0건`). 커밋 진행 가능.

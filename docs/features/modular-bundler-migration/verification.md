@@ -1,8 +1,8 @@
 # 🧪 [modular-bundler-migration] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 1건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
+- **검증 상태**: `🟢 Sign-Off` (`0건 OPEN DEFECT` · `0건 OPEN REFACTOR` — 2026-11-25 `REFACTOR-01` 해결)
 - **인수 조건 통과율**: `3 / 3 (100%)` · 테스트 매트릭스 `5 / 5 PASS`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -12,10 +12,10 @@
   - **Given** 개발자가 `src/` 하위 모듈과 `content.css`를 수정한 상태에서,
   - **When** `npm run build`를 실행하면,
   - **Then** 0.1초 이내에 `content.js`와 메타데이터 배너 및 CSS가 인라인 주입된 `disagall_viewer.user.js`가 정상 생성된다.
-- **AC-02 (모듈 분리 무결성 및 단위 테스트 통과)**:
-  - **Given** 모듈화된 `src/parser`, `src/ui`, `src/controller` 모듈들이 존재할 때,
+- **AC-02 (모듈 분리 무결성 및 단위·E2E 테스트 통과)**:
+  - **Given** 모듈화된 `src/parser`, `src/ui`, `src/controller` 모듈 및 E2E 스위트들이 존재할 때,
   - **When** `npm test`를 실행하면,
-  - **Then** 모듈 임포트, 게시글 내비게이션, 추천 테스트 3종이 오류 없이 100% 통과한다.
+  - **Then** 모듈 임포트, 코어 뷰어, 게시글 내비게이션, 추천, 몰입 모드 단위 5종 및 번들 E2E 2종(총 7개 스위트)이 오류 없이 100% 통과한다.
 - **AC-03 (배포 ZIP 자동 패키징)**:
   - **Given** 빌드가 완료된 상태에서,
   - **When** `npm run pack`을 실행하면,
@@ -28,7 +28,7 @@
 | ID | 구분 | 시나리오 요약 | 관련 AC | 검증 결과 (`⏳` / `PASS` / `FAIL`) | 비고 (티켓 링크) |
 | :--- | :---: | :--- | :--- :---: | :---: | :--- |
 | `TC-HP-01` | Happy | `npm run build` 실행 시 content.js 및 disagall_viewer.user.js 동시 생성 | `AC-01` | `PASS (Fixed in DEFECT-01)` | [`DEFECT-01`](#defect-01-safari-%ED%99%95%EC%9E%A5-%EB%B2%88%EB%93%A4-v100-%EC%9E%A5%EA%B8%B0-%EB%AF%B8%EB%8F%99%EA%B8%B0%ED%99%94-%EB%B0%8F-userscript-%EB%9F%B0%EC%B2%98-css-%EB%88%84%EB%9D%BD) (Safari 리소스 동기화 및 `#disagall-quick-launcher` CSS 복구) |
-| `TC-HP-02` | Happy | `npm test` 실행 시 3개 단위 테스트 스위트 전원 통과 | `AC-02` | `PASS` | - |
+| `TC-HP-02` | Happy | `npm test` 실행 시 7개 단위·E2E 테스트 스위트 전원 통과 | `AC-02` | `PASS` | - |
 | `TC-HP-03` | Happy | `npm run pack` 실행 시 무결한 배포 ZIP 생성 | `AC-03` | `PASS (Fixed in DEFECT-01)` | [`DEFECT-01`](#defect-01-safari-%ED%99%95%EC%9E%A5-%EB%B2%88%EB%93%A4-v100-%EC%9E%A5%EA%B8%B0-%EB%AF%B8%EB%8F%99%EA%B8%B0%ED%99%94-%EB%B0%8F-userscript-%EB%9F%B0%EC%B2%98-css-%EB%88%84%EB%9D%BD) (`disagall_viewer.zip` 재생성 및 Safari 리소스 동기화 완료) |
 | `TC-BD-01` | Boundary | `content.css` 비어있거나 특수문자 포함 시 인라인 JSON 문자열 처리 | `AC-01` | `PASS` | - |
 | `TC-NG-01` | Negative | 모듈 문법 에러 발생 시 esbuild 에러 출력 및 비정상 종료(exit code 1) | `AC-01` | `PASS` | - |
@@ -51,16 +51,11 @@
 ## 🧐 4. 코드 품질 감사 리포트 (Audit & Refactoring Logs)
 
 ### [REFACTOR-01] `npm test` E2E 스위트 연동, 무단언 스크래치 테스트 정리 및 E2E 타이머 헬퍼 공용화
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
 - **심각도**: 🟡 Should Fix (권장 조치)
-- **위치**: [`package.json#L13`](../../../package.json#L13), [`tests/test_dc_sample.js#L1-L19`](../../../tests/test_dc_sample.js#L1-L19), [`tests/test_rows_dc.js#L1-L39`](../../../tests/test_rows_dc.js#L1-L39), [`tests/immersion_e2e.test.js#L9-L84`](../../../tests/immersion_e2e.test.js#L9-L84), [`tests/post_navigation_e2e.test.js#L9-L84`](../../../tests/post_navigation_e2e.test.js#L9-L84), [`build.js#L53-L94`](../../../build.js#L53-L94)
+- **위치**: [`package.json#L13`](../../../package.json#L13), [`tests/helpers/fake_timer_env.js`](../../../tests/helpers/fake_timer_env.js), [`tests/immersion_e2e.test.js#L9`](../../../tests/immersion_e2e.test.js#L9), [`tests/post_navigation_e2e.test.js#L9`](../../../tests/post_navigation_e2e.test.js#L9), [`build.js#L56-L97`](../../../build.js#L56-L97)
 - **위반 규칙**: 테스트 파이프라인 완결성 / 중복 코드 / 죽은 스크래치 코드 위생
-- **발견된 문제**:
-  - `package.json#L13` `npm test`에 번들 E2E 스위트(`tests/immersion_e2e.test.js`, `tests/post_navigation_e2e.test.js`)가 연결되지 않아 기본 테스트 명령에서 누락됨.
-  - `tests/test_dc_sample.js`(미사용 변수 `writeDivEnd` 포함)·`tests/test_rows_dc.js`는 단언(`assert`) 없이 `console.log`만 수행하는 스크래치 파일임.
-  - `immersion_e2e.test.js`와 `post_navigation_e2e.test.js`가 `createFakeTimerEnv()`를 그대로 중복 구현함. `build.js`의 `build()`(42줄)도 단계별 헬퍼로 간결화 가능.
-- **권장 개선안 (Suggested Diff)**:
-  ```text
-  // 1. package.json: test 스크립트(또는 test:e2e 포함)에 E2E 스위트 연결
-  // 2. tests/test_dc_sample.js, tests/test_rows_dc.js 제거(또는 assert 기반 정식 회귀 테스트 편입) 및 tests/helpers/fake_timer_env.js 공용화
-  ```
-- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+- **해결 내역**:
+  - **수정·생성·삭제 파일**: [`tests/helpers/fake_timer_env.js`](../../../tests/helpers/fake_timer_env.js)(신규), [`tests/immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js#L9), [`tests/post_navigation_e2e.test.js`](../../../tests/post_navigation_e2e.test.js#L9), [`build.js`](../../../build.js#L53-L97), [`package.json`](../../../package.json#L13) (`tests/test_dc_sample.js`, `tests/test_rows_dc.js` 삭제)
+  - **원인 및 조치**: `tests/helpers/fake_timer_env.js`로 `createFakeTimerEnv()`를 공용화하여 E2E 2종 중복을 제거하고, 무단언 스크래치 파일(`tests/test_dc_sample.js`, `tests/test_rows_dc.js`)을 삭제함. `build.js`의 `build()`(42줄)를 `buildExtensionBundle(rootDir)`(13줄)·`buildUserscriptBundle(rootDir, cssContent)`(15줄)·`build()`(11줄)로 분할하고(기존 배너/esbuild 옵션/`syncSafariResources()` 100% 유지), `package.json` `"test"` 스크립트에 `immersion_e2e.test.js`·`post_navigation_e2e.test.js`까지 7개 스위트를 연동함.
+  - **회귀 테스트 결과**: `npm run pack` (`PASS`), `npm test` (`7개 스위트 전량 PASS` — `module_import`, `core_viewer`, `post_navigation`, `recommend`, `immersion`, `immersion_e2e` 16/16, `post_navigation_e2e` 11/11), `node --check` (`PASS`)
