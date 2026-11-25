@@ -368,7 +368,7 @@ function createDomEnvironment(initialSyncData = { autoHideUi: true, defaultPaddi
   return { doc, win, chrome, syncStore };
 }
 
-function loadContentBundle(env, timers) {
+function loadContentBundle(env, timers, extraGlobals = {}) {
   const code = fs.readFileSync(path.join(ROOT, 'content.js'), 'utf8');
   class MockImage {
     constructor() {
@@ -401,6 +401,7 @@ function loadContentBundle(env, timers) {
     alert: () => {},
     console,
     URL,
+    ...extraGlobals,
   };
   sandbox.window.document = env.doc;
   vm.createContext(sandbox);
@@ -1122,6 +1123,47 @@ async function run() {
     await Promise.resolve();
     assert.strictEqual(env.doc.fullscreenElement, null, 'TC-BD-06: Korean IME KeyF must exit fullscreen');
     console.log('✅ TC-BD-06 PASS: Built content.js Korean IME KeyF & range slider pass-through verified');
+  }
+
+  // --- TC-BD-07: Fullscreen transition suppresses synthetic/jitter mousemove, wakes on real post-transition move ---
+  {
+    const timers = createFakeTimerEnv();
+    const env = createDomEnvironment({ autoHideUi: true, autoFullscreen: false, defaultPadding: 24 });
+    let fakeNow = 200000;
+    const FakeDate = class extends Date {
+      static now() {
+        return fakeNow;
+      }
+    };
+
+    loadContentBundle(env, timers, { Date: FakeDate });
+
+    env.win.postMessage({ action: 'disagall_test_open' }, '*');
+    const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const fullscreenBtn = env.doc.getElementById('disagall-btn-fullscreen');
+
+    fullscreenBtn.dispatchEvent('click');
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(env.doc.fullscreenElement, overlay);
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true);
+
+    // Synthetic/transition mousemove within 1s guard must NOT flicker UI back on
+    fakeNow += 400;
+    overlay.dispatchEvent({ type: 'mousemove', screenX: 700, screenY: 100, clientX: 700, clientY: 100, movementX: 1, movementY: 0 });
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true, 'TC-BD-07: Transition mousemove must not re-show UI');
+    assert.strictEqual(timers.timers.size, 0, 'TC-BD-07: Transition mousemove must not start idle timer');
+
+    // Stationary synthetic mousemove after guard expires must still stay hidden
+    fakeNow += 800;
+    overlay.dispatchEvent({ type: 'mousemove', screenX: 700, screenY: 100, clientX: 700, clientY: 100, movementX: 0, movementY: 0 });
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), true, 'TC-BD-07: Stationary synthetic mousemove after guard must stay hidden');
+
+    // Real mouse move after guard wakes UI normally
+    overlay.dispatchEvent({ type: 'mousemove', screenX: 760, screenY: 140, clientX: 760, clientY: 140, movementX: 60, movementY: 40 });
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), false, 'TC-BD-07: Real mousemove after transition must wake UI');
+    assert.strictEqual(timers.timers.size, 1, 'TC-BD-07: Real mousemove must resume idle timer');
+    console.log('✅ TC-BD-07 PASS: Built content.js fullscreen transition UI flicker suppression & post-transition wake verified');
   }
 
   console.log('\n🎉 ALL VIEWER IMMERSION E2E TESTS (HAPPY PATH + BOUNDARY & NEGATIVE) PASSED! 🎉');

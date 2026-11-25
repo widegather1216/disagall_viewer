@@ -1843,6 +1843,7 @@ async function run() {
         controller.closeViewer();
 
         // 29.7 Delayed autoHideUi=true after 2500ms idle hide must NOT unexpectedly wake hidden UI
+        state.autoFullscreen = false;
         state.autoHideUi = true;
         controller.initImmersionSettings();
         controller.openViewer();
@@ -1881,6 +1882,103 @@ async function run() {
     });
   });
   console.log('✅ Test 29: DEFECT-03 defaultPadding live sync, guards & async storage race defense verified');
+
+  // 30. Verify fullscreen transition mousemove suppression, stationary synthetic mousemove defense, and autoFullscreen no-flash open
+  await withFakeTimers(async (timers) => {
+    await withControllerHarness(async ({
+      controller,
+      overlayNode,
+      mainImgNode,
+      fullscreenBtnNode,
+      mockDocument,
+    }) => {
+      const origDateNow = Date.now;
+      const origQuerySelectorAll = mockDocument.querySelectorAll;
+      const origImage = global.Image;
+      let fakeNow = 100000;
+      Date.now = () => fakeNow;
+
+      const sampleBodyImg = createMockDomNode('fs-guard-body-img');
+      sampleBodyImg.tagName = 'IMG';
+      sampleBodyImg.src = 'https://dcimg7.dcinside.co.kr/viewimage.php?id=hit&no=999';
+      sampleBodyImg.currentSrc = sampleBodyImg.src;
+      sampleBodyImg.alt = 'fs-guard';
+      sampleBodyImg.naturalWidth = 1000;
+      sampleBodyImg.naturalHeight = 2000;
+      const writeDiv = { querySelectorAll: () => [sampleBodyImg] };
+      sampleBodyImg.closest = (sel) => (sel.includes('.write_div') ? writeDiv : null);
+      sampleBodyImg.getAttribute = () => null;
+      mockDocument.querySelectorAll = (sel) => (sel.endsWith('img') ? [sampleBodyImg] : [writeDiv]);
+      global.Image = class {
+        set src(val) {
+          this._src = val;
+          if (typeof this.onload === 'function') this.onload();
+        }
+        get src() { return this._src; }
+      };
+
+      try {
+        mainImgNode.naturalWidth = 1000;
+        mainImgNode.naturalHeight = 2000;
+        controller.initViewerBase();
+        controller.createOverlay();
+        overlayNode.classList.add('active');
+
+        // 30.1 Enter fullscreen via button click -> mousemove during transition (resize/animation) must NOT wake UI
+        fullscreenBtnNode.dispatchEvent('click');
+        await Promise.resolve();
+        await Promise.resolve();
+        assert.strictEqual(state.isFullscreenMode, true);
+        assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true);
+
+        // Browser fires resize/transition mousemove at t=+300ms and t=+800ms
+        fakeNow += 300;
+        overlayNode.dispatchEvent('mousemove', { screenX: 800, screenY: 120, clientX: 800, clientY: 120, movementX: 2, movementY: 1 });
+        assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true, 'Transition mousemove (+300ms) must NOT wake UI');
+        assert.strictEqual(timers.count, 0, 'Suppressed transition mousemove must NOT start idle timer');
+
+        fakeNow += 500; // +800ms total
+        overlayNode.dispatchEvent('mousemove', { screenX: 800, screenY: 120, clientX: 790, clientY: 80, movementX: 0, movementY: 0 });
+        assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true, 'Transition mousemove (+800ms) must NOT wake UI');
+        assert.strictEqual(timers.count, 0);
+
+        // 30.2 After guard expires (+1200ms), stationary synthetic mousemove (same screenX/Y, movement 0) must NOT wake UI
+        fakeNow += 400; // +1200ms total
+        overlayNode.dispatchEvent('mousemove', { screenX: 800, screenY: 120, clientX: 790, clientY: 80, movementX: 0, movementY: 0 });
+        assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true, 'Stationary synthetic mousemove after guard must NOT wake UI');
+        assert.strictEqual(timers.count, 0);
+
+        // 30.3 Actual pointer movement after guard DOES wake UI and schedules 2500ms idle timer
+        overlayNode.dispatchEvent('mousemove', { screenX: 840, screenY: 150, clientX: 830, clientY: 110, movementX: 40, movementY: 30 });
+        assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), false, 'Real pointer movement after transition must wake UI');
+        assert.strictEqual(state.isUiHidden, false);
+        assert.strictEqual(timers.count, 1, 'Waking UI in fullscreen must start idle timer');
+
+        // 30.4 Manual H during transition guard still works immediately
+        controller.closeViewer();
+        state.autoFullscreen = true;
+        controller.openViewer();
+        assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true, 'autoFullscreen openViewer must hide UI immediately without initial flash');
+        assert.strictEqual(timers.count, 0, 'autoFullscreen openViewer must not start idle timer before fullscreen');
+        await Promise.resolve();
+        await Promise.resolve();
+        assert.strictEqual(state.isFullscreenMode, true);
+
+        fakeNow += 100;
+        overlayNode.dispatchEvent('mousemove', { screenX: 500, screenY: 400, movementX: 5, movementY: 5 });
+        assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true, 'autoFullscreen transition mousemove must stay suppressed');
+
+        controller.handleKeyDown({ key: 'h', preventDefault() {}, stopPropagation() {} });
+        assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), false, 'Manual H must still wake UI immediately even during transition guard');
+        assert.strictEqual(timers.count, 1);
+      } finally {
+        Date.now = origDateNow;
+        mockDocument.querySelectorAll = origQuerySelectorAll;
+        global.Image = origImage;
+      }
+    });
+  });
+  console.log('✅ Test 30: Fullscreen transition mousemove guard, stationary event defense & autoFullscreen no-flash verified');
 
   console.log('\n🎉 ALL VIEWER IMMERSION UNIT TESTS PASSED! 🎉');
 }
