@@ -1,0 +1,39 @@
+=== [TC-BD-01] Top & Bottom Boundary ===
+Top boundary OK: {'url': 'http://127.0.0.1:51642/test_page.html?no=1003', 'toast': '목록의 가장 최신 글입니다.', 'toastShow': True, 'autoOpen': None}
+Bottom boundary OK: {'url': 'http://127.0.0.1:51642/test_page_3.html?no=1001', 'toast': '목록의 마지막 글입니다.', 'toastShow': True, 'autoOpen': None}
+PASS: TC-BD-01
+
+=== [TC-BD-02] Fallback to Adjacent Non-Photo Post & Mobile List (.gall-detail-lst li) ===
+Desktop non-photo fallback navigated OK: http://127.0.0.1:51642/bn_text_target.html?no=4001
+Mobile .gall-detail-lst smart skip & auto-open OK: http://127.0.0.1:51642/bn_mobile_target.html?no=5000, active=True
+PASS: TC-BD-02
+
+=== [TC-BD-03] Korean IME (KeyW/KeyS) & Range Slider Focus Pass-Through ===
+Korean IME KeyS & focused range slider ArrowUp OK: http://127.0.0.1:51642/test_page_2.html?no=1002 -> http://127.0.0.1:51642/test_page.html?no=1003
+PASS: TC-BD-03
+
+=== [TC-BD-04] No-Photo Notice 8s Auto-Dismiss & ESC / Close Button Cleanup ===
+ESC dismiss & listener cleanup OK: {'url': 'http://127.0.0.1:51642/bn_no_photo.html?no=6002', 'autoOpen': None}
+Close button dismiss & listener cleanup OK: {'url': 'http://127.0.0.1:51642/bn_no_photo.html?no=6002', 'autoOpen': None}
+8000ms auto-dismiss & listener cleanup OK: {'url': 'http://127.0.0.1:51642/bn_no_photo.html?no=6002', 'autoOpen': None}
+PASS: TC-BD-04
+
+=== [TC-NG-01] Negative Shortcut Guards (Inactive, Input, Modifier, Repeat, External Modal) ===
+Viewer negative guards OK (10 checks blocked)
+Notice negative guards OK (5 checks blocked)
+PASS: TC-NG-01
+
+=== [TC-NG-02] Disguised Notice/AD & Unsafe Scheme Blocking + Unavailable Result ===
+Disguised notice/AD & unsafe schemes blocked OK: up=목록의 가장 최신 글입니다., down=목록의 마지막 글입니다.
+Unavailable (no_list & current_not_found) OK: {'toast': '이동할 수 있는 게시글 목록을 찾을 수 없습니다.', 'autoOpen': None}
+PASS: TC-NG-02
+
+=== [TC-NG-03] 150ms Delay Cancel & Polling vs Manual openViewer Race ===
+closeViewer during 150ms delay cancelled cleanly: {'url': 'http://127.0.0.1:51642/test_page.html?no=1003', 'active': False, 'autoOpen': None}
+Rapid double-tap ArrowDown->ArrowUp(boundary) cancelled cleanly: {'url': 'http://127.0.0.1:51642/test_page.html?no=1003', 'toast': '목록의 가장 최신 글입니다.', 'autoOpen': None}
+pagehide during 150ms delay cancelled cleanly: {'url': 'http://127.0.0.1:51642/test_page.html?no=1003', 'autoOpen': None}
+Polling vs manual openViewer race defended cleanly: {'active': True, 'notice': None, 'counter': '1 / 1'}
+PASS: TC-NG-03
+
+Runtime uncaught exceptions: 0
+ALL CHROME 158 HEADLESS E2E BOUNDARY & NEGATIVE SCENARIOS (TC-BD-01 ~ TC-NG-03) PASSED!

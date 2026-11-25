@@ -1,14 +1,14 @@
 # 🧭 Disagall Viewer Master Control Tower (Living Wiki Hub)
 
-> **최종 업데이트**: 2026-11-24 (by `systematic-debugger`)
+> **최종 업데이트**: 2026-11-25 (by `user-journey-tester`)
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: `post-navigation` (`core-viewer` `🟢 Sign-Off`, `post-recommend` `🟢 Sign-Off`, `viewer-immersion` `🟢 Sign-Off`, `modular-bundler-migration` `🟢 Sign-Off`)
-- **현재 단계 (Stage)**: `🧪 QA Testing` (`전 도메인 잔여 결함 0건 OPEN` — DEFECT 0건 / REFACTOR 0건; `post-navigation` 동적 QA 검증 대기)
-- **직전 완료 작업**: `systematic-debugger`로 `post-navigation/REFACTOR-05` (`getAdjacentPostUrl()` 하위 호환 Discriminated Result `AdjacentPostResult` 계약 통일 — Option A, `navigatePost()` 단일 가드 정리, `spec.md`·`ADR-005` 명문화) 해결 완료 — `tests/post_navigation.test.js`(11/11)·`npm test`·`immersion_e2e.test.js`(15/15)·`npm run build`·`node --check` PASS
+- **Active 도메인**: `post-navigation` (`🟢 Sign-Off` — 전 도메인 `core-viewer`, `post-navigation`, `post-recommend`, `viewer-immersion`, `modular-bundler-migration` **`🟢 Sign-Off`** 달성)
+- **현재 단계 (Stage)**: `🟢 Sign-Off` (`post-navigation 11/11 (100%) PASS` — 전 도메인 미해결 티켓 `0 / 0`)
+- **직전 완료 작업**: `user-journey-tester`로 `post-navigation` **Dimension B & C: Boundary & Negative QA (`TC-BD-01`~`TC-NG-03`)** 검증 완료 (`Chrome 158 CDP` 실증 스크린샷 3건·로그 확보 및 `tests/post_navigation_e2e.test.js` 11/11 PASS, 신규 결함 `0건`, 최종 `🟢 Sign-Off`)
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `post-navigation` 도메인 Happy Path QA 검증 진행해줘
+  > 모든 도메인 `🟢 Sign-Off` 완료! `npm run pack` 릴리즈 패키징 또는 신규 기능 기획(`기획해줘`) 진행해줘
 
 ---
 
@@ -18,7 +18,7 @@
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | [`00_core_foundation`](./features/00_core_foundation/architecture.md) | 🟢 Stable | `[■■■■] 4/4` | - | `0 / 0` | 전역 아키텍처 헌법 및 기술 스택/동시성 제약 확립 |
 | [`core-viewer`](./features/core-viewer/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `9/9 (100%)` | `0 / 0` | `DEFECT-01~04` 전건 해결 완료 (`bindContextMenuTracker` 지연 로딩 우클릭 매칭 보완, 최종 Sign-Off) |
-| [`post-navigation`](./features/post-navigation/README.md) | 🧪 QA Testing | `[■■■■] 4/4` | `-` | `0 / 0` | `DEFECT-01~04`·`REFACTOR-05` 전건 해결 완료 (하위 호환 Discriminated Result 통일, 동적 QA 대기) |
+| [`post-navigation`](./features/post-navigation/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `11/11 (100%)` | `0 / 0` | `Happy Path + B&N 11/11 PASS` (Chrome 158 CDP·`post_navigation_e2e.test.js` 검증, 최종 Sign-Off) |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `DEFECT-03` 해결 완료 (우선순위 셀렉터·뷰어 배제·디스패치 실패/타이머 정리) |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 0` | `DEFECT-01` 해결 완료 (`#disagall-quick-launcher` CSS 복구·Safari 9종 자동 동기화·`pack` 갱신, 최종 Sign-Off) |
 | [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■■■■■] 8/8` | `15/15 (100%)` | `0 / 0` | `DEFECT-01~03 전건 해결 완료 (단일 스토리지 동기화 통합·비동기 초기화 레이스 방어, 최종 Sign-Off)` |
@@ -30,6 +30,9 @@
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
 
+- **`[2026-11-25]` `[atomic-commit-crafter]` [`post-navigation`]**: `7dd3656` (`test(post-navigation)` 11개 E2E QA 스위트), QA 증적(`evidence/`) 및 전 도메인 `🟢 Sign-Off` 위키·관제탑 동기화 커밋 완료.
+- **`[2026-11-25]` `[user-journey-tester]` [`post-navigation`]**: Dimension B & C Boundary & Negative (`TC-BD-01`~`TC-NG-03`) Chrome 158 CDP 실증(스크린샷 3건·`boundary-negative-qa.log`) 및 번들 E2E(`tests/post_navigation_e2e.test.js` 11/11) 검증 `PASS` (`DEFECT 0건`, **`🟢 Sign-Off`** 확정).
+- **`[2026-11-25]` `[user-journey-tester]` [`post-navigation`]**: Dimension A Happy Path (`TC-HP-01`~`TC-HP-04`) Chrome 158 CDP 실증(스크린샷 4건·`happy-path-qa.log`) 및 번들 E2E(`tests/post_navigation_e2e.test.js` 4/4) 검증 `PASS` (`DEFECT 0건`, `Boundary & Negative` 7건 대기).
 - **`[2026-11-24]` `[atomic-commit-crafter]` [`post-navigation`]**: `849a3d4` (`refactor(post-navigation)` `REFACTOR-05`), `d0bc853` (`test(post-navigation)` Test 11) 및 `spec.md`/`ADR-005`/관제탑 동기화 커밋 완료 (전 도메인 미해결 티켓 `0 / 0`).
 - **`[2026-11-24]` `[systematic-debugger]` [`post-navigation`]**: `REFACTOR-05` 해결 및 `🧪 QA Testing` 전환 — `getAdjacentPostUrl()` 하위 호환 Discriminated Result `AdjacentPostResult`(`found`/`boundary`/`unavailable`, Option A) 통일, `navigatePost()` 단일 가드 정리, `spec.md`·`ADR-005` 명문화 (`tests/post_navigation.test.js` 11/11·`npm test`·`immersion_e2e.test.js` 15/15·`npm run build`·`node --check` PASS).
 - **`[2026-11-23]` `[atomic-commit-crafter]` [`modular-bundler-migration`]**: `e7f1fcd` (`fix(bundler)` `DEFECT-01`), `f7e5eb8` (`test(bundler)` Test 4) 및 `🟢 Sign-Off` 위키/관제탑 동기화 커밋 완료.

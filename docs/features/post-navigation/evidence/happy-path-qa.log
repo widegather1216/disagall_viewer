@@ -1,0 +1,23 @@
+=== [TC-HP-01] Sequential Post Navigation (test_page -> test_page_2 -> test_page) & Footer Keyhints ===
+Page 1 active, keyhints='R\n개추\n↑\n↓\n이전/다음 글\n←\n→\n이전/다음 사진\n마우스 휠 / 트랙패드\n확대/축소\n드래그\n사진 이동\n더블클릭\n확대 리셋\nH\nUI숨김\nF\n전체화면\nESC\n닫기'
+ArrowDown toast='아래쪽 이전 글로 이동 중... 📷 (2번 글: 후지 X-T...)'
+Auto-opened on http://127.0.0.1:51599/test_page_2.html?no=1002, disagall_auto_open=None
+PASS: TC-HP-01
+
+=== [TC-HP-02] Delayed Image Render Auto-Open Polling ===
+Delayed post auto-opened! counter=1 / 1, consumed=None
+PASS: TC-HP-02
+
+=== [TC-HP-03] Real dc_sample.html (crt_icon empty num, AD/survey skip) & Smart Photo Skip ===
+dc_sample ArrowUp toast='위쪽 최신 글로 이동 중... 📷 (니가타 1일차)'
+Smart skip landed & auto-opened on http://127.0.0.1:51599/smart_skip_target.html?no=2999
+PASS: TC-HP-03
+
+=== [TC-HP-04] No-Photo Notice Floating Bar & Recovery Navigation ===
+No-photo notice mounted: '📷\n본문에 사진이 없는 글입니다. (사진 탭 미적용)\n↑ 이전 글\n↓ 다음 글\n✕'
+Recovered via button to photo post & auto-opened: http://127.0.0.1:51599/test_page_2.html?no=1002
+Recovered via 'w' key to photo post & auto-opened: http://127.0.0.1:51599/test_page.html?no=1003
+PASS: TC-HP-04
+
+Runtime uncaught exceptions: 0
+ALL CHROME 158 HEADLESS E2E HAPPY PATH SCENARIOS (TC-HP-01 ~ TC-HP-04) PASSED!

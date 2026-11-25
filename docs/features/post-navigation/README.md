@@ -1,6 +1,6 @@
 # 📦 [post-navigation] 위/아래 방향키 게시글 탐색 (Post Navigation)
 
-- **현재 상태 (Lifecycle)**: `🧪 QA Testing`
+- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
 - **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
@@ -29,24 +29,21 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-24 / `systematic-debugger` / `REFACTOR-05` (`getAdjacentPostUrl()` 하위 호환 확장형 Discriminated Result 계약 통일 — Option A) 해결 및 회귀 검증 완료
+- **직전 완료 작업**: 2026-11-25 / `user-journey-tester` / **Dimension B & C: Boundary & Negative QA (`TC-BD-01` ~ `TC-NG-03`)** 검증 완료 (`7/7 PASS`, 누적 `11/11 100% PASS`, 신규 결함 `0건`, **`🟢 Sign-Off`** 확정)
 - **생성/수정된 핵심 파일**:
-  - `src/parser/post_navigator.js`: `createUnavailableResult()` 도입 및 `getAdjacentPostUrl()` 반환값을 `AdjacentPostResult`(`found` / `boundary` / `unavailable`: `no_list`·`current_not_found`·`unsafe_url`)로 통일
-  - `src/controller/viewer_controller.js`: `navigatePost()`를 `!result || !result.ok || result.status !== 'found'` 단일 가드로 정리(기존 토스트·URL 가드 보존)
-  - `tests/post_navigation.test.js`: Test 11 (`REFACTOR-05` `found`/`boundary`/`unavailable` 3종 및 `navigatePost` 연동 회귀 테스트) 추가 및 기존 Test 9 하위 호환 통과
-  - `docs/features/post-navigation/spec.md`, `decisions.md`: `AdjacentPostResult` 계약 및 `ADR-005` 명문화
-  - `content.js`, `disagall_viewer.user.js`, `safari_extension/.../Resources/`: `npm run build` 번들 동기화
+  - `tests/post_navigation_e2e.test.js`: 빌드된 `content.js` 번들 기반 전체 E2E 스위트 (`TC-HP-01`~`TC-HP-04`, `TC-BD-01`~`TC-BD-04`, `TC-NG-01`~`TC-NG-03` 11/11 PASS) 확장
+  - `docs/features/post-navigation/evidence/`: Chrome 158 Headless CDP B&N 스크린샷 3건(`tc-bd-01-bottom-boundary-toast.png`, `tc-bd-02-mobile-list-auto-open.png`, `tc-ng-02-unavailable-toast.png`) 및 `boundary-negative-qa.log` 추가
+  - `docs/features/post-navigation/verification.md`: 11개 테스트 시나리오 매트릭스 전량 `✅ PASS` (`100%`) 및 `🟢 Sign-Off` 갱신
 - **검증 완료된 테스트 실행 명령어**:
-  - `node tests/post_navigation.test.js`: 11/11 PASS (Test 4 선택적 `live_post.html` 미존재로 skip)
-  - `npm test` && `node tests/immersion_e2e.test.js`: 5개 단위 스위트 전량 PASS & E2E 15/15 PASS
-  - `npm run build` && `node --check`: PASS
+  - `node tests/post_navigation_e2e.test.js`: Happy Path + Boundary & Negative `11/11 PASS` (빌드 번들 `content.js` VM E2E)
+  - Chrome 158 Headless CDP E2E (`test_page*.html`, `dc_sample.html`, 모바일/경계/비안전 URL/8초 타이머/경합 시나리오): `TC-HP-01~04` + `TC-BD-01~04` + `TC-NG-01~03` 전량 `PASS`, `content.js` 런타임 예외 `0건`
+  - `npm test` && `node tests/immersion_e2e.test.js`: 단위 5개 스위트 전량 PASS & E2E 15/15 PASS
 - **Recent Commits**:
+  - `7dd3656` - `test(post-navigation): add built-bundle E2E QA suite for Happy Path and Boundary/Negative`
   - `849a3d4` - `refactor(post-navigation): return backward-compatible discriminated result from getAdjacentPostUrl`
   - `d0bc853` - `test(post-navigation): add regression tests for REFACTOR-05 discriminated result contract`
   - `40ec587` - `fix(post-navigation): track and cancel navigation timeout and auto-open polling timers`
   - `f55f8b3` - `test(post-navigation): add regression tests for DEFECT-04 timer and polling conflicts`
-  - `22a5e6d` - `fix(post-navigation): fix bottom boundary return, notice/ad filtering, and unsafe href schemes`
-  - `a52567b` - `test(post-navigation): add regression tests for DEFECT-03 boundaries, filters, and URL sanitization`
 - **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `post-navigation` 도메인 미해결 `DEFECT` 0건 · `REFACTOR` 0건 달성. 다음 포커스는 `post-navigation` 도메인 동적 QA(`Happy Path` / `Boundary & Negative`) 검증 진행.
+  - `post-navigation` 포함 전 도메인 QA `🟢 Sign-Off` 완료 (신규 기능 기획/릴리즈 패키징 대기).
