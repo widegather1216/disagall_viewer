@@ -61,6 +61,21 @@ export function isRecommendButtonDisabled(btn) {
   return false;
 }
 
+function findValidInSelector(root, selector, hasQueryAll) {
+  if (!hasQueryAll) {
+    const el = root.querySelector(selector);
+    return (el && !isExcludedRecommendElement(el)) ? el : null;
+  }
+
+  const candidates = root.querySelectorAll(selector);
+  if (!candidates) return null;
+
+  for (const el of candidates) {
+    if (!isExcludedRecommendElement(el)) return el;
+  }
+  return null;
+}
+
 function findFirstValidMatch(root, selectors) {
   if (!root) return null;
   const hasQueryAll = typeof root.querySelectorAll === 'function';
@@ -68,17 +83,8 @@ function findFirstValidMatch(root, selectors) {
   if (!hasQueryAll && !hasQueryOne) return null;
 
   for (const selector of selectors) {
-    if (hasQueryAll) {
-      const candidates = root.querySelectorAll(selector);
-      if (candidates) {
-        for (const el of candidates) {
-          if (!isExcludedRecommendElement(el)) return el;
-        }
-      }
-    } else {
-      const el = root.querySelector(selector);
-      if (el && !isExcludedRecommendElement(el)) return el;
-    }
+    const matched = findValidInSelector(root, selector, hasQueryAll);
+    if (matched) return matched;
   }
   return null;
 }
@@ -139,7 +145,7 @@ export function dispatchRecommendClick(btn) {
     try {
       btn.click();
       return true;
-    } catch (e) {}
+    } catch (e) { /* Native .click() threw; fall through to synthetic MouseEvent dispatch */ }
   }
 
   if (typeof btn.dispatchEvent !== 'function') {
