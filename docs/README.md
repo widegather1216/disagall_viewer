@@ -4,11 +4,11 @@
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: `viewer-immersion` (`🩹 Debugging` — 잔여 5건 `REFACTOR` 티켓: 🟡 Should Fix 5건)
-- **현재 단계 (Stage)**: `🩹 Debugging` (전 도메인 미해결 티켓 `0 / 5`)
-- **직전 완료 작업**: 2026-11-25 `post-recommend` `REFACTOR-02` 해결 (`triggerPostRecommend()` 29줄·2-depth 분할 및 상수 추출, `recommend_parser.js` `findValidInSelector()` 평탄화·`catch` 폴백 주석 보강, `npm run build`·`npm test`·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS)
+- **Active 도메인**: `post-navigation` (`🩹 Debugging` — 잔여 4건 `REFACTOR` 티켓: 🟡 Should Fix 4건)
+- **현재 단계 (Stage)**: `🩹 Debugging` (전 도메인 미해결 티켓 `0 / 4`)
+- **직전 완료 작업**: 2026-11-25 `viewer-immersion` `REFACTOR-04` 해결 (`storage_sync.js` 249줄·`fullscreen_controller.js` 268줄 분리 및 `immersion_controller.js` 258줄 슬림화, `popup.js` 유한 정수 클램핑, `popup.html` `v1.1.0` 동기화, `🟢 Sign-Off` 확정)
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
-  > `viewer-immersion` 도메인의 `REFACTOR-04` 티켓 해결해줘
+  > `post-navigation` 도메인의 `REFACTOR-15` 티켓 해결해줘
 
 ---
 
@@ -21,7 +21,7 @@
 | [`post-navigation`](./features/post-navigation/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `11/11 (100%)` | `0 / 1` | `REFACTOR-14` 해결(`post_navigation.test.js` 실모듈 전환), `REFACTOR-15` 🟡 잔여 |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `REFACTOR-02` 해결(`triggerPostRecommend` 분할·`findValidInSelector` 평탄화), `🟢 Sign-Off` 확정 |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🩹 Debugging | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 1` | 클린코드 감사(`REFACTOR-01` 🟡 `npm test` E2E 연동·스크래치 정리) 발행 |
-| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🩹 Debugging | `[■■■■■■■■] 8/8` | `16/16 (100%)` | `0 / 1` | 클린코드 감사(`REFACTOR-04` 🟡 스토리지 분리·`popup.js` 정수 클램핑·버전 동기화) 발행 |
+| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■■■■■] 8/8` | `16/16 (100%)` | `0 / 0` | `REFACTOR-04` 해결(`storage_sync.js`·`fullscreen_controller.js` 분리·`popup.js` 클램핑·`v1.1.0` 동기화), `🟢 Sign-Off` 확정 |
 
 *(※ 상태 범례: `📐 Planning` | `🛠️ Implementing` | `🧐 Auditing` | `🧪 QA Testing` | `🩹 Debugging` | `🟢 Sign-Off`)*
 *(※ 미해결 티켓: `🚨D` = Open `DEFECT-xx` 개수, `🧐R` = Open `REFACTOR-xx` 개수)*
@@ -30,6 +30,7 @@
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
 
+- **`[2026-11-25]` `[systematic-debugger]` [`viewer-immersion`]**: `REFACTOR-04` 해결 — `CONFIG` 상수(`PADDING_MIN`/`PADDING_MAX`/`PADDING_SAVE_DEBOUNCE_MS`/`ZOOM_EPSILON`)·`state.paddingSaveTimer` 추가, `storage_sync.js`(249줄)·`fullscreen_controller.js`(268줄) 분리 및 `immersion_controller.js`(258줄) 슬림화(크로스 컨트롤러 브릿지/동기 플래그 제거·동일 참조 re-export 유지), `popup.js` `normalizePaddingValue` 클램핑·`popup.html` `v1.1.0` 정합화, `🟢 Sign-Off` 확정 (`npm run build`·`npm test`·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS).
 - **`[2026-11-25]` `[systematic-debugger]` [`post-recommend`]**: `REFACTOR-02` 해결 — `recommend_controller.js` 상수(`RECOMMEND_UNLOCK_DELAY_MS`, `RECOMMEND_LOCK_TOAST_DURATION_MS`) 추출 및 `triggerPostRecommend()` 29줄·2-depth 헬퍼 6종 분할, `recommend_parser.js` `findValidInSelector()` 2-depth 평탄화 및 `dispatchRecommendClick()` `catch` 주석 보강, `🟢 Sign-Off` 확정 (`npm run build`·`npm test` 5개 스위트·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS).
 - **`[2026-11-25]` `[systematic-debugger]` [`post-navigation`]**: `REFACTOR-14` 해결 — `tests/post_navigation.test.js` 로컬 복제 함수(`extractPostNo`/`hasPhotoAttachment`/`parseRows`/`parseHtmlRows`) 제거 및 `src/parser/post_navigator.js` 실모듈 기반 Tests 1–7 재작성, Test 4 `AssertionError` 비삼킴·`dc_sample.html` 경로 고정 (`post_navigation.test.js` 11/11·`npm test` 5개 스위트·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`node --check` PASS).
 - **`[2026-11-25]` `[systematic-debugger]` [`post-recommend`]**: `REFACTOR-01` 해결 — `triggerPostRecommend()` `!isOverlayActive()` 진입 가드 및 `isOverlayActive()` 통합, `resetRecommendSessionState()` export, `tests/recommend.test.js` Tests 1~8 실모듈 검증 전환 (`recommend.test.js` 8/8·`npm test` 5개 스위트·`immersion_e2e` 16/16·`post_navigation_e2e` 11/11·`npm run build`·`node --check` PASS).

@@ -1,8 +1,8 @@
 # 🧪 [viewer-immersion] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 1건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
-- **인수 조건 통과율**: `15 / 15 Scenarios PASS (100%)` (`DEFECT-01~03` 해결 완료)
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
+- **검증 상태**: `🟢 Sign-Off` (`0건 OPEN DEFECT` · `🧐 0건 OPEN REFACTOR` — `REFACTOR-04` 해결 완료)
+- **인수 조건 통과율**: `15 / 15 Scenarios PASS (100%)` (`DEFECT-01~03` 및 `REFACTOR-01~04` 전건 해결 완료)
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -108,16 +108,8 @@
   - **회귀 테스트 결과**: `node --check popup.js && node --check tests/immersion.test.js` (`PASS`), `npm test` (19개 immersion 테스트 포함 4개 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`8/8 PASS`), `npm run build` (`PASS`)
 
 ### [REFACTOR-04] `immersion_controller.js`(775줄) 스토리지 동기화 분리, `popup.js` 유한 정수 클램핑 및 버전·방어 보강
-- **심각도**: 🟡 Should Fix (권장 조치)
-- **위치**: [`src/controller/immersion_controller.js#L1-L775`](../../../src/controller/immersion_controller.js#L1-L775), [`src/controller/viewer_controller.js#L300-L315`](../../../src/controller/viewer_controller.js#L300-L315), [`popup.js#L49-L52`](../../../popup.js#L49-L52), [`#L97-L102`](../../../popup.js#L97-L102), [`#L207-L210`](../../../popup.js#L207-L210), [`popup.html#L287`](../../../popup.html#L287)
-- **위반 규칙**: 파일·함수 길이(300줄·30줄) / SRP / 스펙 타입·클램핑 정합성(`spec.md` §2) / 방어 코드
-- **발견된 문제**:
-  - `immersion_controller.js`가 775줄로 비대해졌으며, 스토리지 초기화·`onChanged` 동기화가 `immersion_controller.js`에, 패딩 저장(`persistPaddingSetting`)이 `viewer_controller.js`에 분산되어 3개 브릿지 setter(`setPaddingSavePending`, `markLocalPaddingModified`, `recordSelfPaddingWrite`) 및 무의미한 동기 플래그 토글(`L303/313`)을 유발함. `requestOverlayFullscreen`(32줄)·`exitFullscreenSafely`(34줄)·`applyInitialSettingsResult`(31줄)·`loadInitialSettings`(38줄) 초과, `isOverlayActive` `classList` 및 `bindImmersionEvents` `overlayEl` null 가드 누락, `applyAutoFullscreenSetting` early return 미적용 및 매직 넘버(`1.001`, `0`/`100`, `8`) 잔존.
-  - `popup.js`가 `defaultPadding`에 `Number.isFinite`·정수 반올림·`0~100` 클램핑을 적용하지 않아 `Infinity`/범위 외 값 허용(`#padding-val`과 `<input type="range">` 표시 불일치); `popup.html#L287` 푸터가 `v1.0.0`으로 표기됨(`manifest.json` `1.1.0`과 불일치).
-- **권장 개선안 (Suggested Diff)**:
-  ```text
-  // 1. 스토리지 읽기/쓰기/에코·레이스 관리를 src/controller/storage_sync.js(또는 전용 모듈)로 단일 통합하고 immersion_controller.js / viewer_controller.js re-export 호환 유지
-  // 2. immersion_controller.js 30줄 초과 함수 분할, guard 보강 및 CONFIG 상수(ZOOM_EPSILON 등) 추출
-  // 3. popup.js normalizePaddingValue(0~100 유한 정수 클램핑) 적용 및 popup.html 푸터 v1.1.0 동기화
-  ```
-- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **해결 내역**:
+  - **수정 파일**: [`src/config.js`](../../../src/config.js), [`src/state.js`](../../../src/state.js), [`src/controller/storage_sync.js`](../../../src/controller/storage_sync.js), [`src/controller/fullscreen_controller.js`](../../../src/controller/fullscreen_controller.js), [`src/controller/immersion_controller.js`](../../../src/controller/immersion_controller.js), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js), [`popup.js`](../../../popup.js), [`popup.html`](../../../popup.html#L287), [`tests/immersion.test.js`](../../../tests/immersion.test.js#L1986-L2044)
+  - **원인 및 조치**: `CONFIG` 상수(`PADDING_MIN`/`PADDING_MAX`/`PADDING_SAVE_DEBOUNCE_MS`/`ZOOM_EPSILON`) 및 `state.paddingSaveTimer`를 승격하고, 스토리지 읽기/쓰기/디바운스/에코 억제를 `storage_sync.js`(249줄)로, 전체화면 상태 머신을 `fullscreen_controller.js`(268줄)로 분리해 `immersion_controller.js`를 258줄로 슬림화하고 3개 크로스 컨트롤러 브릿지 setter 및 무의미한 동기 플래그 토글을 제거함(`immersion_controller.js`·`viewer_controller.js` 동일 참조 re-export 100% 유지). `isOverlayActive` `classList`/`bindImmersionEvents` `overlayEl` 가드 및 `applyAutoFullscreenSetting` early return을 보강했고, `popup.js` `normalizePaddingValue()`로 `0~100` 유한 정수 클램핑·비정상 값 거부를 통합했으며 `popup.html` 푸터를 `v1.1.0`으로 정합화하고 `npm run build` 번들을 동기화함.
+  - **회귀 테스트 결과**: `npm run build` (`PASS`), `npm test` (5개 스위트·`immersion.test.js` 31/31 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)

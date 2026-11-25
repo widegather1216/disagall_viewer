@@ -1,8 +1,8 @@
 # 📦 [viewer-immersion] 몰입 모드 및 UI 클린 감상 패키지
 
-- **현재 상태 (Lifecycle)**: `🩹 Debugging`
+- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
 - **구현 진척도**: `[■■■■■■■■] 8/8 Steps` (기본 4/4 + 확장 피팅 2/2 + 전체화면 모드 2/2)
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -47,15 +47,16 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-25 / `clean-code-auditor` / 전 도메인 클린코드 전수 감사 완료 — `viewer-immersion` `REFACTOR-04`(🟡 Should Fix) 발행 및 `spec.md`/`architecture.md` 정리 (`🩹 Debugging` 전환)
+- **직전 완료 작업**: 2026-11-25 / `systematic-debugger` / `viewer-immersion` `REFACTOR-04` 해결 및 **`🟢 Sign-Off`** 확정 (`storage_sync.js`·`fullscreen_controller.js` SRP 분리, `popup.js` 유한 정수 클램핑, `popup.html` `v1.1.0` 정합화)
 - **생성/수정된 핵심 파일**:
-  - `docs/features/viewer-immersion/verification.md`: `REFACTOR-04` (`immersion_controller.js` 775줄 스토리지 동기화 분리·30줄 초과 함수 분할·매직 넘버/가드 보강, `popup.js` 유한 정수 클램핑, `popup.html` `v1.1.0` 버전 정합화) 등록
-  - `docs/features/viewer-immersion/spec.md`, `architecture.md`: 잔존 `[To-Be]` 빈 섹션 제거 및 `mousemove` 직접 바인딩 흐름도 동기화
-- **Working Tree State**: 🟡 Docs Modified (위키 감사 리포트/스펙 역동기화 반영 중)
+  - `src/config.js`, `src/state.js`: `PADDING_MIN`/`PADDING_MAX`/`PADDING_SAVE_DEBOUNCE_MS`/`ZOOM_EPSILON` 및 `state.paddingSaveTimer` 추가
+  - `src/controller/storage_sync.js`, `src/controller/fullscreen_controller.js`, `src/controller/immersion_controller.js`, `src/controller/viewer_controller.js`: 스토리지 동기화(249줄)·전체화면 상태 머신(268줄) 분리, `immersion_controller.js`(258줄) 슬림화 및 동일 참조 re-export 유지
+  - `popup.js`, `popup.html`, `tests/immersion.test.js`, `content.js`, `disagall_viewer.user.js`: `normalizePaddingValue` 클램핑 통합, `v1.1.0` 푸터 동기화, Test 31 추가 및 번들 재빌드
+- **Working Tree State**: 🟡 Modified (커밋 대기 — `REFACTOR-04` 코드/테스트/번들/위키 반영 완료)
 - **실행 검증 명령 및 결과**:
-  - `npm test`: 5개 테스트 스위트(`module_import`, `core_viewer`, `post_navigation`, `recommend`, `immersion` 30개) 전원 PASS
+  - `npm run build` (`PASS`), `npm test` (5개 테스트 스위트·`immersion.test.js` 31/31 `PASS`)
   - `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
-  - 미해결 티켓 (`0 / 1` — `🚨 DEFECT: 0건`, `🧐 REFACTOR: 1건`)
+  - 미해결 티켓 (`0 / 0` — `🚨 DEFECT: 0건`, `🧐 REFACTOR: 0건`)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - 최우선 해결 대상: `viewer-immersion` 도메인 `REFACTOR-04` (`systematic-debugger` 연결).
+  - `viewer-immersion` 도메인은 전 구현/QA/감사 티켓 `0건`으로 `🟢 Sign-Off` 확정 상태. 다음 우선순위는 `post-navigation` `REFACTOR-15`.
   - 참고: 실제 오버레이 패딩 슬라이더의 DOM ID는 `#disagall-slider`(스펙 표기 `#disagall-padding-slider` 대신 실제 마크업 `src/ui/overlay.js#L30`)임.

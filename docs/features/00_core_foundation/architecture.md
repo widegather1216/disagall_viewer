@@ -9,7 +9,7 @@
   - `src/state.js`: 뷰어 런타임 상태 단일 저장소 (Single Source of Truth)
   - `src/parser/`: DOM 크롤링 및 파서 모듈 (`image_parser`, `post_navigator`, `recommend_parser`)
   - `src/ui/`: 뷰어 오버레이 마크업 생성, 스타일, 제스처 제어 (`overlay.js`, `zoom_pan.js`)
-  - `src/controller/`: 사용자 인터랙션, 키보드/마우스 이벤트 디스패치 (`viewer_controller.js`, `immersion_controller.js`, `recommend_controller.js`)
+  - `src/controller/`: 사용자 인터랙션, 키보드/마우스 이벤트 디스패치 (`viewer_controller.js`, `immersion_controller.js`, `fullscreen_controller.js`, `storage_sync.js`, `recommend_controller.js`)
   - `popup.html`, `popup.js`: 확장 프로그램 팝업 설정 UI
 
 ## 2. 단방향 레이어 의존성 헌법 (Unidirectional Layer Rules)
