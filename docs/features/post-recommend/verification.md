@@ -1,8 +1,8 @@
 # 🧪 [post-recommend] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 2건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
+- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 1건 OPEN REFACTOR` — `REFACTOR-01` 해결)
 - **인수 조건 통과율**: `4 / 4 (100%)` · 테스트 매트릭스 `6 / 6 PASS`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
 
 ---
 
@@ -62,18 +62,12 @@
 ## 🧐 4. 코드 품질 감사 리포트 (Audit & Refactoring Logs)
 
 ### [REFACTOR-01] `triggerPostRecommend()` `!active` 진입 가드 누락 및 `tests/recommend.test.js` Tests 1–7 실모듈 전환
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
 - **심각도**: 🔴 Must Fix (즉시 조치·릴리즈 차단)
-- **위치**: [`src/controller/recommend_controller.js#L18-L21`](../../../src/controller/recommend_controller.js#L18-L21), [`#L58-L67`](../../../src/controller/recommend_controller.js#L58-L67), [`tests/recommend.test.js#L7-L82`](../../../tests/recommend.test.js#L7-L82), [`#L86-L268`](../../../tests/recommend.test.js#L86-L268), [`#L203-L211`](../../../tests/recommend.test.js#L203-L211)
-- **위반 규칙**: 스펙 가드 계약 위반(`post-recommend/spec.md` §3.1) / 단위 테스트 실효성(자체 복제 스텁 허수 테스트)
-- **발견된 문제**:
-  - `triggerPostRecommend()` 진입부에 `isOverlayActiveNow()` 체크가 없어 뷰어 비활성(`!active`) 상태에서도 호출 시 `dispatchRecommendClick(btn)`가 실행됨(타이머 콜백 내부에만 존재). 또한 `isOverlayActiveNow()`는 `immersion_controller.js`의 `isOverlayActive()`와 중복 구현됨.
-  - `tests/recommend.test.js` Tests 1–7이 파일 상단의 로컬 문자열 정규식 복제 함수만 검증하고 있으며, Test 8에서도 실모듈 `isUserLoggedIn`, `isGalleryCodeEnforced`, `updateRecommendButtonUi`, `RECOMMEND_THROTTLE_MS`, `alreadyVoted`, 500ms/1200ms `midTimer`/`afterTimer` 콜백 검증이 누락됨. Test 4 `catch`의 `AssertionError` 삼킴 및 `dc_sample.html` CWD 의존 존재.
-- **권장 개선안 (Suggested Diff)**:
-  ```text
-  // 1. recommend_controller.js: triggerPostRecommend() 최상단에 `if (!isOverlayActive() || isRecommending) return false;` 추가
-  // 2. tests/recommend.test.js: 로컬 복제 함수 제거 후 recommend_parser.js / recommend_controller.js 실모듈 전수 검증으로 교체
-  ```
-- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+- **해결 내역**:
+  - **수정 파일**: [`src/controller/recommend_controller.js`](../../../src/controller/recommend_controller.js#L13-L165), [`tests/recommend.test.js`](../../../tests/recommend.test.js#L1-L677)
+  - **원인 및 조치**: `recommend_controller.js`에서 중복 `isOverlayActiveNow()`를 제거하고 `immersion_controller.js`의 `isOverlayActive()`를 import하여 진입부(`if (!isOverlayActive() || isRecommending) return false;`) 및 `midTimer`/`afterTimer` 콜백에 통합 적용했으며, 테스트 세션 초기화를 위한 `resetRecommendSessionState()`를 export함. `tests/recommend.test.js`에서는 로컬 정규식/스텁 복제 함수를 전량 제거하고 `recommend_parser.js`/`recommend_controller.js` 실모듈(`getPostRecommendCount`, `getNativeRecommendButton`, `isRecommendButtonDisabled`, `isUserLoggedIn`, `isGalleryCodeEnforced`, `dispatchRecommendClick`, `updateRecommendButtonUi`, `triggerPostRecommend`, `clearRecommendTimers`, `resetRecommendSessionState`)로 Tests 1~8을 재작성(비활성 차단, 1200ms 쓰로틀, `alreadyVoted`, 500ms/1200ms `.voted`·UI 동기화, 비회원 `🔒` 토스트 폴백, `AssertionError` 비삼킴, `path.join(__dirname, '..', 'dc_sample.html')` HTML-to-MockDOM 연동)함.
+  - **회귀 테스트 결과**: `npm run build` (`PASS`), `npm test` (5개 스위트·`recommend.test.js` 8/8 `PASS`), `node tests/immersion_e2e.test.js` (16/16 `PASS`), `node tests/post_navigation_e2e.test.js` (11/11 `PASS`), `node --check` (`PASS`)
 
 ### [REFACTOR-02] `triggerPostRecommend()`(105줄·7-depth) 분할 및 `recommend_parser.js` 방어·중첩 개선
 - **심각도**: 🟡 Should Fix (권장 조치)

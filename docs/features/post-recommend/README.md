@@ -2,7 +2,7 @@
 
 - **현재 상태 (Lifecycle)**: `🩹 Debugging`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,12 +29,13 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-25 / `clean-code-auditor` / 전 도메인 클린코드 전수 감사 완료 — `post-recommend` `REFACTOR-01`(🔴 Must Fix)·`REFACTOR-02`(🟡 Should Fix) 발행 및 `spec.md`/`architecture.md`/`README.md` 역동기화 (`🩹 Debugging` 전환)
+- **직전 완료 작업**: 2026-11-25 / `systematic-debugger` / `post-recommend` `REFACTOR-01` 해결 — `triggerPostRecommend()` `!isOverlayActive()` 진입 가드·`isOverlayActive()` 통합·`resetRecommendSessionState()` export 및 `tests/recommend.test.js` Tests 1~8 실모듈 검증 전환
 - **생성/수정된 핵심 파일**:
-  - `docs/features/post-recommend/verification.md`: `REFACTOR-01` (`triggerPostRecommend()` `!active` 진입 가드 누락 및 `tests/recommend.test.js` Tests 1~7 실모듈 전환), `REFACTOR-02` (`triggerPostRecommend()` 105줄·7-depth 분할 및 `recommend_parser.js` 중첩/빈 `catch` 개선) 등록
-  - `docs/features/post-recommend/spec.md`, `architecture.md`, `README.md`: `1200ms`, `null` 반환, `DEFECT-03` 우선순위 셀렉터·실제 함수명 역동기화
+  - `src/controller/recommend_controller.js`: `immersion_controller.js`의 `isOverlayActive()` import·중복 `isOverlayActiveNow()` 제거, `triggerPostRecommend()` 최상단 `!isOverlayActive() || isRecommending` 가드 추가, `resetRecommendSessionState()` export
+  - `tests/recommend.test.js`: 로컬 정규식/스텁 복제 제거 및 실모듈(`recommend_parser.js`, `recommend_controller.js`) 전수 검증(Tests 1~8), `AssertionError` 비삼킴, `dc_sample.html` 경로 독립 DOM 파싱 연동
+  - `content.js`, `disagall_viewer.user.js`, `safari_extension/`: `npm run build` 번들 동기화
 - **검증 완료된 테스트 실행 명령어**:
-  - `npm test` (`5개 스위트 PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
-- **Working Tree State**: 🟡 Docs Modified (위키 감사 리포트/스펙 역동기화 반영 중)
+  - `npm run build` (`PASS`), `npm test` (5개 스위트·`recommend.test.js` 8/8 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check src/controller/recommend_controller.js tests/recommend.test.js` (`PASS`)
+- **Working Tree State**: 🟡 Modified (Uncommitted — 부모 코디네이터 커밋 대기)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - 최우선 해결 대상: `post-recommend` 도메인 `REFACTOR-01` (`triggerPostRecommend()` `!active` 가드 및 `recommend.test.js` 실모듈 검증 전환, `systematic-debugger` 연결).
+  - 잔여 `post-recommend` 티켓: `REFACTOR-02` (`🟡 Should Fix` — `triggerPostRecommend()` 분할 및 `recommend_parser.js` 중첩/빈 `catch` 개선). 전체 우선순위상 다음 타깃은 `post-navigation` `REFACTOR-14` (`🔴 Must Fix`).
