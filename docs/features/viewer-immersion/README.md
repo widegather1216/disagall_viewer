@@ -47,19 +47,19 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-23 / `systematic-debugger` / `DEFECT-03` (P1: `defaultPadding` `onChanged` 실시간 동기화 단절 및 비동기 `storage.sync.get` 초기화 레이스 — `immersion_controller.js` 3키 단일 통합·`Option A`·`ADR-07`·자기 에코/역순 덮어쓰기 방어·지연 `autoFullscreen` 소급 진입) 해결 및 최종 **`🟢 Sign-Off`** 확정 (`src/controller/immersion_controller.js`, `src/controller/viewer_controller.js`, `src/extension.js`, `src/userscript.js`, `tests/immersion.test.js` Test 29, `tests/immersion_e2e.test.js` `TC-HP-04`/`TC-BD-05b`)
+- **직전 완료 작업**: 2026-11-25 / `atomic-commit-crafter` / 전체화면 진입 시 OS 전환 애니메이션·창 크기 변경 `mousemove`로 인한 UI 깜빡임(사라짐→재표시→재숨김) 방지 가드(`FULLSCREEN_TRANSITION_MOUSE_GUARD_MS = 1000ms` 전환 억제 + 정지 합성 `mousemove` 필터링 + `autoFullscreen` 오픈 시 즉시 숨김) 구현 및 단위/E2E 회귀 테스트(`Test 30`, `TC-BD-07`) 커밋 완료 (`src/controller/immersion_controller.js`, `src/controller/viewer_controller.js`, `tests/immersion.test.js`, `tests/immersion_e2e.test.js`, `content.js`, `disagall_viewer.user.js`, Safari Extension 리소스)
 - **Recent Commits**:
+  - `9e6e693`: `test(immersion): add unit and E2E tests for fullscreen transition mouse guard`
+  - `f8e8887`: `fix(immersion): suppress mousemove UI wake flicker during fullscreen transition`
   - `317de54`: `fix(immersion): unify defaultPadding sync and guard async storage init races`
   - `cd985b0`: `test(immersion): add unit and E2E tests for DEFECT-03 padding sync and async init races`
   - `b4bf989`: `fix(immersion): ignore synthetic header mouseleave when UI is already hidden`
-  - `3fc9aa6`: `test(immersion): add unit and E2E regression tests for DEFECT-02 header mouseleave`
-  - `57e7826`: `fix(immersion): guard fullscreen Promise races against viewer close and reopen`
 - **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **실행 검증 명령 및 결과**:
-  - `npm run build`: `content.js`, `disagall_viewer.user.js` 번들 생성 PASS
-  - `npm test`: 5개 테스트 스위트(`module_import`, `core_viewer`, `post_navigation`, `recommend`, `immersion` 29개 테스트) 전원 PASS
-  - `node tests/immersion_e2e.test.js`: 실제 번들(`content.js`, `content.css`, `popup.js`, `test_page.html`) 기반 15개 시나리오(`TC-HP-04` padding live sync·`TC-BD-05b` 비동기 초기화 레이스 포함) 전원 PASS
-  - `node --check`: 수정된 `src/`·`tests/`·번들(`content.js`, `disagall_viewer.user.js`) 구문 검사 PASS
+  - `npm run build`: `content.js`, `disagall_viewer.user.js` 및 Safari Extension 리소스 동기화 PASS
+  - `npm test`: 5개 테스트 스위트(`module_import`, `core_viewer`, `post_navigation`, `recommend`, `immersion` 30개 테스트) 전원 PASS
+  - `node tests/immersion_e2e.test.js`: 실제 번들(`content.js`, `content.css`, `popup.js`, `test_page.html`) 기반 16개 시나리오(`TC-BD-07` 포함) 전원 PASS
+  - `node --check`: `src/controller/immersion_controller.js`, `src/controller/viewer_controller.js` 구문 검사 PASS
   - 미해결 티켓 (`0 / 0` — `🚨 DEFECT: 0건`, `🧐 REFACTOR: 0건`)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
   - `viewer-immersion` 도메인 모든 시나리오 `15/15 (100%) PASS` 및 `DEFECT-01~03`·`REFACTOR-01~03` 전건 해결로 `🟢 Sign-Off` 완료.

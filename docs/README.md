@@ -1,12 +1,12 @@
 # 🧭 Disagall Viewer Master Control Tower (Living Wiki Hub)
 
-> **최종 업데이트**: 2026-11-25 (by `user-journey-tester`)
+> **최종 업데이트**: 2026-11-25 (by `atomic-commit-crafter`)
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: `post-navigation` (`🟢 Sign-Off` — 전 도메인 `core-viewer`, `post-navigation`, `post-recommend`, `viewer-immersion`, `modular-bundler-migration` **`🟢 Sign-Off`** 달성)
-- **현재 단계 (Stage)**: `🟢 Sign-Off` (`post-navigation 11/11 (100%) PASS` — 전 도메인 미해결 티켓 `0 / 0`)
-- **직전 완료 작업**: `user-journey-tester`로 `post-navigation` **Dimension B & C: Boundary & Negative QA (`TC-BD-01`~`TC-NG-03`)** 검증 완료 (`Chrome 158 CDP` 실증 스크린샷 3건·로그 확보 및 `tests/post_navigation_e2e.test.js` 11/11 PASS, 신규 결함 `0건`, 최종 `🟢 Sign-Off`)
+- **Active 도메인**: `viewer-immersion` (`🟢 Sign-Off` — 전 도메인 `core-viewer`, `post-navigation`, `post-recommend`, `viewer-immersion`, `modular-bundler-migration` **`🟢 Sign-Off`** 달성)
+- **현재 단계 (Stage)**: `🟢 Sign-Off` (전 도메인 미해결 티켓 `0 / 0`)
+- **직전 완료 작업**: 전체화면 진입 시 전환 `mousemove` 깜빡임 억제·정지 합성 이벤트 필터링·`autoFullscreen` 즉시 숨김 수정(`f8e8887`) 및 `Test 30`/`TC-BD-07` 회귀 테스트(`9e6e693`) 원자적 커밋 완료 (`npm test` 5개 스위트 · `immersion_e2e.test.js` 16개 시나리오 PASS)
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
   > 모든 도메인 `🟢 Sign-Off` 완료! `npm run pack` 릴리즈 패키징 또는 신규 기능 기획(`기획해줘`) 진행해줘
 
@@ -21,7 +21,7 @@
 | [`post-navigation`](./features/post-navigation/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `11/11 (100%)` | `0 / 0` | `Happy Path + B&N 11/11 PASS` (Chrome 158 CDP·`post_navigation_e2e.test.js` 검증, 최종 Sign-Off) |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `DEFECT-03` 해결 완료 (우선순위 셀렉터·뷰어 배제·디스패치 실패/타이머 정리) |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 0` | `DEFECT-01` 해결 완료 (`#disagall-quick-launcher` CSS 복구·Safari 9종 자동 동기화·`pack` 갱신, 최종 Sign-Off) |
-| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■■■■■] 8/8` | `15/15 (100%)` | `0 / 0` | `DEFECT-01~03 전건 해결 완료 (단일 스토리지 동기화 통합·비동기 초기화 레이스 방어, 최종 Sign-Off)` |
+| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■■■■■] 8/8` | `16/16 (100%)` | `0 / 0` | `전체화면 전환 UI 깜빡임 억제 (f8e8887) 및 Test 30/TC-BD-07 검증 (9e6e693), 최종 Sign-Off` |
 
 *(※ 상태 범례: `📐 Planning` | `🛠️ Implementing` | `🧐 Auditing` | `🧪 QA Testing` | `🩹 Debugging` | `🟢 Sign-Off`)*
 *(※ 미해결 티켓: `🚨D` = Open `DEFECT-xx` 개수, `🧐R` = Open `REFACTOR-xx` 개수)*
@@ -29,6 +29,8 @@
 ---
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
+
+- **`[2026-11-25]` `[atomic-commit-crafter]` [`viewer-immersion`]**: `f8e8887` (`fix(immersion)` 전체화면 전환 `mousemove` 억제·정지 합성 이벤트 필터링·`autoFullscreen` 즉시 숨김), `9e6e693` (`test(immersion)` `Test 30`/`TC-BD-07`) 및 리빙 위키/관제탑 동기화 커밋 완료.
 
 - **`[2026-11-25]` `[atomic-commit-crafter]` [`post-navigation`]**: `7dd3656` (`test(post-navigation)` 11개 E2E QA 스위트), QA 증적(`evidence/`) 및 전 도메인 `🟢 Sign-Off` 위키·관제탑 동기화 커밋 완료.
 - **`[2026-11-25]` `[user-journey-tester]` [`post-navigation`]**: Dimension B & C Boundary & Negative (`TC-BD-01`~`TC-NG-03`) Chrome 158 CDP 실증(스크린샷 3건·`boundary-negative-qa.log`) 및 번들 E2E(`tests/post_navigation_e2e.test.js` 11/11) 검증 `PASS` (`DEFECT 0건`, **`🟢 Sign-Off`** 확정).
