@@ -1,8 +1,8 @@
 # 📦 [viewer-immersion] 몰입 모드 및 UI 클린 감상 패키지
 
-- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
+- **현재 상태 (Lifecycle)**: `🩹 Debugging`
 - **구현 진척도**: `[■■■■■■■■] 8/8 Steps` (기본 4/4 + 확장 피팅 2/2 + 전체화면 모드 2/2)
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -47,22 +47,15 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-25 / `atomic-commit-crafter` / 전체화면 진입 시 OS 전환 애니메이션·창 크기 변경 `mousemove`로 인한 UI 깜빡임(사라짐→재표시→재숨김) 방지 가드(`FULLSCREEN_TRANSITION_MOUSE_GUARD_MS = 1000ms` 전환 억제 + 정지 합성 `mousemove` 필터링 + `autoFullscreen` 오픈 시 즉시 숨김) 구현 및 단위/E2E 회귀 테스트(`Test 30`, `TC-BD-07`) 커밋 완료 (`src/controller/immersion_controller.js`, `src/controller/viewer_controller.js`, `tests/immersion.test.js`, `tests/immersion_e2e.test.js`, `content.js`, `disagall_viewer.user.js`, Safari Extension 리소스)
-- **Recent Commits**:
-  - `9e6e693`: `test(immersion): add unit and E2E tests for fullscreen transition mouse guard`
-  - `f8e8887`: `fix(immersion): suppress mousemove UI wake flicker during fullscreen transition`
-  - `317de54`: `fix(immersion): unify defaultPadding sync and guard async storage init races`
-  - `cd985b0`: `test(immersion): add unit and E2E tests for DEFECT-03 padding sync and async init races`
-  - `b4bf989`: `fix(immersion): ignore synthetic header mouseleave when UI is already hidden`
-- **Working Tree State**: 🟢 Clean (No uncommitted changes)
+- **직전 완료 작업**: 2026-11-25 / `clean-code-auditor` / 전 도메인 클린코드 전수 감사 완료 — `viewer-immersion` `REFACTOR-04`(🟡 Should Fix) 발행 및 `spec.md`/`architecture.md` 정리 (`🩹 Debugging` 전환)
+- **생성/수정된 핵심 파일**:
+  - `docs/features/viewer-immersion/verification.md`: `REFACTOR-04` (`immersion_controller.js` 775줄 스토리지 동기화 분리·30줄 초과 함수 분할·매직 넘버/가드 보강, `popup.js` 유한 정수 클램핑, `popup.html` `v1.1.0` 버전 정합화) 등록
+  - `docs/features/viewer-immersion/spec.md`, `architecture.md`: 잔존 `[To-Be]` 빈 섹션 제거 및 `mousemove` 직접 바인딩 흐름도 동기화
+- **Working Tree State**: 🟡 Docs Modified (위키 감사 리포트/스펙 역동기화 반영 중)
 - **실행 검증 명령 및 결과**:
-  - `npm run build`: `content.js`, `disagall_viewer.user.js` 및 Safari Extension 리소스 동기화 PASS
-  - `npm test`: 5개 테스트 스위트(`module_import`, `core_viewer`, `post_navigation`, `recommend`, `immersion` 30개 테스트) 전원 PASS
-  - `node tests/immersion_e2e.test.js`: 실제 번들(`content.js`, `content.css`, `popup.js`, `test_page.html`) 기반 16개 시나리오(`TC-BD-07` 포함) 전원 PASS
-  - `node --check`: `src/controller/immersion_controller.js`, `src/controller/viewer_controller.js` 구문 검사 PASS
-  - 미해결 티켓 (`0 / 0` — `🚨 DEFECT: 0건`, `🧐 REFACTOR: 0건`)
+  - `npm test`: 5개 테스트 스위트(`module_import`, `core_viewer`, `post_navigation`, `recommend`, `immersion` 30개) 전원 PASS
+  - `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
+  - 미해결 티켓 (`0 / 1` — `🚨 DEFECT: 0건`, `🧐 REFACTOR: 1건`)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `viewer-immersion` 도메인 모든 시나리오 `15/15 (100%) PASS` 및 `DEFECT-01~03`·`REFACTOR-01~03` 전건 해결로 `🟢 Sign-Off` 완료.
-  - 다음 미해결 도메인(`post-navigation/DEFECT-03` 등) 디버깅 진행 가능 (`atomic-commit-crafter`로 현재 변경사항 커밋 후 진행 권장).
+  - 최우선 해결 대상: `viewer-immersion` 도메인 `REFACTOR-04` (`systematic-debugger` 연결).
   - 참고: 실제 오버레이 패딩 슬라이더의 DOM ID는 `#disagall-slider`(스펙 표기 `#disagall-padding-slider` 대신 실제 마크업 `src/ui/overlay.js#L30`)임.
-  - Chrome `--headless=new` 환경은 OS 전체화면 권한 제약(`TypeError: not granted`)이 있으므로, 전체화면 중 `closeViewer` 해제 경로는 `tests/immersion_e2e.test.js`의 Fullscreen API 계약 시뮬레이션과 실브라우저 `closeViewer` 경로를 병행해 검증함.

@@ -1,8 +1,8 @@
 # 🧪 [post-navigation] Verification & Ticket Logs
 
-- **검증 상태**: `🟢 Sign-Off` (`Happy Path 4/4 + Boundary & Negative 7/7 PASS` · `0건 OPEN`)
+- **검증 상태**: `🩹 Debugging` (`Happy Path 4/4 + Boundary & Negative 7/7 PASS` · `0건 OPEN DEFECT` · `🧐 2건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
 - **인수 조건 통과율**: `11 / 11 Scenarios PASS (100%)`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건`
 
 ---
 
@@ -105,3 +105,33 @@
 
 ### [REFACTOR-13] `createOverlay()` 내 단일 거대 함수(120줄) SRP 분해
 - **현재 상태**: 🟢 RESOLVED — `buildOverlayHtml`, `cacheOverlayElements`, `bindOverlayButtons` 등으로 책임 분리 완료.
+
+### [REFACTOR-14] `tests/post_navigation.test.js` Tests 1–7 로컬 복제 모의 함수 제거 및 실모듈 검증 전환
+- **심각도**: 🔴 Must Fix (즉시 조치·릴리즈 차단)
+- **위치**: [`tests/post_navigation.test.js#L7-L164`](../../../tests/post_navigation.test.js#L7-L164), [`#L169-L343`](../../../tests/post_navigation.test.js#L169-L343), [`#L262-L270`](../../../tests/post_navigation.test.js#L262-L270), [`#L908`](../../../tests/post_navigation.test.js#L908)
+- **위반 규칙**: 단위 테스트 실효성 (자체 복제 스텁 허수 테스트 금지)
+- **발견된 문제**:
+  - `tests/post_navigation.test.js` Tests 1–7이 `src/parser/post_navigator.js`를 임포트하지 않고 파일 상단의 로컬 정규식 복제 함수(`extractPostNo`, `hasPhotoAttachment`, `parseRows`)만 검증함(실모듈 테스트는 Test 8부터 시작).
+  - Test 4의 `catch (e)`가 `AssertionError`까지 삼키며, `dc_sample.html` 존재 확인(`L270, L908`)이 실행 CWD에 의존함.
+- **권장 개선안 (Suggested Diff)**:
+  ```text
+  // Tests 1~7을 src/parser/post_navigator.js 실제 export 호출(경량 DOM 목업)로 전환하고,
+  // catch에서 ENOENT만 스킵하며 path.join(__dirname, '..', 'dc_sample.html') 사용
+  ```
+- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+
+### [REFACTOR-15] `post_navigator.js`·`showNoPhotoNotice()`·`startAutoOpenPolling()` 복잡도/방어 코드 개선 및 탐색 컨트롤러 분리
+- **심각도**: 🟡 Should Fix (권장 조치)
+- **위치**: [`src/parser/post_navigator.js#L81-L248`](../../../src/parser/post_navigator.js#L81-L248), [`src/ui/overlay.js#L270-L359`](../../../src/ui/overlay.js#L270-L359), [`src/controller/viewer_controller.js#L186-L246`](../../../src/controller/viewer_controller.js#L186-L246), [`#L504-L537`](../../../src/controller/viewer_controller.js#L504-L537)
+- **위반 규칙**: 방어 코드 / 함수 길이(30줄)·중첩 깊이(3-depth) / 컨트롤러 SRP 분리
+- **발견된 문제**:
+  - `post_navigator.js#L167-L171`: `anyImgIcon.className`에 `typeof === 'string'` 가드가 없어 SVG(`SVGAnimatedString`)일 때 `TypeError` 위험, `L81/108/136/151` `textContent` null 가드 및 `direction` 유효성 검증 누락, `hasPhotoAttachment`(31줄)·`getAdjacentPostUrl`(61줄·3-depth·중복 `hasPhotoAttachment`/제목 셀렉터 조회) 초과.
+  - `overlay.js#L270-L359`: `showNoPhotoNotice`(90줄·3-depth)에 `typeof onNavigatePost === 'function'`, `window`/`document.body` null 가드 및 타이머 `fired` 가드 누락.
+  - `viewer_controller.js`: `navigatePost`/`startAutoOpenPolling`(34줄·4-depth)을 전용 탐색 하위 컨트롤러(예: `post_nav_controller.js`)로 분리 필요(`viewer_controller.js` re-export 호환 유지).
+- **권장 개선안 (Suggested Diff)**:
+  ```text
+  // 1. post_navigator.js: getElementClassName() 헬퍼 + findTargetPostIndex()/selectAdjacentTarget() 추출로 30줄 이하 평탄화
+  // 2. overlay.js: showNoPhotoNotice 내부 핸들러/마크업/타이머 가드 분리
+  // 3. src/controller/post_nav_controller.js 분리 및 viewer_controller.js re-export 유지
+  ```
+- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)

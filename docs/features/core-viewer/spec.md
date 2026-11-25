@@ -25,8 +25,8 @@
 
 ### 2.2 DOM 이미지 크롤링 및 URL 정제 계약 (`image_parser.js`)
 - **본문 컨테이너 15종**: `.write_div`, `.thum-txtin`, `.us-txt`, `.usertxt`, `.writing_view_box`, `.gallview_contents`, `.view_content_wrap`, `.reading_box`, `.article-content`, `#dc_contents` 등
-- **제외 컨테이너 21종**: 댓글창(`.comment_box`), 사이드바(`.side_box`), 광고(`.ad_box`, `#ad_nv_slot`), 배너(`.con_banner`), 갤러리목록(`.gall_list`) 등
-- **디시콘/UI 블랙리스트 12종**: `/dcicon/`, `/emoticon/`, `/dccon`, `dccon.php`, `nik.gif`, `bestcon`, `icon_`, `logo`, `banner` 등
+- **제외 컨테이너 23종**: 댓글창(`.comment_box`), 사이드바(`.side_box`), 광고(`.ad_box`, `#ad_nv_slot`), 배너(`.con_banner`), 갤러리목록(`.gall_list`), 뷰어 자체(`#disagall-viewer-overlay`) 등
+- **디시콘/UI 블랙리스트 13종**: `/dcicon/`, `/emoticon/`, `/dccon`, `dccon.php`, `nik.gif`, `fix_nik.gif`, `bestcon`, `/btn_`, `icon_`, `logo`, `banner`, `gallview_loading`, `nstatic.dcinside.com`
 - **다운스케일 쿼리 제거**: URL 쿼리 파라미터에서 `s`, `type` 파라미터 강제 삭제하여 CDN 원본 복원
 
 ## 3. 화면 맞춤(피팅) 및 줌앤팬 엔진 규격 (`overlay.js`, `zoom_pan.js`)
@@ -47,7 +47,7 @@
 ## 4. UI 5대 상태 및 디자인 규칙 (UI States & Design Rules)
 - **오버레이 루트**: `#disagall-viewer-overlay` (`fixed`, `z-index: 99999999`, `100vw x 100vh`)
 - **Loading**: 고화질 원본 비동기 로딩 중 중앙 스피너(`.disagall-spinner`) 노출
-- **Empty**: 수집된 이미지가 0개일 경우 `alert("본문에서 사진을 찾을 수 없습니다.")` 조기 리턴
+- **Empty**: 수집된 이미지가 0개일 경우 `alert("디시 사진 뷰어: 게시글 본문에서 감상 가능한 이미지를 찾지 못했습니다.")` 조기 리턴
 - **Success (Active)**: `.active` 클래스 추가로 화면 페이드인, `document.body.style.overflow = 'hidden'` 적용
 
 ## 5. 예외 처리 및 엣지 케이스 정책 (Edge Cases & Fallbacks)

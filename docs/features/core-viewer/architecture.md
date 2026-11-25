@@ -31,7 +31,7 @@ flowchart TD
   - `src/extension.js`: Chrome Extension 런타임 수신 및 초기화
   - `src/userscript.js`: Tampermonkey/Safari 유저스크립트 전역 단축키(`V`) 및 CSS 주입 초기화
 - **파서 & 데이터 추출**:
-  - `src/parser/image_parser.js`: 15종 컨테이너 탐색, 21종 비본문 제외, 디시콘 필터링, 다운스케일 쿼리 제거
+  - `src/parser/image_parser.js`: 15종 컨테이너 탐색, 23종 비본문 제외, 디시콘 필터링, 다운스케일 쿼리 제거
 - **UI 및 제스처 엔진**:
   - `src/ui/overlay.js`: 오버레이 DOM 빌더, 슬라이더/버튼/토스트 바인딩, 종횡비 피팅 계산
   - `src/ui/zoom_pan.js`: 1.0x~5.0x 마우스 휠 줌, 트랙패드 핀치, 드래그 팬, 더블클릭 리셋, RAF 렌더러

@@ -6,7 +6,6 @@
 - `CONFIG.STORAGE_KEY_AUTO_OPEN`: `'disagall_auto_open'` (sessionStorage 키)
 - `CONFIG.POST_NAV_DELAY`: `150` (ms, 토스트 노출 후 페이지 전환 대기 시간)
 - `CONFIG.NO_PHOTO_NOTICE_DURATION`: `8000` (ms, 사진 없는 글 알림바 노출 시간)
-- `PostRowInfo`: `{ element: HTMLElement, no: string, title: string, url: string, hasPhoto: boolean, isCurrent: boolean }`
 - `AdjacentPostResult` (Discriminated Result Union — `REFACTOR-05` / `ADR-005`):
   - **Found**: `{ ok: true, status: 'found', url: string, title: string, hasPhoto: boolean }`
   - **Boundary**: `{ ok: false, status: 'boundary', error: 'top' | 'bottom', message: string }`
@@ -15,8 +14,8 @@
 ## 2. DOM 탐색 및 게시글 필터링 계약 (`post_navigator.js`)
 
 ### 2.1 대상 테이블 및 목록 셀렉터
-- **데스크톱 목록**: `table.gall_list tbody tr.ub-content`, `table.gall_list tbody tr`
-- **모바일 목록**: `.gall-detail-lst li`, `.gall-thum-lst li`
+- **데스크톱 목록**: `table.gall_list tbody tr.ub-content`, `.gall_listwrap table tbody tr.ub-content`
+- **모바일 목록**: `.gall-detail-lst li`, `.gall-thum-btm li`
 
 ### 2.2 유효 게시글 검증 및 제외 규칙
 - **제외 대상**:
@@ -24,12 +23,12 @@
   - `numText === '설문'` 또는 설문 아이콘 행
   - 광고 행 (`AD`, `javascript:;`, 애드센스 슬롯)
 - **현재 열람 글 판별 우선순위 (`isCurrentPost`)**:
-  1. `row.classList.contains('crt')` 또는 클래스명 끝에 `crt` 포함 여부
+  1. `row.classList.contains('crt')` 또는 클래스명 내 `crt` 포함 여부
   2. `row.querySelector('.crt_icon')` 존재 여부 (게시글 번호가 비어있어도 현재 글로 확정)
-  3. `row.dataset.no === currentPostNo` 또는 제목 링크 `href` 내 `no=` 쿼리와 일치 여부
+  3. `row.dataset.no === currentPostNo` 또는 `.gall_num` 텍스트/제목 링크 `href` 내 `no=` 쿼리와 일치 여부
 
 ### 2.3 스마트 사진글 우선 탐색 (`preferPhoto = true`)
-- 사진 탭이 활성화되지 않은 일반 게시판에서, 글 목록 내 이미지 아이콘(`.sp_img.icon_pic`, `.icon_pic`, `.pic_icon`)을 보유한 게시글을 우선 탐색하여 글만 있는 게시글을 자동으로 건너뜀.
+- 사진 탭이 활성화되지 않은 일반 게시판에서, 글 목록 내 분류(`'사진'`) 또는 이미지 아이콘(`.icon_pic`, `.icon_recomimg`, `.sp-lst-img`, `.sp-photo`, 비텍스트/비광고 `.icon_img`)을 보유한 게시글을 우선 탐색하여 글만 있는 게시글을 자동으로 건너뜀.
 - 목록 내 잔여 사진글이 없을 경우 가장 가까운 일반 글로 폴백.
 
 ### 2.4 반환 계약 (`getAdjacentPostUrl` — `AdjacentPostResult`)

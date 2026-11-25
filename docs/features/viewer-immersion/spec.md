@@ -27,9 +27,6 @@
   - `state.isFullscreenMode === true` 동안 `state.currentPadding` 저장값을 훼손하지 않고 임시 `effectivePadding = 0` 및 `hideUi(true)` 적용, 해제 시 원래 여백 및 UI 복구
   - `openViewer()` 시 `state.autoFullscreen === true`이면 `requestFullscreen()` 시도 및 차단 시 `0px`+UI 숨김 폴백 적용 + 토스트 안내
 
-### 🟡 [To-Be 신규/마이그레이션 대상]
-- 현재 예정된 추가 변경사항 없음
-
 ## 2. 저장소 및 통신 계약 (Storage & Communication Contracts)
 - **Chrome Extension Storage**:
   - 키: `defaultPadding` (`number`, `0~100`, 기본값 `24`), `autoHideUi` (`boolean`, 기본값 `true`), `autoFullscreen` (`boolean`, 기본값 `false`)

@@ -1,8 +1,8 @@
 # 🧪 [core-viewer] Verification & Ticket Logs
 
-- **검증 상태**: `🟢 Sign-Off` (`0건 OPEN DEFECT` — `DEFECT-01~04` 전건 해결 완료)
+- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 3건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
 - **인수 조건 통과율**: `9 / 9 Scenarios PASS (100%)`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 3건`
 
 ---
 
@@ -89,4 +89,48 @@
 
 ## 🧐 4. 코드 품질 감사 리포트 (Audit & Refactoring Logs)
 
-*(현재 등록된 미해결 리팩토링 티켓 없음)*
+### [REFACTOR-01] `closeViewer()` 동기 스토리지 예외 중단, `resizeRafId`/`updateImgTransform()` `rAF` 누수 및 `!active` 가드 누락
+- **심각도**: 🔴 Must Fix (즉시 조치·릴리즈 차단)
+- **위치**: [`src/controller/viewer_controller.js#L300-L315`](../../../src/controller/viewer_controller.js#L300-L315), [`#L480-L502`](../../../src/controller/viewer_controller.js#L480-L502), [`#L561-L572`](../../../src/controller/viewer_controller.js#L561-L572), [`src/ui/zoom_pan.js#L50-L76`](../../../src/ui/zoom_pan.js#L50-L76), [`#L97-L149`](../../../src/ui/zoom_pan.js#L97-L149)
+- **위반 규칙**: 동시성·리소스 수명주기 제약 (`00_core_foundation/architecture.md` §3) / 방어 코드 / 멱등성
+- **발견된 문제**:
+  - `persistPaddingSetting()`에 `catch` 블록이 없어 `chrome.storage.sync.set()`이 확장 재로드 등으로 동기 예외를 던지면 `closeViewer()`(`L489`)가 `resetZoom()`·`.active` 제거·스크롤/전체화면 해제를 실행하지 못한 채 중단됨.
+  - `closeViewer()`가 `.active` 제거(`L497`) 전에 `resetZoom()`(`L493`)을 호출해 `updateImgTransform()`의 `requestAnimationFrame`이 재예약된 채 해제되지 않음. `updateImgTransform()` 콜백은 `state.zoom.transformRafId = null` 초기화 및 `!active` 가드가 없음.
+  - `bindResizeHandler()`의 `resizeRafId`가 클로저 지역 변수로 고립되어 `closeViewer()`에서 취소되지 않으며 `rAF` 콜백 내 `isOverlayActive()` 재검증이 없음. `setupZoomEvents()` 리스너(`wheel`/`mousedown`/`dblclick`)는 `!active` 조기 리턴 및 `WeakSet` 중복 바인딩 가드가 누락됨.
+- **권장 개선안 (Suggested Diff)**:
+  ```text
+  // 1. persistPaddingSetting(): catch 블록 추가 및 closeViewer()에서 overlayEl.classList.remove('active')·transformRafId/resizeRafId 취소를 안전 순서로 보장
+  // 2. state.resizeRafId 등록 + closeViewer() cancelAnimationFrame + rAF 콜백 내 isOverlayActive() 체크
+  // 3. zoom_pan.js: transformRafId = null 초기화, !isOverlayActive() 가드, WeakSet(boundZoomEls) 중복 바인딩 방어
+  ```
+- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+
+### [REFACTOR-02] `viewer_controller.js`(610줄)·`overlay.js`(359줄) 책임 분리, `userscript.js` 계층 우회 및 `image_parser.js` 방어·중복 정리
+- **심각도**: 🟡 Should Fix (권장 조치)
+- **위치**: [`src/controller/viewer_controller.js#L1-L610`](../../../src/controller/viewer_controller.js#L1-L610), [`src/ui/overlay.js#L5-L183`](../../../src/ui/overlay.js#L5-L183), [`src/userscript.js#L2-L75`](../../../src/userscript.js#L2-L75), [`src/extension.js#L9-L14`](../../../src/extension.js#L9-L14), [`src/parser/image_parser.js#L48-L189`](../../../src/parser/image_parser.js#L48-L189), [`content.css#L269-L279`](../../../content.css#L269-L279)
+- **위반 규칙**: SRP·단방향 레이어 경계 / 함수·파일 길이(30줄·300줄) / 방어 코드 / 중복 로직
+- **발견된 문제**:
+  - `viewer_controller.js`(610줄)가 이미지 프리로드/오버레이 수명주기·게시글 탐색 폴링·패딩 영속화·단축키를 모두 담당하며 `openViewer`(43줄)·`showImage`(34줄) 초과, `bindOverlayBackdrop` null 가드 및 `bindContextMenuTracker`/`bindResizeHandler`/`bindTestOpenListener` 멱등 가드, `paddingSaveTimer` `state` 이관·`pagehide` flush 누락.
+  - `overlay.js`(359줄)의 `buildOverlayHtml`(88줄)·`applyFittingAndPadding`(44줄) 초과 및 `zoom_pan.js#L62-L67`과 orientation/크기 배지 포맷 중복(`content.css#L269-L279` 데드 규칙 및 매직 넘버 정리 포함).
+  - `userscript.js`가 `state`/`image_parser` 직접 임포트·셀렉터 중복·`e.repeat`/`SELECT`/`readyState` 가드 및 미추적 `setTimeout` 사용; `extension.js#L10` `message` null 가드 누락.
+  - `image_parser.js`: `getCleanOriginalUrl` 상대 URL/스킴(`http:`/`https:`) 미검증(`parentAnchor.href` `javascript:` 차단 누락), `getBestImgUrl` 4-depth 중첩·속성 재조회, `isDcIconOrUiAsset` 36줄 초과, `extractImagesFromElements` `getBestImgUrl` 2회 호출 및 `extractPostImages` 중첩 컨테이너 재탐색.
+- **권장 개선안 (Suggested Diff)**:
+  ```text
+  // 1. viewer_controller.js에서 게시글 탐색/스토리지 영속화 책임을 하위 모듈로 분리(re-export 호환 유지) 및 30줄 초과 함수 분할
+  // 2. overlay.js 마크업/피팅 헬퍼 분할 및 formatImageOrientationLabel() 공용화
+  // 3. userscript.js controller 경유 위임(이미지 클릭 판별·isOverlayActive·isEditableTarget 재사용) 및 extension.js message 가드
+  // 4. image_parser.js URL base/스킴 검증, getBestImgUrl/isDcIconOrUiAsset 평탄화 및 단일 패스 추출
+  ```
+- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+
+### [REFACTOR-03] `tests/core_viewer.test.js` 줌 변환·가로 피팅·토스트 타이머 테스트 커버리지 보강 및 위생 정리
+- **심각도**: 🟡 Should Fix (권장 조치)
+- **위치**: [`tests/core_viewer.test.js#L321`](../../../tests/core_viewer.test.js#L321), [`#L380`](../../../tests/core_viewer.test.js#L380), [`#L422-L424`](../../../tests/core_viewer.test.js#L422-L424), [`#L728-L731`](../../../tests/core_viewer.test.js#L728-L731)
+- **위반 규칙**: 단위 테스트 실효성 & 커버리지 / 코드 위생
+- **발견된 문제**:
+  - `global.requestAnimationFrame = () => 1;` no-op 스텁으로 `updateImgTransform()`의 `style.transform`·`panX`/`panY`·상한 `5.0x` 클램핑이 미검증되며, 가로 이미지(`.landscape`, `가로 사진`) 피팅 및 `showViewerToast`/`dismissViewerToast` 타이머 레이스 단위 테스트가 부재함. 미사용 변수(`openCount`, `origSetAttr`, `origSrcDesc`) 잔존.
+- **권장 개선안 (Suggested Diff)**:
+  ```text
+  // rAF 큐 스텁 기반 panX/panY/transform/5.0x 테스트, 가로 이미지 피팅 및 toast 타이머 경합 테스트 추가 + 미사용 변수 제거
+  ```
+- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)

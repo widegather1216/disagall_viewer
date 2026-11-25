@@ -4,9 +4,10 @@
 
 ```mermaid
 flowchart TD
-    UserMouse["사용자 마우스/키보드 이벤트"] -->|mousemove / keydown| Controller["viewer_controller.js"]
-    Controller -->|타이머 리셋 / 유휴 감지| Timer["Idle Timer (2500ms)"]
-    Controller -->|H / F 및 몰입 상태 위임| ImmersionHandler["immersion_controller.js"]
+    UserMouse["사용자 마우스 이벤트"] -->|mousemove| ImmersionHandler["immersion_controller.js"]
+    UserKey["사용자 키보드 입력"] -->|keydown (H / F)| Controller["viewer_controller.js"]
+    Controller -->|H / F 및 몰입 상태 위임| ImmersionHandler
+    ImmersionHandler -->|타이머 리셋 / 유휴 감지| Timer["Idle Timer (2500ms)"]
     
     Timer -->|만료 시 (2.5초)| ImmersionHandler
     ImmersionHandler -->|클래스 토글 (.disagall-idle)| Overlay["#disagall-viewer-overlay"]

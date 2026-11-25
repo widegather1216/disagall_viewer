@@ -1,8 +1,8 @@
 # 📦 [post-navigation] 위/아래 방향키 게시글 탐색 (Post Navigation)
 
-- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
+- **현재 상태 (Lifecycle)**: `🩹 Debugging`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,21 +29,12 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-25 / `user-journey-tester` / **Dimension B & C: Boundary & Negative QA (`TC-BD-01` ~ `TC-NG-03`)** 검증 완료 (`7/7 PASS`, 누적 `11/11 100% PASS`, 신규 결함 `0건`, **`🟢 Sign-Off`** 확정)
+- **직전 완료 작업**: 2026-11-25 / `clean-code-auditor` / 전 도메인 클린코드 전수 감사 완료 — `post-navigation` `REFACTOR-14`(🔴 Must Fix)·`REFACTOR-15`(🟡 Should Fix) 발행 및 `spec.md` 셀렉터 역동기화 (`🩹 Debugging` 전환)
 - **생성/수정된 핵심 파일**:
-  - `tests/post_navigation_e2e.test.js`: 빌드된 `content.js` 번들 기반 전체 E2E 스위트 (`TC-HP-01`~`TC-HP-04`, `TC-BD-01`~`TC-BD-04`, `TC-NG-01`~`TC-NG-03` 11/11 PASS) 확장
-  - `docs/features/post-navigation/evidence/`: Chrome 158 Headless CDP B&N 스크린샷 3건(`tc-bd-01-bottom-boundary-toast.png`, `tc-bd-02-mobile-list-auto-open.png`, `tc-ng-02-unavailable-toast.png`) 및 `boundary-negative-qa.log` 추가
-  - `docs/features/post-navigation/verification.md`: 11개 테스트 시나리오 매트릭스 전량 `✅ PASS` (`100%`) 및 `🟢 Sign-Off` 갱신
+  - `docs/features/post-navigation/verification.md`: `REFACTOR-14` (`tests/post_navigation.test.js` Tests 1~7 로컬 복제 스텁 제거 및 실모듈 검증 전환), `REFACTOR-15` (`post_navigator.js` SVG `className` 가드·함수 길이/중첩 정리, `showNoPhotoNotice` 분리, `post_nav_controller.js` 분리) 등록
+  - `docs/features/post-navigation/spec.md`: `.gall_listwrap`·`.gall-thum-btm li`·사진 아이콘 셀렉터 역동기화
 - **검증 완료된 테스트 실행 명령어**:
-  - `node tests/post_navigation_e2e.test.js`: Happy Path + Boundary & Negative `11/11 PASS` (빌드 번들 `content.js` VM E2E)
-  - Chrome 158 Headless CDP E2E (`test_page*.html`, `dc_sample.html`, 모바일/경계/비안전 URL/8초 타이머/경합 시나리오): `TC-HP-01~04` + `TC-BD-01~04` + `TC-NG-01~03` 전량 `PASS`, `content.js` 런타임 예외 `0건`
-  - `npm test` && `node tests/immersion_e2e.test.js`: 단위 5개 스위트 전량 PASS & E2E 15/15 PASS
-- **Recent Commits**:
-  - `7dd3656` - `test(post-navigation): add built-bundle E2E QA suite for Happy Path and Boundary/Negative`
-  - `849a3d4` - `refactor(post-navigation): return backward-compatible discriminated result from getAdjacentPostUrl`
-  - `d0bc853` - `test(post-navigation): add regression tests for REFACTOR-05 discriminated result contract`
-  - `40ec587` - `fix(post-navigation): track and cancel navigation timeout and auto-open polling timers`
-  - `f55f8b3` - `test(post-navigation): add regression tests for DEFECT-04 timer and polling conflicts`
-- **Working Tree State**: 🟢 Clean (No uncommitted changes)
+  - `npm test` (`5개 스위트 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node --check` (`PASS`)
+- **Working Tree State**: 🟡 Docs Modified (위키 감사 리포트/스펙 역동기화 반영 중)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `post-navigation` 포함 전 도메인 QA `🟢 Sign-Off` 완료 (신규 기능 기획/릴리즈 패키징 대기).
+  - 최우선 해결 대상: `post-navigation` 도메인 `REFACTOR-14` (`tests/post_navigation.test.js` Tests 1~7 실모듈 검증 전환, `systematic-debugger` 연결).

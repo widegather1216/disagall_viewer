@@ -1,8 +1,8 @@
 # 🧪 [modular-bundler-migration] Verification & Ticket Logs
 
-- **검증 상태**: `🟢 Sign-Off` (`0건 OPEN DEFECT` — `DEFECT-01` 해결 완료)
+- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 1건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
 - **인수 조건 통과율**: `3 / 3 (100%)` · 테스트 매트릭스 `5 / 5 PASS`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
 
 ---
 
@@ -50,4 +50,17 @@
 
 ## 🧐 4. 코드 품질 감사 리포트 (Audit & Refactoring Logs)
 
-*(현재 등록된 미해결 리팩토링 티켓 없음)*
+### [REFACTOR-01] `npm test` E2E 스위트 연동, 무단언 스크래치 테스트 정리 및 E2E 타이머 헬퍼 공용화
+- **심각도**: 🟡 Should Fix (권장 조치)
+- **위치**: [`package.json#L13`](../../../package.json#L13), [`tests/test_dc_sample.js#L1-L19`](../../../tests/test_dc_sample.js#L1-L19), [`tests/test_rows_dc.js#L1-L39`](../../../tests/test_rows_dc.js#L1-L39), [`tests/immersion_e2e.test.js#L9-L84`](../../../tests/immersion_e2e.test.js#L9-L84), [`tests/post_navigation_e2e.test.js#L9-L84`](../../../tests/post_navigation_e2e.test.js#L9-L84), [`build.js#L53-L94`](../../../build.js#L53-L94)
+- **위반 규칙**: 테스트 파이프라인 완결성 / 중복 코드 / 죽은 스크래치 코드 위생
+- **발견된 문제**:
+  - `package.json#L13` `npm test`에 번들 E2E 스위트(`tests/immersion_e2e.test.js`, `tests/post_navigation_e2e.test.js`)가 연결되지 않아 기본 테스트 명령에서 누락됨.
+  - `tests/test_dc_sample.js`(미사용 변수 `writeDivEnd` 포함)·`tests/test_rows_dc.js`는 단언(`assert`) 없이 `console.log`만 수행하는 스크래치 파일임.
+  - `immersion_e2e.test.js`와 `post_navigation_e2e.test.js`가 `createFakeTimerEnv()`를 그대로 중복 구현함. `build.js`의 `build()`(42줄)도 단계별 헬퍼로 간결화 가능.
+- **권장 개선안 (Suggested Diff)**:
+  ```text
+  // 1. package.json: test 스크립트(또는 test:e2e 포함)에 E2E 스위트 연결
+  // 2. tests/test_dc_sample.js, tests/test_rows_dc.js 제거(또는 assert 기반 정식 회귀 테스트 편입) 및 tests/helpers/fake_timer_env.js 공용화
+  ```
+- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)

@@ -1,8 +1,8 @@
 # 📦 [modular-bundler-migration] 모듈화 및 esbuild 번들러 파이프라인 (Modular Bundler)
 
-- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
+- **현재 상태 (Lifecycle)**: `🩹 Debugging`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,17 +29,12 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-23 / `systematic-debugger` / `DEFECT-01` 해결 (`content.css` `#disagall-quick-launcher` 플로팅 스타일 복구, `build.js` `syncSafariResources()` 9종 자동 동기화 통합, `disagall_viewer.zip` 재생성 및 `🟢 Sign-Off` 전환)
+- **직전 완료 작업**: 2026-11-25 / `clean-code-auditor` / 전 도메인 클린코드 전수 감사 완료 — `modular-bundler-migration` `REFACTOR-01`(🟡 Should Fix) 발행 및 `spec.md`/`architecture.md` 역동기화 (`🩹 Debugging` 전환)
 - **생성/수정된 핵심 파일**:
-  - `content.css`: `#disagall-quick-launcher` 및 `:hover` 스타일 복구 (Userscript `__INJECTED_CSS__` 반영)
-  - `build.js`: `EXTENSION_ASSETS` 9종을 `safari_extension/DisagallViewerSafari/DisagallViewerSafari Extension/Resources/`로 복사하는 `syncSafariResources()` 추가
-  - `tests/module_import.test.js`: Test 4 (`DEFECT-01` 런처 CSS 인라인 주입 및 Safari 9종 에셋 바이트 일치 검증) 추가
-  - 산출물 동기화: `content.js`, `disagall_viewer.user.js`, `disagall_viewer.zip`, `safari_extension/.../Resources/` 9종
+  - `docs/features/modular-bundler-migration/verification.md`: `REFACTOR-01` (`npm test` E2E 스위트 연동, 무단언 스크래치 `test_dc_sample.js`/`test_rows_dc.js` 정리, E2E `createFakeTimerEnv()` 공용화 및 `build.js` 헬퍼 분리) 등록
+  - `docs/features/modular-bundler-migration/spec.md`, `architecture.md`: 5개 `npm test` 스위트 및 Safari 9종 동기화 대상 역동기화
 - **검증 완료된 테스트 실행 명령어**:
-  - `node tests/module_import.test.js` (`4/4 PASS`), `npm test` (5개 스위트 전량 `PASS`), `node tests/immersion_e2e.test.js` (`15/15 PASS`), `npm run build` (`PASS`), `npm run pack` (`PASS`), `node --check` (`PASS`)
-- **Recent Commits**:
-  - `e7f1fcd` - `fix(bundler): restore quick-launcher CSS and sync Safari extension resources`
-  - `f7e5eb8` - `test(bundler): add regression test for quick-launcher CSS and Safari asset parity`
-- **Working Tree State**: 🟢 Clean (No uncommitted changes)
+  - `npm test` (`5개 스위트 PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
+- **Working Tree State**: 🟡 Docs Modified (위키 감사 리포트/스펙 역동기화 반영 중)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `modular-bundler-migration` 도메인 미해결 티켓 `0건` (`🟢 Sign-Off`). 잔여 타 도메인 티켓(`post-navigation/REFACTOR-05`) 진행 가능.
+  - 최우선 해결 대상: `modular-bundler-migration` 도메인 `REFACTOR-01` (`systematic-debugger` 연결).

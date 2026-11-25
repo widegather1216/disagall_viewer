@@ -3,13 +3,13 @@
 ## 1. 기술 스택 및 디렉토리 구조 (Tech Stack & Layout)
 - **Runtime & Extensions**: Chrome Extension (Manifest V3), Safari / Tampermonkey Userscript, Vanilla JavaScript (ES Modules)
 - **Bundler**: esbuild (`build.js`) — `src/extension.js` ➔ `content.js`, `src/userscript.js` ➔ `disagall_viewer.user.js`
-- **Testing**: Node.js built-in assertion tests (`tests/module_import.test.js`, `tests/post_navigation.test.js`, `tests/recommend.test.js`)
+- **Testing**: Node.js built-in assertion tests (`tests/module_import.test.js`, `tests/core_viewer.test.js`, `tests/post_navigation.test.js`, `tests/recommend.test.js`, `tests/immersion.test.js`, 및 번들 E2E `tests/immersion_e2e.test.js`, `tests/post_navigation_e2e.test.js`)
 - **디렉토리 레이아웃**:
   - `src/config.js`: 불변 설정 상수 및 스토리지 키 관리
   - `src/state.js`: 뷰어 런타임 상태 단일 저장소 (Single Source of Truth)
   - `src/parser/`: DOM 크롤링 및 파서 모듈 (`image_parser`, `post_navigator`, `recommend_parser`)
   - `src/ui/`: 뷰어 오버레이 마크업 생성, 스타일, 제스처 제어 (`overlay.js`, `zoom_pan.js`)
-  - `src/controller/`: 사용자 인터랙션, 키보드/마우스 이벤트 디스패치 (`viewer_controller.js`, `recommend_controller.js`)
+  - `src/controller/`: 사용자 인터랙션, 키보드/마우스 이벤트 디스패치 (`viewer_controller.js`, `immersion_controller.js`, `recommend_controller.js`)
   - `popup.html`, `popup.js`: 확장 프로그램 팝업 설정 UI
 
 ## 2. 단방향 레이어 의존성 헌법 (Unidirectional Layer Rules)

@@ -13,6 +13,7 @@ flowchart TD
     
     Build --> ExtBundle["content.js (Chrome Extension Content Script)"]
     Build --> UserBundle["disagall_viewer.user.js (배너 + 인라인 CSS 포함)"]
+    Build --> SafariSync["safari_extension/.../Resources/ (9종 에셋 자동 동기화)"]
     
     ExtBundle --> DistZip["disagall_viewer.zip (배포 패키지)"]
 ```
@@ -20,7 +21,7 @@ flowchart TD
 ## 2. 도메인 파일 트리 및 단일 책임 (File Tree & SRP)
 
 - **빌드 파이프라인**:
-  - `build.js`: `esbuild`를 프로그래밍 방식으로 호출하여 Chrome 확장과 Userscript 번들을 원클릭 컴파일
+  - `build.js`: `esbuild`를 프로그래밍 방식으로 호출하여 Chrome 확장·Userscript 번들을 원클릭 컴파일하고 `syncSafariResources()`로 Safari 확장 리소스 9종을 자동 동기화
   - `package.json`: 빌드(`npm run build`), 패키징(`npm run pack`), 테스트(`npm test`) 스크립트 정의
 - **엔트리포인트**:
   - `src/extension.js`: Chrome Manifest V3 Content Script 엔트리 (`chrome.runtime.onMessage` 리스너 바인딩)
@@ -28,6 +29,7 @@ flowchart TD
 - **산출물**:
   - `content.js`: 번들링된 Chrome 확장용 실행 파일
   - `disagall_viewer.user.js`: 유저스크립트 메타데이터 배너 및 인라인 CSS가 결합된 단일 파일
+  - `safari_extension/DisagallViewerSafari/DisagallViewerSafari Extension/Resources/`: Safari 확장용 9종 동기화 에셋
   - `disagall_viewer.zip`: 웹스토어 배포용 압축 패키지
 
 ## 3. 타 도메인 참조 및 경계 계약 (Cross-Domain Dependencies)

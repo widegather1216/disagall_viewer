@@ -1,8 +1,8 @@
 # 🧪 [post-recommend] Verification & Ticket Logs
 
-- **검증 상태**: `🟢 Sign-Off` (`0건 OPEN DEFECT` — `DEFECT-01~03` 전량 해결 완료)
+- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 2건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
 - **인수 조건 통과율**: `4 / 4 (100%)` · 테스트 매트릭스 `6 / 6 PASS`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 2건`
 
 ---
 
@@ -61,4 +61,30 @@
 
 ## 🧐 4. 코드 품질 감사 리포트 (Audit & Refactoring Logs)
 
-*(현재 등록된 미해결 리팩토링 티켓 없음)*
+### [REFACTOR-01] `triggerPostRecommend()` `!active` 진입 가드 누락 및 `tests/recommend.test.js` Tests 1–7 실모듈 전환
+- **심각도**: 🔴 Must Fix (즉시 조치·릴리즈 차단)
+- **위치**: [`src/controller/recommend_controller.js#L18-L21`](../../../src/controller/recommend_controller.js#L18-L21), [`#L58-L67`](../../../src/controller/recommend_controller.js#L58-L67), [`tests/recommend.test.js#L7-L82`](../../../tests/recommend.test.js#L7-L82), [`#L86-L268`](../../../tests/recommend.test.js#L86-L268), [`#L203-L211`](../../../tests/recommend.test.js#L203-L211)
+- **위반 규칙**: 스펙 가드 계약 위반(`post-recommend/spec.md` §3.1) / 단위 테스트 실효성(자체 복제 스텁 허수 테스트)
+- **발견된 문제**:
+  - `triggerPostRecommend()` 진입부에 `isOverlayActiveNow()` 체크가 없어 뷰어 비활성(`!active`) 상태에서도 호출 시 `dispatchRecommendClick(btn)`가 실행됨(타이머 콜백 내부에만 존재). 또한 `isOverlayActiveNow()`는 `immersion_controller.js`의 `isOverlayActive()`와 중복 구현됨.
+  - `tests/recommend.test.js` Tests 1–7이 파일 상단의 로컬 문자열 정규식 복제 함수만 검증하고 있으며, Test 8에서도 실모듈 `isUserLoggedIn`, `isGalleryCodeEnforced`, `updateRecommendButtonUi`, `RECOMMEND_THROTTLE_MS`, `alreadyVoted`, 500ms/1200ms `midTimer`/`afterTimer` 콜백 검증이 누락됨. Test 4 `catch`의 `AssertionError` 삼킴 및 `dc_sample.html` CWD 의존 존재.
+- **권장 개선안 (Suggested Diff)**:
+  ```text
+  // 1. recommend_controller.js: triggerPostRecommend() 최상단에 `if (!isOverlayActive() || isRecommending) return false;` 추가
+  // 2. tests/recommend.test.js: 로컬 복제 함수 제거 후 recommend_parser.js / recommend_controller.js 실모듈 전수 검증으로 교체
+  ```
+- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+
+### [REFACTOR-02] `triggerPostRecommend()`(105줄·7-depth) 분할 및 `recommend_parser.js` 방어·중첩 개선
+- **심각도**: 🟡 Should Fix (권장 조치)
+- **위치**: [`src/controller/recommend_controller.js#L58-L162`](../../../src/controller/recommend_controller.js#L58-L162), [`src/parser/recommend_parser.js#L64-L84`](../../../src/parser/recommend_parser.js#L64-L84), [`#L139-L143`](../../../src/parser/recommend_parser.js#L139-L143)
+- **위반 규칙**: 함수 길이(30줄)·중첩 깊이(3-depth) / 중복 로직 / 빈 `catch` 블록
+- **발견된 문제**:
+  - `triggerPostRecommend()`가 105줄·7-depth 중첩으로 비대하며 `midTimer`/`afterTimer` 간 `.voted` 상태 갱신 로직과 매직 넘버(`500`, `2500`)가 중복/산재됨.
+  - `recommend_parser.js`: `findFirstValidMatch()`가 5-depth 중첩이며 `dispatchRecommendClick()`에 빈 `catch (e) {}` 블록(`L142`)이 존재함.
+- **권장 개선안 (Suggested Diff)**:
+  ```text
+  // 1. recommend_controller.js: validateRecommendPreconditions(), markCurrentPostVoted(), scheduleRecommendSyncTimers(), releaseRecommendLockAsync() 분리
+  // 2. recommend_parser.js: findFirstValidMatch() 헬퍼 평탄화 및 dispatchRecommendClick() catch 폴백 사유 주석/로깅 정리
+  ```
+- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
