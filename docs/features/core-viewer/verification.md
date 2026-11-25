@@ -1,8 +1,8 @@
 # 🧪 [core-viewer] Verification & Ticket Logs
 
-- **검증 상태**: `🩹 Debugging` (`0건 OPEN DEFECT` · `🧐 1건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사)
+- **검증 상태**: `🟢 Sign-Off` (`0건 OPEN DEFECT` · `0건 OPEN REFACTOR` — 2026-11-25 전수 클린코드 감사 및 최종 회귀 PASS)
 - **인수 조건 통과율**: `9 / 9 Scenarios PASS (100%)`
-- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건`
+- **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
 
 ---
 
@@ -141,4 +141,8 @@
   ```text
   // rAF 큐 스텁 기반 panX/panY/transform/5.0x 테스트, 가로 이미지 피팅 및 toast 타이머 경합 테스트 추가 + 미사용 변수 제거
   ```
-- **현재 상태**: 🟡 OPEN (`systematic-debugger` 위임 대기)
+- **현재 상태**: 🟢 RESOLVED (수정 및 회귀 검증 완료)
+- **해결 내역**:
+  - **수정 파일**: [`tests/core_viewer.test.js`](../../../tests/core_viewer.test.js)
+  - **원인 및 조치**: Test 3 미사용 변수(`openCount`, `origSetAttr`, `origSrcDesc`)를 제거하고, flushing `requestAnimationFrame` 큐 및 fake `setTimeout`/`clearTimeout` 하네스를 갖춘 **Test 9**를 추가해 ① `5.0x` 휠 줌 상한 클램핑·`panX === 60`/`panY === 40` 드래그 팬·`style.transform`/`grabbing`/`grab` 커서·`🔍 확대:` 배지, ② `1600x900` 가로 사진 피팅(`.landscape`, `가로 사진 (1600x900)`), ③ `showViewerToast()` `CONFIG.TOAST_DURATION`(1800ms) 자동 숨김 및 `dismissViewerToast()` 스테일 콜백 무효화, ④ `image_parser.js` 상대 URL(`/viewimage.php?id=hit&no=1&s=thumb`) 정규화 및 `javascript:` 앵커 차단을 검증함.
+  - **회귀 테스트 결과**: `node --check tests/core_viewer.test.js` (`PASS`), `npm test` (`core_viewer` 9/9 포함 5개 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`)

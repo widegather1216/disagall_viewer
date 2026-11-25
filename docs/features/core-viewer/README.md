@@ -1,8 +1,8 @@
 # 📦 [core-viewer] 코어 뷰어 및 이미지 피팅 엔진 (Core Viewer)
 
-- **현재 상태 (Lifecycle)**: `🩹 Debugging`
+- **현재 상태 (Lifecycle)**: `🟢 Sign-Off`
 - **구현 진척도**: `[■■■■] 4/4 Steps`
-- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 1건` ([`verification.md`](./verification.md) 참조)
+- **미해결 티켓 현황**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건` ([`verification.md`](./verification.md) 참조)
 - **관련 문서**: [`architecture.md`](./architecture.md) | [`spec.md`](./spec.md) | [`verification.md`](./verification.md) | [`decisions.md`](./decisions.md)
 
 ---
@@ -29,14 +29,11 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-25 / `systematic-debugger` / `core-viewer` [`REFACTOR-02`](./verification.md#refactor-02-viewer_controllerjs610줄overlayjs359줄-책임-분리-userscriptjs-계층-우회-및-image_parserjs-방어중복-정리) 해결 (`viewer_controller.js`·`overlay.js`·`zoom_pan.js` 책임 분리 및 라인 상한 준수, `userscript.js` 단방향 경유, `image_parser.js` 스킴/상대 URL/중복 정리 및 번들 동기화)
+- **직전 완료 작업**: 2026-11-25 / `systematic-debugger` / `core-viewer` [`REFACTOR-03`](./verification.md#refactor-03-testscore_viewertestjs-줌-변환가로-피팅토스트-타이머-테스트-커버리지-보강-및-위생-정리) 해결 (`tests/core_viewer.test.js` 미사용 변수 제거, flushing rAF 큐·fake timer 기반 Test 9 추가: `5.0x` 줌 상한·드래그 팬·가로 피팅·토스트 타이머 경합·상대/`javascript:` URL 검증 및 `🟢 Sign-Off` 확정)
 - **생성/수정된 핵심 파일**:
-  - [`src/state.js`](../../../src/state.js): `state.quickLauncherTimer: null` 추가
-  - [`src/controller/image_loader.js`](../../../src/controller/image_loader.js), [`src/controller/overlay_bindings.js`](../../../src/controller/overlay_bindings.js), [`src/controller/viewer_shortcuts.js`](../../../src/controller/viewer_shortcuts.js), [`src/controller/viewer_controller.js`](../../../src/controller/viewer_controller.js): 로더·바인딩·단축키 분리(re-export 유지), null/멱등 가드, `pagehide` 정리 및 유저스크립트 브릿지 API 추가
-  - [`src/ui/overlay_template.js`](../../../src/ui/overlay_template.js), [`src/ui/overlay.js`](../../../src/ui/overlay.js), [`src/ui/zoom_pan.js`](../../../src/ui/zoom_pan.js), [`content.css`](../../../content.css): 마크업/피팅 분할, `formatImageOrientationLabel()` 공용화, `CONFIG.ZOOM_EPSILON`·중복 팬 리셋 통합, 데드 CSS 제거
-  - [`src/userscript.js`](../../../src/userscript.js), [`src/extension.js`](../../../src/extension.js), [`src/parser/image_parser.js`](../../../src/parser/image_parser.js): 단방향 controller 위임, `message` null 가드, `http:`/`https:`·상대 URL·`javascript:` 앵커 차단 및 단일 패스/중첩 컨테이너 필터링
+  - [`tests/core_viewer.test.js`](../../../tests/core_viewer.test.js): Test 3 미사용 변수(`openCount`, `origSetAttr`, `origSrcDesc`) 제거 및 Test 9 추가
 - **검증 완료된 테스트 실행 명령어**:
-  - `npm run build` (`PASS`), `npm test` (`core_viewer` 8/8 포함 5개 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
-- **Working Tree State**: 🟡 Uncommitted Fix & Docs (`REFACTOR-02` 수정·번들·위키 반영 완료, 커밋 전)
+  - `node --check tests/core_viewer.test.js` (`PASS`), `npm test` (`core_viewer` 9/9 포함 5개 스위트 `PASS`), `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`)
+- **Working Tree State**: 🟡 Uncommitted Fix & Docs (`REFACTOR-02~03` 수정·테스트·위키 반영 완료, 커밋 전)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
-  - `core-viewer` 잔여 티켓: [`REFACTOR-03`](./verification.md#refactor-03-testscore_viewertestjs-줌-변환가로-피팅토스트-타이머-테스트-커버리지-보강-및-위생-정리) (🟡 Should Fix). 전역 잔여 티켓은 `core-viewer` `REFACTOR-03` / `modular-bundler-migration` `REFACTOR-01`.
+  - `core-viewer` 잔여 티켓 0건 (`🟢 Sign-Off` 확정). 전역 잔여 티켓은 `modular-bundler-migration` `REFACTOR-01`.
