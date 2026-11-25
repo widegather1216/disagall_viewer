@@ -10,15 +10,11 @@ import {
   dispatchRecommendClick
 } from '../parser/recommend_parser.js';
 import { showViewerToast } from '../ui/overlay.js';
+import { isOverlayActive } from './immersion_controller.js';
 
 let lastRecommendTime = 0;
 let isRecommending = false;
 let hasVotedCurrentPost = false;
-
-function isOverlayActiveNow() {
-  const { overlayEl } = state.elements;
-  return Boolean(overlayEl && overlayEl.classList && overlayEl.classList.contains('active'));
-}
 
 export function clearRecommendTimers() {
   if (Array.isArray(state.recommendTimers)) {
@@ -30,6 +26,13 @@ export function clearRecommendTimers() {
     state.recommendUnlockTimer = null;
   }
   isRecommending = false;
+}
+
+export function resetRecommendSessionState() {
+  lastRecommendTime = 0;
+  isRecommending = false;
+  hasVotedCurrentPost = false;
+  clearRecommendTimers();
 }
 
 export function updateRecommendButtonUi() {
@@ -56,8 +59,8 @@ export function updateRecommendButtonUi() {
 }
 
 export function triggerPostRecommend() {
+  if (!isOverlayActive() || isRecommending) return false;
   const { recommendBtnEl } = state.elements;
-  if (isRecommending) return false;
 
   const now = Date.now();
   if (now - lastRecommendTime < CONFIG.RECOMMEND_THROTTLE_MS) {
@@ -108,7 +111,7 @@ export function triggerPostRecommend() {
     state.recommendTimers = [];
 
     const midTimer = setTimeout(() => {
-      if (!isOverlayActiveNow()) return;
+      if (!isOverlayActive()) return;
       const midCount = getPostRecommendCount();
       updateRecommendButtonUi();
 
@@ -120,7 +123,7 @@ export function triggerPostRecommend() {
     }, CONFIG.RECOMMEND_SYNC_DELAYS[0]);
 
     const afterTimer = setTimeout(() => {
-      if (!isOverlayActiveNow()) return;
+      if (!isOverlayActive()) return;
       const afterCount = getPostRecommendCount();
       updateRecommendButtonUi();
 

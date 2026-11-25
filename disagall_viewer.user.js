@@ -1016,131 +1016,6 @@
     }
   }
 
-  // src/controller/recommend_controller.js
-  var lastRecommendTime = 0;
-  var isRecommending = false;
-  var hasVotedCurrentPost = false;
-  function isOverlayActiveNow() {
-    const { overlayEl } = state.elements;
-    return Boolean(overlayEl && overlayEl.classList && overlayEl.classList.contains("active"));
-  }
-  function clearRecommendTimers() {
-    if (Array.isArray(state.recommendTimers)) {
-      state.recommendTimers.forEach((timerId) => clearTimeout(timerId));
-      state.recommendTimers = [];
-    }
-    if (state.recommendUnlockTimer !== null) {
-      clearTimeout(state.recommendUnlockTimer);
-      state.recommendUnlockTimer = null;
-    }
-    isRecommending = false;
-  }
-  function updateRecommendButtonUi() {
-    const { recommendBtnEl } = state.elements;
-    if (!recommendBtnEl) return;
-    const count = getPostRecommendCount();
-    const countText = count !== null ? ` (${count})` : "";
-    const isLoggedIn = isUserLoggedIn();
-    const isCodeEnforced = isGalleryCodeEnforced();
-    const lockIcon = !isLoggedIn && isCodeEnforced ? " \u{1F512}" : "";
-    const hintTitle = !isLoggedIn && isCodeEnforced ? "\uAC1C\uB150\uAE00 \uCD94\uCC9C (\uBE44\uD68C\uC6D0 \uCF54\uB4DC/\uB85C\uADF8\uC778 \uC81C\uD55C \uAC24\uB7EC\uB9AC - \uB2E8\uCD95\uD0A4: R)" : "\uAC1C\uB150\uAE00 \uCD94\uCC9C (\uB2E8\uCD95\uD0A4: R)";
-    recommendBtnEl.title = hintTitle;
-    recommendBtnEl.innerHTML = `
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
-    </svg>
-    <span>\uAC1C\uCD94${countText}${lockIcon}</span>
-  `;
-  }
-  function triggerPostRecommend() {
-    const { recommendBtnEl } = state.elements;
-    if (isRecommending) return false;
-    const now = Date.now();
-    if (now - lastRecommendTime < CONFIG.RECOMMEND_THROTTLE_MS) {
-      showViewerToast("\uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.");
-      return false;
-    }
-    const btn = getNativeRecommendButton();
-    if (!btn) {
-      showViewerToast("\uBCF8\uBB38\uC758 \uCD94\uCC9C \uBC84\uD2BC\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
-      return false;
-    }
-    const isAlreadyVoted = hasVotedCurrentPost || isRecommendButtonDisabled(btn) || recommendBtnEl && recommendBtnEl.classList.contains("voted");
-    if (isAlreadyVoted) {
-      showViewerToast("\uC774\uBBF8 \uAC1C\uB150\uAE00 \uCD94\uCC9C\uC744 \uC644\uB8CC\uD55C \uAC8C\uC2DC\uAE00\uC785\uB2C8\uB2E4. \u{1F44D}");
-      return true;
-    }
-    const isLoggedIn = isUserLoggedIn();
-    const isCodeEnforced = isGalleryCodeEnforced();
-    const beforeCount = getPostRecommendCount();
-    isRecommending = true;
-    let shouldUnlockAsync = false;
-    try {
-      const dispatched = dispatchRecommendClick(btn);
-      if (!dispatched) {
-        showViewerToast("\uCD94\uCC9C \uC2E4\uD589\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
-        return false;
-      }
-      lastRecommendTime = now;
-      if (!isLoggedIn && isCodeEnforced) {
-        showViewerToast("\uAC1C\uCD94 \uC2DC\uB3C4 \uC911... (\uBE44\uD68C\uC6D0 \uCF54\uB4DC \uC81C\uD55C \uAC00\uB2A5 \u{1F512})");
-      } else {
-        showViewerToast("\uAC1C\uB150\uAE00 \uCD94\uCC9C\uC744 \uB20C\uB800\uC2B5\uB2C8\uB2E4! \u{1F44D}");
-      }
-      if (Array.isArray(state.recommendTimers)) {
-        state.recommendTimers.forEach((timerId) => clearTimeout(timerId));
-      }
-      state.recommendTimers = [];
-      const midTimer = setTimeout(() => {
-        if (!isOverlayActiveNow()) return;
-        const midCount = getPostRecommendCount();
-        updateRecommendButtonUi();
-        if (midCount !== null && beforeCount !== null && midCount > beforeCount) {
-          hasVotedCurrentPost = true;
-          if (recommendBtnEl) recommendBtnEl.classList.add("voted");
-          showViewerToast("\uAC1C\uB150\uAE00 \uCD94\uCC9C\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4! \u{1F44D}");
-        }
-      }, CONFIG.RECOMMEND_SYNC_DELAYS[0]);
-      const afterTimer = setTimeout(() => {
-        if (!isOverlayActiveNow()) return;
-        const afterCount = getPostRecommendCount();
-        updateRecommendButtonUi();
-        if (afterCount !== null && beforeCount !== null) {
-          if (afterCount > beforeCount) {
-            hasVotedCurrentPost = true;
-            if (recommendBtnEl) recommendBtnEl.classList.add("voted");
-          } else {
-            hasVotedCurrentPost = false;
-            if (!isLoggedIn) {
-              if (recommendBtnEl) recommendBtnEl.classList.remove("voted");
-              showViewerToast("\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD55C \uAC24\uB7EC\uB9AC\uC785\uB2C8\uB2E4. (\uBE44\uD68C\uC6D0 \uCD94\uCC9C \uC81C\uD55C \u{1F512})", 2500);
-            } else {
-              showViewerToast("\uCD94\uCC9C\uC774 \uBC18\uC601\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. (\uC774\uBBF8 \uCD94\uCC9C\uD588\uAC70\uB098 \uC81C\uD55C\uB428)");
-            }
-          }
-        }
-      }, CONFIG.RECOMMEND_SYNC_DELAYS[1]);
-      state.recommendTimers.push(midTimer, afterTimer);
-      shouldUnlockAsync = true;
-      return true;
-    } catch (e) {
-      showViewerToast("\uCD94\uCC9C \uC2E4\uD589 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.");
-      return false;
-    } finally {
-      if (shouldUnlockAsync) {
-        if (state.recommendUnlockTimer !== null) {
-          clearTimeout(state.recommendUnlockTimer);
-        }
-        state.recommendUnlockTimer = setTimeout(() => {
-          isRecommending = false;
-          state.recommendUnlockTimer = null;
-        }, 500);
-      } else {
-        isRecommending = false;
-      }
-    }
-  }
-
   // src/controller/immersion_controller.js
   var FULLSCREEN_TRANSITION_MOUSE_GUARD_MS = 1e3;
   var isHeaderHovered = false;
@@ -1783,6 +1658,127 @@
     });
     bindHeaderHoverEvents(overlayEl);
     bindSliderInteractionEvents(sliderEl);
+  }
+
+  // src/controller/recommend_controller.js
+  var lastRecommendTime = 0;
+  var isRecommending = false;
+  var hasVotedCurrentPost = false;
+  function clearRecommendTimers() {
+    if (Array.isArray(state.recommendTimers)) {
+      state.recommendTimers.forEach((timerId) => clearTimeout(timerId));
+      state.recommendTimers = [];
+    }
+    if (state.recommendUnlockTimer !== null) {
+      clearTimeout(state.recommendUnlockTimer);
+      state.recommendUnlockTimer = null;
+    }
+    isRecommending = false;
+  }
+  function updateRecommendButtonUi() {
+    const { recommendBtnEl } = state.elements;
+    if (!recommendBtnEl) return;
+    const count = getPostRecommendCount();
+    const countText = count !== null ? ` (${count})` : "";
+    const isLoggedIn = isUserLoggedIn();
+    const isCodeEnforced = isGalleryCodeEnforced();
+    const lockIcon = !isLoggedIn && isCodeEnforced ? " \u{1F512}" : "";
+    const hintTitle = !isLoggedIn && isCodeEnforced ? "\uAC1C\uB150\uAE00 \uCD94\uCC9C (\uBE44\uD68C\uC6D0 \uCF54\uB4DC/\uB85C\uADF8\uC778 \uC81C\uD55C \uAC24\uB7EC\uB9AC - \uB2E8\uCD95\uD0A4: R)" : "\uAC1C\uB150\uAE00 \uCD94\uCC9C (\uB2E8\uCD95\uD0A4: R)";
+    recommendBtnEl.title = hintTitle;
+    recommendBtnEl.innerHTML = `
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+    </svg>
+    <span>\uAC1C\uCD94${countText}${lockIcon}</span>
+  `;
+  }
+  function triggerPostRecommend() {
+    if (!isOverlayActive() || isRecommending) return false;
+    const { recommendBtnEl } = state.elements;
+    const now = Date.now();
+    if (now - lastRecommendTime < CONFIG.RECOMMEND_THROTTLE_MS) {
+      showViewerToast("\uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.");
+      return false;
+    }
+    const btn = getNativeRecommendButton();
+    if (!btn) {
+      showViewerToast("\uBCF8\uBB38\uC758 \uCD94\uCC9C \uBC84\uD2BC\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+      return false;
+    }
+    const isAlreadyVoted = hasVotedCurrentPost || isRecommendButtonDisabled(btn) || recommendBtnEl && recommendBtnEl.classList.contains("voted");
+    if (isAlreadyVoted) {
+      showViewerToast("\uC774\uBBF8 \uAC1C\uB150\uAE00 \uCD94\uCC9C\uC744 \uC644\uB8CC\uD55C \uAC8C\uC2DC\uAE00\uC785\uB2C8\uB2E4. \u{1F44D}");
+      return true;
+    }
+    const isLoggedIn = isUserLoggedIn();
+    const isCodeEnforced = isGalleryCodeEnforced();
+    const beforeCount = getPostRecommendCount();
+    isRecommending = true;
+    let shouldUnlockAsync = false;
+    try {
+      const dispatched = dispatchRecommendClick(btn);
+      if (!dispatched) {
+        showViewerToast("\uCD94\uCC9C \uC2E4\uD589\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+        return false;
+      }
+      lastRecommendTime = now;
+      if (!isLoggedIn && isCodeEnforced) {
+        showViewerToast("\uAC1C\uCD94 \uC2DC\uB3C4 \uC911... (\uBE44\uD68C\uC6D0 \uCF54\uB4DC \uC81C\uD55C \uAC00\uB2A5 \u{1F512})");
+      } else {
+        showViewerToast("\uAC1C\uB150\uAE00 \uCD94\uCC9C\uC744 \uB20C\uB800\uC2B5\uB2C8\uB2E4! \u{1F44D}");
+      }
+      if (Array.isArray(state.recommendTimers)) {
+        state.recommendTimers.forEach((timerId) => clearTimeout(timerId));
+      }
+      state.recommendTimers = [];
+      const midTimer = setTimeout(() => {
+        if (!isOverlayActive()) return;
+        const midCount = getPostRecommendCount();
+        updateRecommendButtonUi();
+        if (midCount !== null && beforeCount !== null && midCount > beforeCount) {
+          hasVotedCurrentPost = true;
+          if (recommendBtnEl) recommendBtnEl.classList.add("voted");
+          showViewerToast("\uAC1C\uB150\uAE00 \uCD94\uCC9C\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4! \u{1F44D}");
+        }
+      }, CONFIG.RECOMMEND_SYNC_DELAYS[0]);
+      const afterTimer = setTimeout(() => {
+        if (!isOverlayActive()) return;
+        const afterCount = getPostRecommendCount();
+        updateRecommendButtonUi();
+        if (afterCount !== null && beforeCount !== null) {
+          if (afterCount > beforeCount) {
+            hasVotedCurrentPost = true;
+            if (recommendBtnEl) recommendBtnEl.classList.add("voted");
+          } else {
+            hasVotedCurrentPost = false;
+            if (!isLoggedIn) {
+              if (recommendBtnEl) recommendBtnEl.classList.remove("voted");
+              showViewerToast("\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD55C \uAC24\uB7EC\uB9AC\uC785\uB2C8\uB2E4. (\uBE44\uD68C\uC6D0 \uCD94\uCC9C \uC81C\uD55C \u{1F512})", 2500);
+            } else {
+              showViewerToast("\uCD94\uCC9C\uC774 \uBC18\uC601\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. (\uC774\uBBF8 \uCD94\uCC9C\uD588\uAC70\uB098 \uC81C\uD55C\uB428)");
+            }
+          }
+        }
+      }, CONFIG.RECOMMEND_SYNC_DELAYS[1]);
+      state.recommendTimers.push(midTimer, afterTimer);
+      shouldUnlockAsync = true;
+      return true;
+    } catch (e) {
+      showViewerToast("\uCD94\uCC9C \uC2E4\uD589 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.");
+      return false;
+    } finally {
+      if (shouldUnlockAsync) {
+        if (state.recommendUnlockTimer !== null) {
+          clearTimeout(state.recommendUnlockTimer);
+        }
+        state.recommendUnlockTimer = setTimeout(() => {
+          isRecommending = false;
+          state.recommendUnlockTimer = null;
+        }, 500);
+      } else {
+        isRecommending = false;
+      }
+    }
   }
 
   // src/controller/viewer_controller.js
