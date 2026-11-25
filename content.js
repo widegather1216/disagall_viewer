@@ -203,195 +203,150 @@
     return collected;
   }
 
-  // src/parser/post_navigator.js
-  function extractPostNo(url, origin = typeof window !== "undefined" ? window.location?.origin : "https://gall.dcinside.com") {
-    if (!url) return null;
-    try {
-      const parsed = new URL(url, origin);
-      const no = parsed.searchParams.get("no");
-      if (no) return no;
-      const match = parsed.pathname.match(/\/(\d+)(?:\/|\?|$)/);
-      if (match) return match[1];
-    } catch (e) {
-      const match = url.match(/[?&]no=(\d+)/) || url.match(/\/(\d+)(?:\/|\?|$)/);
-      if (match) return match[1];
+  // src/ui/dom_guards.js
+  var NON_TEXT_INPUT_TYPES = /* @__PURE__ */ new Set([
+    "range",
+    "checkbox",
+    "radio",
+    "button",
+    "submit",
+    "reset",
+    "color",
+    "file",
+    "hidden"
+  ]);
+  function isEditableTarget(target) {
+    if (!target) return false;
+    const tag = typeof target.tagName === "string" ? target.tagName.toUpperCase() : "";
+    if (tag === "INPUT") {
+      const inputType = typeof target.type === "string" ? target.type.toLowerCase() : "text";
+      return !NON_TEXT_INPUT_TYPES.has(inputType);
     }
+    return tag === "TEXTAREA" || tag === "SELECT" || Boolean(target.isContentEditable);
+  }
+  function isExternalModalOpen() {
+    if (typeof document === "undefined" || typeof document.querySelector !== "function") {
+      return false;
+    }
+    const openModal = document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
+    if (!openModal) return false;
+    const { overlayEl } = state.elements;
+    return !overlayEl || typeof overlayEl.contains === "function" && !overlayEl.contains(openModal);
+  }
+
+  // src/ui/no_photo_notice.js
+  var activeNoticeCleanup = null;
+  function clearNoPhotoNoticeTimer() {
+    if (state.noPhotoNoticeTimer === null) return;
+    clearTimeout(state.noPhotoNoticeTimer);
+    state.noPhotoNoticeTimer = null;
+  }
+  function buildNoPhotoNoticeHtml() {
+    return `
+    <div class="disagall-notice-content">
+      <span class="disagall-notice-icon">\u{1F4F7}</span>
+      <span class="disagall-notice-text">\uBCF8\uBB38\uC5D0 \uC0AC\uC9C4\uC774 \uC5C6\uB294 \uAE00\uC785\uB2C8\uB2E4. (\uC0AC\uC9C4 \uD0ED \uBBF8\uC801\uC6A9)</span>
+    </div>
+    <div class="disagall-notice-btns">
+      <button id="disagall-notice-prev" class="disagall-notice-btn" title="\uC774\uC804 \uAE00 (\u2191 / W)">\u2191 \uC774\uC804 \uAE00</button>
+      <button id="disagall-notice-next" class="disagall-notice-btn" title="\uB2E4\uC74C \uAE00 (\u2193 / S)">\u2193 \uB2E4\uC74C \uAE00</button>
+      <button id="disagall-notice-close" class="disagall-notice-btn close" title="\uB2EB\uAE30 (ESC)">\u2715</button>
+    </div>
+  `;
+  }
+  function shouldIgnoreNoticeKey(e) {
+    if (!e || e.repeat) return true;
+    if (e.ctrlKey || e.metaKey || e.altKey) return true;
+    const { overlayEl } = state.elements;
+    if (overlayEl?.classList?.contains("active")) return true;
+    const activeEl = typeof document !== "undefined" ? document.activeElement : null;
+    if (isEditableTarget(e.target) || isEditableTarget(activeEl)) return true;
+    return isExternalModalOpen();
+  }
+  function resolveNoticeKeyAction(e) {
+    if (["ArrowUp", "w", "W"].includes(e.key) || e.code === "KeyW") return "up";
+    if (["ArrowDown", "s", "S"].includes(e.key) || e.code === "KeyS") return "down";
+    if (e.key === "Escape") return "dismiss";
     return null;
   }
-  var ALLOWED_NAV_SCHEMES = /* @__PURE__ */ new Set(["http", "https", "file"]);
-  var EXCLUDED_CLASS_TOKENS = ["notice", "ad", "adv", "ads", "adsense", "survey"];
-  var EXCLUDED_MARKER_SELECTOR = ".sp-notice, .sp-ad, .sp-survey, .icon_notice, .icon_ad, .icon_survey";
-  var EXCLUDED_NUM_TEXTS = /* @__PURE__ */ new Set(["-", "\uACF5\uC9C0", "\uC124\uBB38"]);
-  var EXCLUDED_SUBJECT_TEXTS = /* @__PURE__ */ new Set(["\uACF5\uC9C0", "AD", "\uC124\uBB38"]);
-  function isSafeNavigationHref(rawHref) {
-    if (typeof rawHref !== "string") return false;
-    const trimmed = rawHref.trim();
-    if (!trimmed || trimmed === "#") return false;
-    const normalized = trimmed.replace(/[\u0000-\u0020]+/g, "");
-    const schemeMatch = normalized.match(/^([a-z][a-z0-9+.-]*):/i);
-    if (schemeMatch) {
-      return ALLOWED_NAV_SCHEMES.has(schemeMatch[1].toLowerCase());
-    }
-    return true;
-  }
-  function isSafePostLink(link) {
-    if (!link || !link.href) return false;
-    const rawAttr = typeof link.getAttribute === "function" ? link.getAttribute("href") : null;
-    if (rawAttr !== null && rawAttr !== void 0 && !isSafeNavigationHref(rawAttr)) {
-      return false;
-    }
-    return isSafeNavigationHref(link.href);
-  }
-  function hasClassToken(el, token) {
-    if (!el) return false;
-    if (el.classList && typeof el.classList.contains === "function" && el.classList.contains(token)) {
-      return true;
-    }
-    if (typeof el.className === "string") {
-      return el.className.split(/[\s>]+/).includes(token);
-    }
-    return false;
-  }
-  function isExcludedPostElement(el, numText = "", subjectText = "") {
-    if (!el) return true;
-    if (typeof el.className === "string" && el.className.toLowerCase().includes("notice")) {
-      return true;
-    }
-    if (EXCLUDED_CLASS_TOKENS.some((token) => hasClassToken(el, token))) {
-      return true;
-    }
-    if (el.querySelector && el.querySelector(EXCLUDED_MARKER_SELECTOR)) {
-      return true;
-    }
-    if (EXCLUDED_NUM_TEXTS.has(numText) || EXCLUDED_SUBJECT_TEXTS.has(subjectText)) {
-      return true;
-    }
-    return false;
-  }
-  function isDesktopPostRowValid(tr, currentPostNo) {
-    if (!tr) return false;
-    const titLink = tr.querySelector?.(".gall_tit a:not(.reply_numbox)") || tr.querySelector?.("a");
-    if (!isSafePostLink(titLink)) return false;
-    const numEl = tr.querySelector?.(".gall_num");
-    const subjectEl = tr.querySelector?.(".gall_subject");
-    const numText = numEl ? numEl.textContent.trim() : "";
-    const subjectText = subjectEl ? subjectEl.textContent.trim() : "";
-    if (isExcludedPostElement(tr, numText, subjectText)) return false;
-    const isCurrentPost = hasClassToken(tr, "crt") || typeof tr.className === "string" && tr.className.includes("crt") || !!(tr.querySelector && tr.querySelector(".crt_icon")) || currentPostNo && (tr.dataset && tr.dataset.no === currentPostNo || extractPostNo(titLink.href) === currentPostNo);
-    if (isCurrentPost) return true;
-    if (!numText || isNaN(Number(numText))) return false;
-    return true;
-  }
-  function isMobilePostItemValid(li) {
-    if (!li) return false;
-    const link = li.querySelector?.("a");
-    if (!isSafePostLink(link)) return false;
-    const numEl = li.querySelector?.(".gall_num");
-    const subjectEl = li.querySelector?.(".gall_subject, .subject-txt");
-    const numText = numEl ? numEl.textContent.trim() : "";
-    const subjectText = subjectEl ? subjectEl.textContent.trim() : "";
-    if (isExcludedPostElement(li, numText, subjectText)) return false;
-    return true;
-  }
-  function getValidPostRows(currentPostNo, root = typeof document !== "undefined" ? document : null) {
-    if (!root || !root.querySelectorAll) return [];
-    const tableRows = Array.from(root.querySelectorAll("table.gall_list tbody tr.ub-content, .gall_listwrap table tbody tr.ub-content"));
-    if (tableRows.length > 0) {
-      return tableRows.filter((tr) => isDesktopPostRowValid(tr, currentPostNo));
-    }
-    const mobileItems = Array.from(root.querySelectorAll(".gall-detail-lst li, .gall-thum-btm li"));
-    return mobileItems.filter(isMobilePostItemValid);
-  }
-  function findCurrentPostRowIndex(validRows, currentPostNo) {
-    return validRows.findIndex((row) => {
-      if (hasClassToken(row, "crt") || typeof row.className === "string" && row.className.includes("crt") || !!row.querySelector?.(".crt_icon")) {
-        return true;
+  function createNoticeKeyHandler(dismissNotice, onNavigatePost) {
+    return (e) => {
+      if (shouldIgnoreNoticeKey(e)) return;
+      const action = resolveNoticeKeyAction(e);
+      if (!action) return;
+      if (typeof e.preventDefault === "function") e.preventDefault();
+      if (typeof e.stopPropagation === "function") e.stopPropagation();
+      dismissNotice();
+      if (action !== "dismiss" && typeof onNavigatePost === "function") {
+        onNavigatePost(action);
       }
-      if (currentPostNo) {
-        if (row.dataset && row.dataset.no === currentPostNo) return true;
-        const numEl = row.querySelector?.(".gall_num");
-        if (numEl && numEl.textContent.trim() === currentPostNo) return true;
-        const titLink = row.querySelector?.(".gall_tit a:not(.reply_numbox)") || row.querySelector?.("a");
-        if (titLink && extractPostNo(titLink.href) === currentPostNo) return true;
-      }
-      return false;
-    });
-  }
-  function hasPhotoAttachment(row) {
-    if (!row) return false;
-    const subjectEl = row.querySelector?.(".gall_subject");
-    if (subjectEl) {
-      const subj = subjectEl.textContent.trim();
-      if (subj.includes("\uC0AC\uC9C4")) return true;
-    }
-    const photoIcon = row.querySelector?.(
-      '.icon_pic, .icon_recomimg, .icon_img.icon_pic, .icon_img.icon_recomimg, [class*="icon_pic"], em.icon_pic, em.icon_recomimg'
-    );
-    if (photoIcon) return true;
-    const mobilePhotoIcon = row.querySelector?.('.sp-lst-img, .sp-photo, [class*="sp-lst-img"], [class*="ico_pic"]');
-    if (mobilePhotoIcon) return true;
-    const anyImgIcon = row.querySelector?.(".icon_img");
-    if (anyImgIcon) {
-      const cls = anyImgIcon.className || "";
-      if (!cls.includes("icon_txt") && !cls.includes("survey") && !cls.includes("notice") && !cls.includes("ad")) {
-        return true;
-      }
-    }
-    return false;
-  }
-  var NAV_UNAVAILABLE_MESSAGE = "\uC774\uB3D9\uD560 \uC218 \uC788\uB294 \uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
-  function createUnavailableResult(error) {
-    return {
-      ok: false,
-      status: "unavailable",
-      error,
-      message: NAV_UNAVAILABLE_MESSAGE
     };
   }
-  function getAdjacentPostUrl(direction, preferPhotos = true, currentUrl = typeof window !== "undefined" ? window.location?.href : "", root = typeof document !== "undefined" ? document : null) {
-    const currentPostNo = extractPostNo(currentUrl);
-    const validRows = getValidPostRows(currentPostNo, root);
-    if (validRows.length === 0) {
-      return createUnavailableResult("no_list");
-    }
-    const currentIdx = findCurrentPostRowIndex(validRows, currentPostNo);
-    if (currentIdx === -1) {
-      return createUnavailableResult("current_not_found");
-    }
-    const step = direction === "up" ? -1 : 1;
-    let targetIdx = -1;
-    if (preferPhotos) {
-      let candidateIdx = currentIdx + step;
-      while (candidateIdx >= 0 && candidateIdx < validRows.length) {
-        if (hasPhotoAttachment(validRows[candidateIdx])) {
-          targetIdx = candidateIdx;
-          break;
-        }
-        candidateIdx += step;
+  function bindNoticeButtons(noticeEl, dismissNotice, onNavigatePost) {
+    const navigateFromNotice = (direction) => {
+      dismissNotice();
+      if (typeof onNavigatePost === "function") {
+        onNavigatePost(direction);
       }
-    }
-    if (targetIdx === -1) {
-      const fallbackIdx = currentIdx + step;
-      if (fallbackIdx >= 0 && fallbackIdx < validRows.length) {
-        targetIdx = fallbackIdx;
-      }
-    }
-    if (targetIdx < 0 || targetIdx >= validRows.length) {
-      return direction === "up" ? { ok: false, status: "boundary", error: "top", message: "\uBAA9\uB85D\uC758 \uAC00\uC7A5 \uCD5C\uC2E0 \uAE00\uC785\uB2C8\uB2E4." } : { ok: false, status: "boundary", error: "bottom", message: "\uBAA9\uB85D\uC758 \uB9C8\uC9C0\uB9C9 \uAE00\uC785\uB2C8\uB2E4." };
-    }
-    const targetRow = validRows[targetIdx];
-    const targetLink = targetRow.querySelector?.(".gall_tit a:not(.reply_numbox)") || targetRow.querySelector?.("a");
-    if (!targetLink || !isSafePostLink(targetLink)) {
-      return createUnavailableResult("unsafe_url");
-    }
-    const targetTitle = (targetLink.textContent || "").trim().replace(/\s+/g, " ");
-    return {
-      ok: true,
-      status: "found",
-      url: targetLink.href,
-      title: targetTitle,
-      hasPhoto: hasPhotoAttachment(targetRow)
     };
+    const prevBtn = noticeEl.querySelector?.("#disagall-notice-prev");
+    const nextBtn = noticeEl.querySelector?.("#disagall-notice-next");
+    const closeBtn = noticeEl.querySelector?.("#disagall-notice-close");
+    if (prevBtn) prevBtn.addEventListener("click", () => navigateFromNotice("up"));
+    if (nextBtn) nextBtn.addEventListener("click", () => navigateFromNotice("down"));
+    if (closeBtn) closeBtn.addEventListener("click", dismissNotice);
+  }
+  function scheduleNoPhotoNoticeTimer(dismissNotice) {
+    let fired = false;
+    const timerId = setTimeout(() => {
+      fired = true;
+      dismissNotice();
+    }, CONFIG.NO_PHOTO_NOTICE_DURATION);
+    state.noPhotoNoticeTimer = fired ? null : timerId;
+  }
+  function dismissNoPhotoNotice() {
+    if (activeNoticeCleanup) {
+      const cleanup = activeNoticeCleanup;
+      activeNoticeCleanup = null;
+      cleanup();
+    }
+    clearNoPhotoNoticeTimer();
+    if (typeof document !== "undefined" && typeof document.getElementById === "function") {
+      const existingEl = document.getElementById("disagall-no-photo-notice");
+      if (existingEl && typeof existingEl.remove === "function") {
+        existingEl.remove();
+      }
+    }
+  }
+  function showNoPhotoNotice(onNavigatePost) {
+    dismissNoPhotoNotice();
+    if (typeof document === "undefined" || typeof document.createElement !== "function" || !document.body || typeof document.body.appendChild !== "function") {
+      return;
+    }
+    const noticeEl = document.createElement("div");
+    noticeEl.id = "disagall-no-photo-notice";
+    noticeEl.className = "disagall-no-photo-notice";
+    noticeEl.innerHTML = buildNoPhotoNoticeHtml();
+    document.body.appendChild(noticeEl);
+    let isDismissed = false;
+    let handleNoticeKey = null;
+    const dismissNotice = () => {
+      if (isDismissed) return;
+      isDismissed = true;
+      if (activeNoticeCleanup === dismissNotice) activeNoticeCleanup = null;
+      clearNoPhotoNoticeTimer();
+      if (handleNoticeKey && typeof window !== "undefined" && typeof window.removeEventListener === "function") {
+        window.removeEventListener("keydown", handleNoticeKey);
+      }
+      if (noticeEl && typeof noticeEl.remove === "function") noticeEl.remove();
+    };
+    handleNoticeKey = createNoticeKeyHandler(dismissNotice, onNavigatePost);
+    activeNoticeCleanup = dismissNotice;
+    bindNoticeButtons(noticeEl, dismissNotice, onNavigatePost);
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+      window.addEventListener("keydown", handleNoticeKey);
+    }
+    scheduleNoPhotoNoticeTimer(dismissNotice);
   }
 
   // src/ui/overlay.js
@@ -586,131 +541,282 @@
     }, duration);
     state.toastTimer = fired ? null : timerId;
   }
-  var NON_TEXT_INPUT_TYPES = /* @__PURE__ */ new Set([
-    "range",
-    "checkbox",
-    "radio",
-    "button",
-    "submit",
-    "reset",
-    "color",
-    "file",
-    "hidden"
-  ]);
-  var activeNoticeCleanup = null;
-  function isEditableTarget(target) {
-    if (!target) return false;
-    const tag = typeof target.tagName === "string" ? target.tagName.toUpperCase() : "";
-    if (tag === "INPUT") {
-      const inputType = typeof target.type === "string" ? target.type.toLowerCase() : "text";
-      return !NON_TEXT_INPUT_TYPES.has(inputType);
-    }
-    return tag === "TEXTAREA" || tag === "SELECT" || Boolean(target.isContentEditable);
+
+  // src/parser/post_navigator.js
+  var ALLOWED_NAV_SCHEMES = /* @__PURE__ */ new Set(["http", "https", "file"]);
+  var EXCLUDED_CLASS_TOKENS = ["notice", "ad", "adv", "ads", "adsense", "survey"];
+  var EXCLUDED_MARKER_SELECTOR = ".sp-notice, .sp-ad, .sp-survey, .icon_notice, .icon_ad, .icon_survey";
+  var EXCLUDED_NUM_TEXTS = /* @__PURE__ */ new Set(["-", "\uACF5\uC9C0", "\uC124\uBB38"]);
+  var EXCLUDED_SUBJECT_TEXTS = /* @__PURE__ */ new Set(["\uACF5\uC9C0", "AD", "\uC124\uBB38"]);
+  var PHOTO_ICON_SELECTOR = '.icon_pic, .icon_recomimg, .icon_img.icon_pic, .icon_img.icon_recomimg, [class*="icon_pic"], em.icon_pic, em.icon_recomimg, .sp-lst-img, .sp-photo, [class*="sp-lst-img"], [class*="ico_pic"]';
+  var NON_PHOTO_ICON_TOKENS = ["icon_txt", "survey", "notice", "ad"];
+  var NAV_UNAVAILABLE_MESSAGE = "\uC774\uB3D9\uD560 \uC218 \uC788\uB294 \uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
+  function getClassNameString(el) {
+    return typeof el?.className === "string" ? el.className : "";
   }
-  function isExternalModalOpen() {
-    if (typeof document === "undefined" || typeof document.querySelector !== "function") {
+  function getTrimmedText(el) {
+    return typeof el?.textContent === "string" ? el.textContent.trim() : "";
+  }
+  function queryPostTitleLink(row) {
+    return row?.querySelector?.(".gall_tit a:not(.reply_numbox)") || row?.querySelector?.("a") || null;
+  }
+  function extractPostNo(url, origin = typeof window !== "undefined" ? window.location?.origin : "https://gall.dcinside.com") {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url, origin);
+      const no = parsed.searchParams.get("no");
+      if (no) return no;
+      const match = parsed.pathname.match(/\/(\d+)(?:\/|\?|$)/);
+      if (match) return match[1];
+    } catch (e) {
+      const match = url.match(/[?&]no=(\d+)/) || url.match(/\/(\d+)(?:\/|\?|$)/);
+      if (match) return match[1];
+    }
+    return null;
+  }
+  function isSafeNavigationHref(rawHref) {
+    if (typeof rawHref !== "string") return false;
+    const trimmed = rawHref.trim();
+    if (!trimmed || trimmed === "#") return false;
+    const normalized = trimmed.replace(/[\u0000-\u0020]+/g, "");
+    const schemeMatch = normalized.match(/^([a-z][a-z0-9+.-]*):/i);
+    if (schemeMatch) {
+      return ALLOWED_NAV_SCHEMES.has(schemeMatch[1].toLowerCase());
+    }
+    return true;
+  }
+  function isSafePostLink(link) {
+    if (!link || !link.href) return false;
+    const rawAttr = typeof link.getAttribute === "function" ? link.getAttribute("href") : null;
+    if (rawAttr !== null && rawAttr !== void 0 && !isSafeNavigationHref(rawAttr)) {
       return false;
     }
-    const openModal = document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
-    if (!openModal) return false;
-    const { overlayEl } = state.elements;
-    return !overlayEl || typeof overlayEl.contains === "function" && !overlayEl.contains(openModal);
+    return isSafeNavigationHref(link.href);
   }
-  function dismissNoPhotoNotice() {
-    if (activeNoticeCleanup) {
-      const cleanup = activeNoticeCleanup;
-      activeNoticeCleanup = null;
-      cleanup();
+  function hasClassToken(el, token) {
+    if (!el) return false;
+    if (el.classList && typeof el.classList.contains === "function" && el.classList.contains(token)) {
+      return true;
     }
-    if (state.noPhotoNoticeTimer !== null) {
-      clearTimeout(state.noPhotoNoticeTimer);
-      state.noPhotoNoticeTimer = null;
-    }
-    if (typeof document !== "undefined" && typeof document.getElementById === "function") {
-      const existingEl = document.getElementById("disagall-no-photo-notice");
-      if (existingEl && typeof existingEl.remove === "function") {
-        existingEl.remove();
-      }
-    }
+    const cls = getClassNameString(el);
+    return cls ? cls.split(/[\s>]+/).includes(token) : false;
   }
-  function showNoPhotoNotice(onNavigatePost) {
-    dismissNoPhotoNotice();
-    const noticeEl = document.createElement("div");
-    noticeEl.id = "disagall-no-photo-notice";
-    noticeEl.className = "disagall-no-photo-notice";
-    noticeEl.innerHTML = `
-    <div class="disagall-notice-content">
-      <span class="disagall-notice-icon">\u{1F4F7}</span>
-      <span class="disagall-notice-text">\uBCF8\uBB38\uC5D0 \uC0AC\uC9C4\uC774 \uC5C6\uB294 \uAE00\uC785\uB2C8\uB2E4. (\uC0AC\uC9C4 \uD0ED \uBBF8\uC801\uC6A9)</span>
-    </div>
-    <div class="disagall-notice-btns">
-      <button id="disagall-notice-prev" class="disagall-notice-btn" title="\uC774\uC804 \uAE00 (\u2191 / W)">\u2191 \uC774\uC804 \uAE00</button>
-      <button id="disagall-notice-next" class="disagall-notice-btn" title="\uB2E4\uC74C \uAE00 (\u2193 / S)">\u2193 \uB2E4\uC74C \uAE00</button>
-      <button id="disagall-notice-close" class="disagall-notice-btn close" title="\uB2EB\uAE30 (ESC)">\u2715</button>
-    </div>
-  `;
-    document.body.appendChild(noticeEl);
-    let isDismissed = false;
-    const dismissNotice = () => {
-      if (isDismissed) return;
-      isDismissed = true;
-      if (activeNoticeCleanup === dismissNotice) {
-        activeNoticeCleanup = null;
+  function isExcludedPostElement(el, numText = "", subjectText = "") {
+    if (!el) return true;
+    if (getClassNameString(el).toLowerCase().includes("notice")) return true;
+    if (EXCLUDED_CLASS_TOKENS.some((token) => hasClassToken(el, token))) return true;
+    if (el.querySelector && el.querySelector(EXCLUDED_MARKER_SELECTOR)) return true;
+    return EXCLUDED_NUM_TEXTS.has(numText) || EXCLUDED_SUBJECT_TEXTS.has(subjectText);
+  }
+  function isDesktopPostRowValid(tr, currentPostNo) {
+    if (!tr) return false;
+    const titLink = queryPostTitleLink(tr);
+    if (!isSafePostLink(titLink)) return false;
+    const numText = getTrimmedText(tr.querySelector?.(".gall_num"));
+    const subjectText = getTrimmedText(tr.querySelector?.(".gall_subject"));
+    if (isExcludedPostElement(tr, numText, subjectText)) return false;
+    const isCurrentPost = hasClassToken(tr, "crt") || getClassNameString(tr).includes("crt") || Boolean(tr.querySelector?.(".crt_icon")) || Boolean(currentPostNo && (tr.dataset?.no === currentPostNo || extractPostNo(titLink.href) === currentPostNo));
+    if (isCurrentPost) return true;
+    return Boolean(numText) && !isNaN(Number(numText));
+  }
+  function isMobilePostItemValid(li) {
+    if (!li) return false;
+    const link = li.querySelector?.("a");
+    if (!isSafePostLink(link)) return false;
+    const numText = getTrimmedText(li.querySelector?.(".gall_num"));
+    const subjectText = getTrimmedText(li.querySelector?.(".gall_subject, .subject-txt"));
+    return !isExcludedPostElement(li, numText, subjectText);
+  }
+  function getValidPostRows(currentPostNo, root = typeof document !== "undefined" ? document : null) {
+    if (!root || !root.querySelectorAll) return [];
+    const tableRows = Array.from(root.querySelectorAll("table.gall_list tbody tr.ub-content, .gall_listwrap table tbody tr.ub-content"));
+    if (tableRows.length > 0) {
+      return tableRows.filter((tr) => isDesktopPostRowValid(tr, currentPostNo));
+    }
+    const mobileItems = Array.from(root.querySelectorAll(".gall-detail-lst li, .gall-thum-btm li"));
+    return mobileItems.filter(isMobilePostItemValid);
+  }
+  function findCurrentPostRowIndex(validRows, currentPostNo) {
+    return validRows.findIndex((row) => {
+      if (hasClassToken(row, "crt") || getClassNameString(row).includes("crt") || row.querySelector?.(".crt_icon")) {
+        return true;
       }
-      if (state.noPhotoNoticeTimer !== null) {
-        clearTimeout(state.noPhotoNoticeTimer);
-        state.noPhotoNoticeTimer = null;
-      }
-      if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
-        window.removeEventListener("keydown", handleNoticeKey);
-      }
-      if (noticeEl && typeof noticeEl.remove === "function") {
-        noticeEl.remove();
-      }
+      if (!currentPostNo) return false;
+      if (row.dataset?.no === currentPostNo) return true;
+      if (getTrimmedText(row.querySelector?.(".gall_num")) === currentPostNo) return true;
+      const titLink = queryPostTitleLink(row);
+      return Boolean(titLink && extractPostNo(titLink.href) === currentPostNo);
+    });
+  }
+  function hasPhotoAttachment(row) {
+    if (!row) return false;
+    if (getTrimmedText(row.querySelector?.(".gall_subject")).includes("\uC0AC\uC9C4")) {
+      return true;
+    }
+    if (row.querySelector?.(PHOTO_ICON_SELECTOR)) {
+      return true;
+    }
+    const anyImgIcon = row.querySelector?.(".icon_img");
+    if (!anyImgIcon) return false;
+    const cls = getClassNameString(anyImgIcon);
+    return !NON_PHOTO_ICON_TOKENS.some((token) => cls.includes(token));
+  }
+  function createUnavailableResult(error) {
+    return {
+      ok: false,
+      status: "unavailable",
+      error,
+      message: NAV_UNAVAILABLE_MESSAGE
     };
-    function handleNoticeKey(e) {
-      if (!e || e.repeat) return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const { overlayEl } = state.elements;
-      if (overlayEl && overlayEl.classList && overlayEl.classList.contains("active")) return;
-      const activeEl = typeof document !== "undefined" ? document.activeElement : null;
-      if (isEditableTarget(e.target) || isEditableTarget(activeEl)) return;
-      if (isExternalModalOpen()) return;
-      if (["ArrowUp", "w", "W"].includes(e.key) || e.code === "KeyW") {
-        if (typeof e.preventDefault === "function") e.preventDefault();
-        if (typeof e.stopPropagation === "function") e.stopPropagation();
-        dismissNotice();
-        onNavigatePost("up");
-      } else if (["ArrowDown", "s", "S"].includes(e.key) || e.code === "KeyS") {
-        if (typeof e.preventDefault === "function") e.preventDefault();
-        if (typeof e.stopPropagation === "function") e.stopPropagation();
-        dismissNotice();
-        onNavigatePost("down");
-      } else if (e.key === "Escape") {
-        if (typeof e.preventDefault === "function") e.preventDefault();
-        if (typeof e.stopPropagation === "function") e.stopPropagation();
-        dismissNotice();
+  }
+  function findTargetPostIndex(validRows, currentIdx, step, preferPhotos) {
+    const nextIdx = currentIdx + step;
+    if (nextIdx < 0 || nextIdx >= validRows.length) {
+      return { targetIdx: -1, hasPhoto: false };
+    }
+    if (preferPhotos) {
+      for (let idx = nextIdx; idx >= 0 && idx < validRows.length; idx += step) {
+        if (hasPhotoAttachment(validRows[idx])) {
+          return { targetIdx: idx, hasPhoto: true };
+        }
       }
+      return { targetIdx: nextIdx, hasPhoto: false };
     }
-    activeNoticeCleanup = dismissNotice;
-    const prevBtn = noticeEl.querySelector("#disagall-notice-prev");
-    const nextBtn = noticeEl.querySelector("#disagall-notice-next");
-    const closeBtn = noticeEl.querySelector("#disagall-notice-close");
-    if (prevBtn) {
-      prevBtn.addEventListener("click", () => {
-        dismissNotice();
-        onNavigatePost("up");
-      });
+    return { targetIdx: nextIdx, hasPhoto: hasPhotoAttachment(validRows[nextIdx]) };
+  }
+  function buildFoundPostResult(targetRow, hasPhoto = hasPhotoAttachment(targetRow)) {
+    const targetLink = queryPostTitleLink(targetRow);
+    if (!targetLink || !isSafePostLink(targetLink)) {
+      return createUnavailableResult("unsafe_url");
     }
-    if (nextBtn) {
-      nextBtn.addEventListener("click", () => {
-        dismissNotice();
-        onNavigatePost("down");
-      });
+    const targetTitle = getTrimmedText(targetLink).replace(/\s+/g, " ");
+    return {
+      ok: true,
+      status: "found",
+      url: targetLink.href,
+      title: targetTitle,
+      hasPhoto
+    };
+  }
+  function getAdjacentPostUrl(direction, preferPhotos = true, currentUrl = typeof window !== "undefined" ? window.location?.href : "", root = typeof document !== "undefined" ? document : null) {
+    if (direction !== "up" && direction !== "down") {
+      return createUnavailableResult("invalid_direction");
     }
-    if (closeBtn) closeBtn.addEventListener("click", dismissNotice);
-    window.addEventListener("keydown", handleNoticeKey);
-    state.noPhotoNoticeTimer = setTimeout(dismissNotice, CONFIG.NO_PHOTO_NOTICE_DURATION);
+    const currentPostNo = extractPostNo(currentUrl);
+    const validRows = getValidPostRows(currentPostNo, root);
+    if (validRows.length === 0) return createUnavailableResult("no_list");
+    const currentIdx = findCurrentPostRowIndex(validRows, currentPostNo);
+    if (currentIdx === -1) return createUnavailableResult("current_not_found");
+    const step = direction === "up" ? -1 : 1;
+    const { targetIdx, hasPhoto } = findTargetPostIndex(validRows, currentIdx, step, preferPhotos);
+    if (targetIdx < 0 || targetIdx >= validRows.length) {
+      return direction === "up" ? { ok: false, status: "boundary", error: "top", message: "\uBAA9\uB85D\uC758 \uAC00\uC7A5 \uCD5C\uC2E0 \uAE00\uC785\uB2C8\uB2E4." } : { ok: false, status: "boundary", error: "bottom", message: "\uBAA9\uB85D\uC758 \uB9C8\uC9C0\uB9C9 \uAE00\uC785\uB2C8\uB2E4." };
+    }
+    return buildFoundPostResult(validRows[targetIdx], hasPhoto);
+  }
+
+  // src/controller/post_nav_controller.js
+  var postNavSeq = 0;
+  var autoOpenPollSeq = 0;
+  var postNavCallbacks = {
+    onOpenViewer: () => {
+    },
+    onPreloadAndCollect: () => state.postImages
+  };
+  function setPostNavCallbacks(callbacks = {}) {
+    postNavCallbacks = { ...postNavCallbacks, ...callbacks };
+  }
+  function withAutoOpenStorage(method, ...args) {
+    try {
+      if (typeof sessionStorage !== "undefined" && typeof sessionStorage[method] === "function") {
+        return sessionStorage[method](CONFIG.STORAGE_KEY_AUTO_OPEN, ...args);
+      }
+    } catch (e) {
+    }
+    return null;
+  }
+  function cancelPendingPostNavigation() {
+    postNavSeq += 1;
+    if (state.postNavTimer === null) return false;
+    clearTimeout(state.postNavTimer);
+    state.postNavTimer = null;
+    withAutoOpenStorage("removeItem");
+    return true;
+  }
+  function clearAutoOpenPollTimer() {
+    autoOpenPollSeq += 1;
+    if (state.autoOpenPollTimer === null) return false;
+    clearInterval(state.autoOpenPollTimer);
+    state.autoOpenPollTimer = null;
+    return true;
+  }
+  function buildNavigateToastMessage(direction, result) {
+    const label = direction === "up" ? "\uC704\uCABD \uCD5C\uC2E0 \uAE00" : "\uC544\uB798\uCABD \uC774\uC804 \uAE00";
+    const photoHint = result.hasPhoto ? " \u{1F4F7}" : "";
+    const titleHint = result.title ? ` (${result.title.length > 12 ? result.title.slice(0, 12) + "..." : result.title})` : "";
+    return `${label}\uB85C \uC774\uB3D9 \uC911...${photoHint}${titleHint}`;
+  }
+  function navigatePost(direction) {
+    cancelPendingPostNavigation();
+    const result = getAdjacentPostUrl(direction);
+    if (!result || !result.ok || result.status !== "found") {
+      showViewerToast(result?.message || "\uC774\uB3D9\uD560 \uC218 \uC788\uB294 \uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+      return;
+    }
+    if (!result.url || !isSafeNavigationHref(result.url)) return;
+    showViewerToast(buildNavigateToastMessage(direction, result));
+    withAutoOpenStorage("setItem", "1");
+    const token = postNavSeq;
+    let fired = false;
+    const timerId = setTimeout(() => {
+      fired = true;
+      if (token !== postNavSeq) return;
+      state.postNavTimer = null;
+      if (typeof window !== "undefined" && window.location) {
+        window.location.href = result.url;
+      }
+    }, CONFIG.POST_NAV_DELAY);
+    state.postNavTimer = fired ? null : timerId;
+  }
+  function stopPollInterval(pollCtx) {
+    pollCtx.stopped = true;
+    if (pollCtx.timerId !== null) clearInterval(pollCtx.timerId);
+  }
+  function runAutoOpenPollTick(pollCtx, callbacks) {
+    if (pollCtx.token !== autoOpenPollSeq) {
+      stopPollInterval(pollCtx);
+      return;
+    }
+    pollCtx.attempts += 1;
+    callbacks.onPreloadAndCollect();
+    if (state.postImages.length > 0) {
+      stopPollInterval(pollCtx);
+      clearAutoOpenPollTimer();
+      callbacks.onOpenViewer(null, true);
+      return;
+    }
+    if (pollCtx.attempts >= pollCtx.maxAttempts) {
+      stopPollInterval(pollCtx);
+      clearAutoOpenPollTimer();
+      showNoPhotoNotice((dir) => navigatePost(dir));
+    }
+  }
+  function startAutoOpenPolling(callbacks = postNavCallbacks) {
+    clearAutoOpenPollTimer();
+    const pollCtx = {
+      attempts: 0,
+      maxAttempts: CONFIG.AUTO_OPEN_MAX_ATTEMPTS,
+      token: autoOpenPollSeq,
+      stopped: false,
+      timerId: null
+    };
+    pollCtx.timerId = setInterval(() => runAutoOpenPollTick(pollCtx, callbacks), CONFIG.AUTO_OPEN_POLL_INTERVAL);
+    state.autoOpenPollTimer = pollCtx.stopped ? null : pollCtx.timerId;
+  }
+  function checkAutoOpen(callbacks = postNavCallbacks) {
+    if (withAutoOpenStorage("getItem") !== "1") return;
+    withAutoOpenStorage("removeItem");
+    startAutoOpenPolling(callbacks);
   }
 
   // src/ui/zoom_pan.js
@@ -1796,8 +1902,6 @@
   // src/controller/viewer_controller.js
   var imageLoadSeq = 0;
   var renderedLoadSeq = -1;
-  var postNavSeq = 0;
-  var autoOpenPollSeq = 0;
   var boundPageHideWin = null;
   var boundMainImgEls = /* @__PURE__ */ new WeakSet();
   function resolveLazyOriginalUrl(img) {
@@ -1894,52 +1998,6 @@
   }
   function navigate(direction) {
     showImage(state.currentIndex + direction);
-  }
-  function cancelPendingPostNavigation() {
-    postNavSeq += 1;
-    if (state.postNavTimer === null) return false;
-    clearTimeout(state.postNavTimer);
-    state.postNavTimer = null;
-    try {
-      if (typeof sessionStorage !== "undefined" && typeof sessionStorage.removeItem === "function") {
-        sessionStorage.removeItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
-      }
-    } catch (e) {
-    }
-    return true;
-  }
-  function clearAutoOpenPollTimer() {
-    autoOpenPollSeq += 1;
-    if (state.autoOpenPollTimer === null) return false;
-    clearInterval(state.autoOpenPollTimer);
-    state.autoOpenPollTimer = null;
-    return true;
-  }
-  function navigatePost(direction) {
-    cancelPendingPostNavigation();
-    const result = getAdjacentPostUrl(direction);
-    if (!result || !result.ok || result.status !== "found") {
-      showViewerToast(result?.message || "\uC774\uB3D9\uD560 \uC218 \uC788\uB294 \uAC8C\uC2DC\uAE00 \uBAA9\uB85D\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
-      return;
-    }
-    if (!result.url || !isSafeNavigationHref(result.url)) return;
-    const label = direction === "up" ? "\uC704\uCABD \uCD5C\uC2E0 \uAE00" : "\uC544\uB798\uCABD \uC774\uC804 \uAE00";
-    const photoHint = result.hasPhoto ? " \u{1F4F7}" : "";
-    const titleHint = result.title ? ` (${result.title.length > 12 ? result.title.slice(0, 12) + "..." : result.title})` : "";
-    showViewerToast(`${label}\uB85C \uC774\uB3D9 \uC911...${photoHint}${titleHint}`);
-    try {
-      sessionStorage.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, "1");
-    } catch (e) {
-    }
-    const token = postNavSeq;
-    let fired = false;
-    const timerId = setTimeout(() => {
-      fired = true;
-      if (token !== postNavSeq) return;
-      state.postNavTimer = null;
-      window.location.href = result.url;
-    }, CONFIG.POST_NAV_DELAY);
-    state.postNavTimer = fired ? null : timerId;
   }
   var KEY_ACTIONS = {
     "Escape": () => {
@@ -2144,46 +2202,14 @@
     cancelResizeRaf();
     exitFullscreenSafely();
   }
-  function startAutoOpenPolling() {
-    clearAutoOpenPollTimer();
-    let attempts = 0;
-    const maxAttempts = CONFIG.AUTO_OPEN_MAX_ATTEMPTS;
-    const token = autoOpenPollSeq;
-    let stopped = false;
-    let pollTimer = null;
-    pollTimer = setInterval(() => {
-      if (token !== autoOpenPollSeq) {
-        if (pollTimer !== null) clearInterval(pollTimer);
-        return;
-      }
-      attempts++;
+  setPostNavCallbacks({
+    onOpenViewer: (targetSrc, isAuto) => openViewer(targetSrc, isAuto),
+    onPreloadAndCollect: () => {
       forcePreloadPostImages();
       collectPostImages();
-      if (state.postImages.length > 0) {
-        stopped = true;
-        if (pollTimer !== null) clearInterval(pollTimer);
-        clearAutoOpenPollTimer();
-        openViewer(null, true);
-        return;
-      }
-      if (attempts >= maxAttempts) {
-        stopped = true;
-        if (pollTimer !== null) clearInterval(pollTimer);
-        clearAutoOpenPollTimer();
-        showNoPhotoNotice((dir) => navigatePost(dir));
-      }
-    }, CONFIG.AUTO_OPEN_POLL_INTERVAL);
-    state.autoOpenPollTimer = stopped ? null : pollTimer;
-  }
-  function checkAutoOpen() {
-    try {
-      const autoOpen = sessionStorage.getItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
-      if (autoOpen !== "1") return;
-      sessionStorage.removeItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
-      startAutoOpenPolling();
-    } catch (e) {
+      return state.postImages;
     }
-  }
+  });
   function bindContextMenuTracker() {
     document.addEventListener("contextmenu", (e) => {
       const target = e.target;

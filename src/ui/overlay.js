@@ -1,6 +1,15 @@
 // Overlay UI and Notice for Disagall Viewer
 import { CONFIG } from '../config.js';
 import { state } from '../state.js';
+import { isEditableTarget, isExternalModalOpen } from './dom_guards.js';
+import { showNoPhotoNotice, dismissNoPhotoNotice } from './no_photo_notice.js';
+
+export {
+  isEditableTarget,
+  isExternalModalOpen,
+  showNoPhotoNotice,
+  dismissNoPhotoNotice,
+};
 
 export function buildOverlayHtml() {
   return `
@@ -213,147 +222,4 @@ export function showViewerToast(message, duration = CONFIG.TOAST_DURATION) {
     if (toastEl && toastEl.classList) toastEl.classList.remove('show');
   }, duration);
   state.toastTimer = fired ? null : timerId;
-}
-
-const NON_TEXT_INPUT_TYPES = new Set([
-  'range',
-  'checkbox',
-  'radio',
-  'button',
-  'submit',
-  'reset',
-  'color',
-  'file',
-  'hidden',
-]);
-
-let activeNoticeCleanup = null;
-
-export function isEditableTarget(target) {
-  if (!target) return false;
-  const tag = typeof target.tagName === 'string' ? target.tagName.toUpperCase() : '';
-  if (tag === 'INPUT') {
-    const inputType = typeof target.type === 'string' ? target.type.toLowerCase() : 'text';
-    return !NON_TEXT_INPUT_TYPES.has(inputType);
-  }
-  return tag === 'TEXTAREA' || tag === 'SELECT' || Boolean(target.isContentEditable);
-}
-
-export function isExternalModalOpen() {
-  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') {
-    return false;
-  }
-  const openModal = document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]');
-  if (!openModal) return false;
-  const { overlayEl } = state.elements;
-  return !overlayEl || (typeof overlayEl.contains === 'function' && !overlayEl.contains(openModal));
-}
-
-export function dismissNoPhotoNotice() {
-  if (activeNoticeCleanup) {
-    const cleanup = activeNoticeCleanup;
-    activeNoticeCleanup = null;
-    cleanup();
-  }
-  if (state.noPhotoNoticeTimer !== null) {
-    clearTimeout(state.noPhotoNoticeTimer);
-    state.noPhotoNoticeTimer = null;
-  }
-  if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
-    const existingEl = document.getElementById('disagall-no-photo-notice');
-    if (existingEl && typeof existingEl.remove === 'function') {
-      existingEl.remove();
-    }
-  }
-}
-
-export function showNoPhotoNotice(onNavigatePost) {
-  dismissNoPhotoNotice();
-
-  const noticeEl = document.createElement('div');
-  noticeEl.id = 'disagall-no-photo-notice';
-  noticeEl.className = 'disagall-no-photo-notice';
-  noticeEl.innerHTML = `
-    <div class="disagall-notice-content">
-      <span class="disagall-notice-icon">📷</span>
-      <span class="disagall-notice-text">본문에 사진이 없는 글입니다. (사진 탭 미적용)</span>
-    </div>
-    <div class="disagall-notice-btns">
-      <button id="disagall-notice-prev" class="disagall-notice-btn" title="이전 글 (↑ / W)">↑ 이전 글</button>
-      <button id="disagall-notice-next" class="disagall-notice-btn" title="다음 글 (↓ / S)">↓ 다음 글</button>
-      <button id="disagall-notice-close" class="disagall-notice-btn close" title="닫기 (ESC)">✕</button>
-    </div>
-  `;
-
-  document.body.appendChild(noticeEl);
-
-  let isDismissed = false;
-
-  const dismissNotice = () => {
-    if (isDismissed) return;
-    isDismissed = true;
-    if (activeNoticeCleanup === dismissNotice) {
-      activeNoticeCleanup = null;
-    }
-    if (state.noPhotoNoticeTimer !== null) {
-      clearTimeout(state.noPhotoNoticeTimer);
-      state.noPhotoNoticeTimer = null;
-    }
-    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
-      window.removeEventListener('keydown', handleNoticeKey);
-    }
-    if (noticeEl && typeof noticeEl.remove === 'function') {
-      noticeEl.remove();
-    }
-  };
-
-  function handleNoticeKey(e) {
-    if (!e || e.repeat) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const { overlayEl } = state.elements;
-    if (overlayEl && overlayEl.classList && overlayEl.classList.contains('active')) return;
-    const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
-    if (isEditableTarget(e.target) || isEditableTarget(activeEl)) return;
-    if (isExternalModalOpen()) return;
-
-    if (['ArrowUp', 'w', 'W'].includes(e.key) || e.code === 'KeyW') {
-      if (typeof e.preventDefault === 'function') e.preventDefault();
-      if (typeof e.stopPropagation === 'function') e.stopPropagation();
-      dismissNotice();
-      onNavigatePost('up');
-    } else if (['ArrowDown', 's', 'S'].includes(e.key) || e.code === 'KeyS') {
-      if (typeof e.preventDefault === 'function') e.preventDefault();
-      if (typeof e.stopPropagation === 'function') e.stopPropagation();
-      dismissNotice();
-      onNavigatePost('down');
-    } else if (e.key === 'Escape') {
-      if (typeof e.preventDefault === 'function') e.preventDefault();
-      if (typeof e.stopPropagation === 'function') e.stopPropagation();
-      dismissNotice();
-    }
-  }
-
-  activeNoticeCleanup = dismissNotice;
-
-  const prevBtn = noticeEl.querySelector('#disagall-notice-prev');
-  const nextBtn = noticeEl.querySelector('#disagall-notice-next');
-  const closeBtn = noticeEl.querySelector('#disagall-notice-close');
-
-  if (prevBtn) {
-    prevBtn.addEventListener('click', () => {
-      dismissNotice();
-      onNavigatePost('up');
-    });
-  }
-  if (nextBtn) {
-    nextBtn.addEventListener('click', () => {
-      dismissNotice();
-      onNavigatePost('down');
-    });
-  }
-  if (closeBtn) closeBtn.addEventListener('click', dismissNotice);
-
-  window.addEventListener('keydown', handleNoticeKey);
-
-  state.noPhotoNoticeTimer = setTimeout(dismissNotice, CONFIG.NO_PHOTO_NOTICE_DURATION);
 }

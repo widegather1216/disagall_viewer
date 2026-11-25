@@ -8,18 +8,22 @@ import {
   POST_BODY_CONTAINER_SELECTORS,
   isPostBodyImage
 } from '../parser/image_parser.js';
-import { getAdjacentPostUrl, isSafeNavigationHref } from '../parser/post_navigator.js';
 import {
   buildOverlayHtml,
   cacheOverlayElements,
   applyFittingAndPadding,
-  showViewerToast,
   dismissViewerToast,
-  showNoPhotoNotice,
   dismissNoPhotoNotice,
   isEditableTarget,
   isExternalModalOpen
 } from '../ui/overlay.js';
+import {
+  setPostNavCallbacks,
+  cancelPendingPostNavigation,
+  clearAutoOpenPollTimer,
+  navigatePost,
+  checkAutoOpen
+} from './post_nav_controller.js';
 import { resetZoom, setupZoomEvents, consumeSuppressedBackdropClick, cancelZoomRaf } from '../ui/zoom_pan.js';
 import { triggerPostRecommend, updateRecommendButtonUi, clearRecommendTimers } from './recommend_controller.js';
 import {
@@ -66,13 +70,15 @@ export {
   applyPaddingSetting,
   applyAutoHideUiSetting,
   applyAutoFullscreenSetting,
-  initImmersionSettings
+  initImmersionSettings,
+  cancelPendingPostNavigation,
+  clearAutoOpenPollTimer,
+  navigatePost,
+  checkAutoOpen
 };
 
 let imageLoadSeq = 0;
 let renderedLoadSeq = -1;
-let postNavSeq = 0;
-let autoOpenPollSeq = 0;
 let boundPageHideWin = null;
 const boundMainImgEls = new WeakSet();
 
@@ -183,60 +189,6 @@ export function showImage(index) {
 
 export function navigate(direction) {
   showImage(state.currentIndex + direction);
-}
-
-export function cancelPendingPostNavigation() {
-  postNavSeq += 1;
-  if (state.postNavTimer === null) return false;
-  clearTimeout(state.postNavTimer);
-  state.postNavTimer = null;
-  try {
-    if (typeof sessionStorage !== 'undefined' && typeof sessionStorage.removeItem === 'function') {
-      sessionStorage.removeItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
-    }
-  } catch (e) {
-    // Non-fatal: sessionStorage access may be blocked under browser privacy or sandbox policies
-  }
-  return true;
-}
-
-export function clearAutoOpenPollTimer() {
-  autoOpenPollSeq += 1;
-  if (state.autoOpenPollTimer === null) return false;
-  clearInterval(state.autoOpenPollTimer);
-  state.autoOpenPollTimer = null;
-  return true;
-}
-
-export function navigatePost(direction) {
-  cancelPendingPostNavigation();
-  const result = getAdjacentPostUrl(direction);
-  if (!result || !result.ok || result.status !== 'found') {
-    showViewerToast(result?.message || '이동할 수 있는 게시글 목록을 찾을 수 없습니다.');
-    return;
-  }
-  if (!result.url || !isSafeNavigationHref(result.url)) return;
-
-  const label = direction === 'up' ? '위쪽 최신 글' : '아래쪽 이전 글';
-  const photoHint = result.hasPhoto ? ' 📷' : '';
-  const titleHint = result.title ? ` (${result.title.length > 12 ? result.title.slice(0, 12) + '...' : result.title})` : '';
-  showViewerToast(`${label}로 이동 중...${photoHint}${titleHint}`);
-
-  try {
-    sessionStorage.setItem(CONFIG.STORAGE_KEY_AUTO_OPEN, '1');
-  } catch (e) {
-    // Non-fatal: sessionStorage may be blocked under browser privacy or sandbox policies
-  }
-
-  const token = postNavSeq;
-  let fired = false;
-  const timerId = setTimeout(() => {
-    fired = true;
-    if (token !== postNavSeq) return;
-    state.postNavTimer = null;
-    window.location.href = result.url;
-  }, CONFIG.POST_NAV_DELAY);
-  state.postNavTimer = fired ? null : timerId;
 }
 
 export const KEY_ACTIONS = {
@@ -470,51 +422,14 @@ export function closeViewer() {
   exitFullscreenSafely();
 }
 
-function startAutoOpenPolling() {
-  clearAutoOpenPollTimer();
-  let attempts = 0;
-  const maxAttempts = CONFIG.AUTO_OPEN_MAX_ATTEMPTS;
-  const token = autoOpenPollSeq;
-  let stopped = false;
-  let pollTimer = null;
-
-  pollTimer = setInterval(() => {
-    if (token !== autoOpenPollSeq) {
-      if (pollTimer !== null) clearInterval(pollTimer);
-      return;
-    }
-    attempts++;
+setPostNavCallbacks({
+  onOpenViewer: (targetSrc, isAuto) => openViewer(targetSrc, isAuto),
+  onPreloadAndCollect: () => {
     forcePreloadPostImages();
     collectPostImages();
-
-    if (state.postImages.length > 0) {
-      stopped = true;
-      if (pollTimer !== null) clearInterval(pollTimer);
-      clearAutoOpenPollTimer();
-      openViewer(null, true);
-      return;
-    }
-    if (attempts >= maxAttempts) {
-      stopped = true;
-      if (pollTimer !== null) clearInterval(pollTimer);
-      clearAutoOpenPollTimer();
-      showNoPhotoNotice((dir) => navigatePost(dir));
-    }
-  }, CONFIG.AUTO_OPEN_POLL_INTERVAL);
-
-  state.autoOpenPollTimer = stopped ? null : pollTimer;
-}
-
-export function checkAutoOpen() {
-  try {
-    const autoOpen = sessionStorage.getItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
-    if (autoOpen !== '1') return;
-    sessionStorage.removeItem(CONFIG.STORAGE_KEY_AUTO_OPEN);
-    startAutoOpenPolling();
-  } catch (e) {
-    // Non-fatal: sessionStorage access may be blocked under strict privacy/sandbox policies
-  }
-}
+    return state.postImages;
+  },
+});
 
 function bindContextMenuTracker() {
   document.addEventListener('contextmenu', (e) => {
