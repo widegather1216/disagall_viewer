@@ -40,6 +40,7 @@ export const state = {
   autoFullscreen: false,
   isUiHidden: false,
   isFullscreenMode: false,
+  isFullscreenPaddingZero: false,
 
   // Zoom & Pan
   zoom: {

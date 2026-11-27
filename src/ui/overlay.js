@@ -85,8 +85,19 @@ function applyStageChromePadding(overlayEl) {
   return heights;
 }
 
+export function getEffectivePadding() {
+  return state.isFullscreenMode && state.isFullscreenPaddingZero ? 0 : state.currentPadding;
+}
+
+export function syncPaddingSliderUi() {
+  const displayPadding = getEffectivePadding();
+  const { sliderEl, sliderValEl } = state.elements;
+  if (sliderEl) sliderEl.value = displayPadding;
+  if (sliderValEl) sliderValEl.textContent = `${displayPadding}px`;
+}
+
 function applyFittedImageDimensions(mainImgEl, nw, nh, headerHeight, footerHeight) {
-  const effectivePadding = state.isFullscreenMode ? 0 : state.currentPadding;
+  const effectivePadding = getEffectivePadding();
   const availableHeight = Math.max(MIN_VIEWPORT_SIZE, window.innerHeight - headerHeight - footerHeight - (effectivePadding * 2));
   const availableWidth = Math.max(MIN_VIEWPORT_SIZE, window.innerWidth - (effectivePadding * 2));
   const scale = Math.min(availableWidth / nw, availableHeight / nh);

@@ -74,6 +74,7 @@
     autoFullscreen: false,
     isUiHidden: false,
     isFullscreenMode: false,
+    isFullscreenPaddingZero: false,
     // Zoom & Pan
     zoom: {
       scale: 1,
@@ -573,8 +574,17 @@ ${buildOverlayFooterHtml()}
     }
     return heights;
   }
+  function getEffectivePadding() {
+    return state.isFullscreenMode && state.isFullscreenPaddingZero ? 0 : state.currentPadding;
+  }
+  function syncPaddingSliderUi() {
+    const displayPadding = getEffectivePadding();
+    const { sliderEl, sliderValEl } = state.elements;
+    if (sliderEl) sliderEl.value = displayPadding;
+    if (sliderValEl) sliderValEl.textContent = `${displayPadding}px`;
+  }
   function applyFittedImageDimensions(mainImgEl, nw, nh, headerHeight, footerHeight) {
-    const effectivePadding = state.isFullscreenMode ? 0 : state.currentPadding;
+    const effectivePadding = getEffectivePadding();
     const availableHeight = Math.max(MIN_VIEWPORT_SIZE, window.innerHeight - headerHeight - footerHeight - effectivePadding * 2);
     const availableWidth = Math.max(MIN_VIEWPORT_SIZE, window.innerWidth - effectivePadding * 2);
     const scale = Math.min(availableWidth / nw, availableHeight / nh);
@@ -1229,10 +1239,9 @@ ${buildOverlayFooterHtml()}
     const normalized = normalizePaddingValue(padding);
     if (normalized === null) return false;
     state.currentPadding = normalized;
-    const { sliderEl, sliderValEl } = state.elements;
-    if (sliderEl) sliderEl.value = normalized;
-    if (sliderValEl) sliderValEl.textContent = `${normalized}px`;
-    if (refit && syncCallbacks.isOverlayActive() && !state.isFullscreenMode && state.zoom.scale <= CONFIG.ZOOM_EPSILON) {
+    syncPaddingSliderUi();
+    const isLockedZero = state.isFullscreenMode && state.isFullscreenPaddingZero;
+    if (refit && syncCallbacks.isOverlayActive() && !isLockedZero && state.zoom.scale <= CONFIG.ZOOM_EPSILON) {
       applyFittingAndPadding();
     }
     return true;
@@ -1438,12 +1447,15 @@ ${buildOverlayFooterHtml()}
     fullscreenMouseGuardUntil = Date.now() + FULLSCREEN_TRANSITION_MOUSE_GUARD_MS;
     if (state.isFullscreenMode && overlayEl.classList.contains("disagall-fullscreen")) {
       updateFullscreenButtonUi(true);
+      syncPaddingSliderUi();
       if (!uiHooks.isAnyUiHiddenClass(overlayEl)) uiHooks.hideUi(true);
       return;
     }
     state.isFullscreenMode = true;
+    state.isFullscreenPaddingZero = true;
     overlayEl.classList.add("disagall-fullscreen");
     updateFullscreenButtonUi(true);
+    syncPaddingSliderUi();
     uiHooks.hideUi(true);
   }
   function exitFullscreenVisualState() {
@@ -1451,8 +1463,10 @@ ${buildOverlayFooterHtml()}
     const wasActive = Boolean(state.isFullscreenMode || overlayEl?.classList?.contains("disagall-fullscreen"));
     clearFullscreenMouseGuard();
     state.isFullscreenMode = false;
+    state.isFullscreenPaddingZero = false;
     if (overlayEl) overlayEl.classList.remove("disagall-fullscreen");
     updateFullscreenButtonUi(false);
+    syncPaddingSliderUi();
     if (wasActive && uiHooks.isOverlayActive()) {
       uiHooks.showUi();
       uiHooks.resetIdleTimer();
@@ -1467,8 +1481,10 @@ ${buildOverlayFooterHtml()}
     hasUserToggledFullscreenInSession = false;
     clearFullscreenMouseGuard();
     state.isFullscreenMode = false;
+    state.isFullscreenPaddingZero = false;
     if (state.elements.overlayEl) state.elements.overlayEl.classList.remove("disagall-fullscreen");
     updateFullscreenButtonUi(false);
+    syncPaddingSliderUi();
   }
   function syncFullscreenState() {
     if (!uiHooks.isOverlayActive()) {
@@ -2114,8 +2130,12 @@ ${buildOverlayFooterHtml()}
     const numeric = typeof rawValue === "string" && rawValue.trim() !== "" ? Number(rawValue) : rawValue;
     const nextPadding = normalizePaddingValue(numeric);
     if (nextPadding === null) return null;
+    state.isFullscreenPaddingZero = false;
     state.currentPadding = nextPadding;
-    if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
+    syncPaddingSliderUi();
+    if (sliderValEl && sliderValEl !== state.elements.sliderValEl) {
+      sliderValEl.textContent = `${state.currentPadding}px`;
+    }
     markLocalPaddingModified();
     applyFittingAndPadding();
     return state.currentPadding;

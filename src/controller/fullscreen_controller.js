@@ -1,6 +1,6 @@
 // Fullscreen State Machine & OS/Fallback Transitions for Disagall Viewer
 import { state } from '../state.js';
-import { showViewerToast } from '../ui/overlay.js';
+import { showViewerToast, syncPaddingSliderUi } from '../ui/overlay.js';
 
 const FULLSCREEN_TRANSITION_MOUSE_GUARD_MS = 1000;
 
@@ -58,12 +58,15 @@ function enterFullscreenVisualState() {
   fullscreenMouseGuardUntil = Date.now() + FULLSCREEN_TRANSITION_MOUSE_GUARD_MS;
   if (state.isFullscreenMode && overlayEl.classList.contains('disagall-fullscreen')) {
     updateFullscreenButtonUi(true);
+    syncPaddingSliderUi();
     if (!uiHooks.isAnyUiHiddenClass(overlayEl)) uiHooks.hideUi(true);
     return;
   }
   state.isFullscreenMode = true;
+  state.isFullscreenPaddingZero = true;
   overlayEl.classList.add('disagall-fullscreen');
   updateFullscreenButtonUi(true);
+  syncPaddingSliderUi();
   uiHooks.hideUi(true);
 }
 
@@ -72,8 +75,10 @@ function exitFullscreenVisualState() {
   const wasActive = Boolean(state.isFullscreenMode || overlayEl?.classList?.contains('disagall-fullscreen'));
   clearFullscreenMouseGuard();
   state.isFullscreenMode = false;
+  state.isFullscreenPaddingZero = false;
   if (overlayEl) overlayEl.classList.remove('disagall-fullscreen');
   updateFullscreenButtonUi(false);
+  syncPaddingSliderUi();
   if (wasActive && uiHooks.isOverlayActive()) { uiHooks.showUi(); uiHooks.resetIdleTimer(); }
 }
 
@@ -86,8 +91,10 @@ export function resetFullscreenState() {
   hasUserToggledFullscreenInSession = false;
   clearFullscreenMouseGuard();
   state.isFullscreenMode = false;
+  state.isFullscreenPaddingZero = false;
   if (state.elements.overlayEl) state.elements.overlayEl.classList.remove('disagall-fullscreen');
   updateFullscreenButtonUi(false);
+  syncPaddingSliderUi();
 }
 
 function syncFullscreenState() {

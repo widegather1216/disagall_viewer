@@ -1,7 +1,7 @@
 // Storage Read/Write, Debounce, Echo-Suppression & Live Sync for Disagall Viewer
 import { CONFIG } from '../config.js';
 import { state } from '../state.js';
-import { applyFittingAndPadding } from '../ui/overlay.js';
+import { applyFittingAndPadding, syncPaddingSliderUi } from '../ui/overlay.js';
 
 const MAX_SELF_PADDING_WRITE_HISTORY = 8;
 
@@ -50,11 +50,10 @@ export function applyPaddingSetting(padding, { refit = true } = {}) {
   if (normalized === null) return false;
 
   state.currentPadding = normalized;
-  const { sliderEl, sliderValEl } = state.elements;
-  if (sliderEl) sliderEl.value = normalized;
-  if (sliderValEl) sliderValEl.textContent = `${normalized}px`;
+  syncPaddingSliderUi();
 
-  if (refit && syncCallbacks.isOverlayActive() && !state.isFullscreenMode && state.zoom.scale <= CONFIG.ZOOM_EPSILON) {
+  const isLockedZero = state.isFullscreenMode && state.isFullscreenPaddingZero;
+  if (refit && syncCallbacks.isOverlayActive() && !isLockedZero && state.zoom.scale <= CONFIG.ZOOM_EPSILON) {
     applyFittingAndPadding();
   }
   return true;

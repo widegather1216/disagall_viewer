@@ -1,6 +1,6 @@
 // Overlay Control Event Bindings (Buttons, Slider, Backdrop) for Disagall Viewer
 import { state } from '../state.js';
-import { applyFittingAndPadding } from '../ui/overlay.js';
+import { applyFittingAndPadding, syncPaddingSliderUi } from '../ui/overlay.js';
 import { consumeSuppressedBackdropClick } from '../ui/zoom_pan.js';
 import { triggerPostRecommend } from './recommend_controller.js';
 import { navigate } from './image_loader.js';
@@ -34,8 +34,12 @@ function applySliderPaddingInput(rawValue, sliderValEl) {
   const numeric = typeof rawValue === 'string' && rawValue.trim() !== '' ? Number(rawValue) : rawValue;
   const nextPadding = normalizePaddingValue(numeric);
   if (nextPadding === null) return null;
+  state.isFullscreenPaddingZero = false;
   state.currentPadding = nextPadding;
-  if (sliderValEl) sliderValEl.textContent = `${state.currentPadding}px`;
+  syncPaddingSliderUi();
+  if (sliderValEl && sliderValEl !== state.elements.sliderValEl) {
+    sliderValEl.textContent = `${state.currentPadding}px`;
+  }
   markLocalPaddingModified();
   applyFittingAndPadding();
   return state.currentPadding;
