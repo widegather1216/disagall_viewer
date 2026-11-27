@@ -71,3 +71,13 @@
   - **초기 지연 `get` 한정 소급 진입**: 지연된 초기 `storage.sync.get` 콜백에서만 아직 열려 있고 수동 `F` 조작(`hasUserToggledFullscreenInSession`)이 없는 세션에 `enterAutoFullscreenOnOpen()`을 소급 실행하며, 팝업 `onChanged` `autoFullscreen: true`는 다음 `openViewer()`부터 적용함.
   - **`defaultPadding` 클램핑·삭제 무시·자기 에코 방어**: `onChanged`의 `newValue === undefined` 삭제 이벤트는 `popup.js`와 동일하게 무시(현재 값 유지)하고, 유한 숫자는 `0~100` 정수로 클램핑하며, 슬라이더 드래그/디바운스 대기/역전된 자기 에코(`pendingSelfPaddingWrites`)·로컬 선편집·선도착 `onChanged`로부터 사용자 조작을 보호함.
 - **결과 및 트레이드오프 (Consequences)**: 스토리지 IPC를 2회→1회로 축소하고 확장·유저스크립트·팝업 간 3개 설정 동기화 및 초기화 레이스 방어를 일원화함.
+
+---
+
+### [ADR-08] 전체화면 임시 0px 표시 동기화 및 슬라이더 조작 시 오버라이드 즉시 해제·저장 정책 (2026-11-27)
+- **상태**: Accepted
+- **배경 및 문제 상황 (Context)**: `ADR-06`에서 전체화면 진입 시 `state.isFullscreenMode ? 0 : state.currentPadding`을 무조건 강제 적용했으나, 상단 헤더의 `#disagall-slider` UI는 활성화된 상태로 노출되어 사용자가 전체화면 중 슬라이더를 드래그해도 숫자·스토리지만 바뀌고 실제 사진 여백에는 반영되지 않는 UX 모순이 발생함.
+- **결정 내용 (Decision)**:
+  - **임시 `0px` 플래그 분리 (`state.isFullscreenPaddingZero`)**: 전체화면 진입 시 `state.isFullscreenPaddingZero = true`로 설정하여 `state.currentPadding`·스토리지를 훼손하지 않고 임시 `0px`을 적용하되, UI 표시는 `getEffectivePadding()`/`syncPaddingSliderUi()`로 실화면과 동일하게 `0` / `'0px'`로 동기화함.
+  - **슬라이더 조작 시 즉시 오버라이드 해제·저장**: 전체화면 상태에서 사용자가 `#disagall-slider`를 조작(`applySliderPaddingInput`)하면 `state.isFullscreenPaddingZero = false`로 즉시 해제하여 조절한 여백을 실시간 리피팅하고 `defaultPadding` 스토리지에도 저장함(전체화면 해제 후 유지, 다음 전체화면 진입 시에는 다시 임시 `0px`으로 시작). 조작 없이 전체화면을 해제하면 기존 `state.currentPadding`으로 복원함.
+- **결과 및 트레이드오프 (Consequences)**: 전체화면 진입 시 즉각적인 풀블리드 몰입감(`ADR-06`)을 유지하면서도, 전체화면 도중 여백 조절이 필요한 사용자의 슬라이더 조작과 화면 표시가 100% 일치함.

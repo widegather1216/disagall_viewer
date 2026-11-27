@@ -1,12 +1,12 @@
 # 🧭 Disagall Viewer Master Control Tower (Living Wiki Hub)
 
-> **최종 업데이트**: 2026-11-25 (by `atomic-commit-crafter`)
+> **최종 업데이트**: 2026-11-27 (by `atomic-commit-crafter`)
 
 ## 🎯 1. Current Spotlight (현재 포커스 & 다음 추천 액션)
 
-- **Active 도메인**: 전체 도메인 `🟢 Sign-Off` (9개 `REFACTOR` 티켓 전건 해결 · 원자적 커밋 완료 · 릴리스 준비 완료)
+- **Active 도메인**: 전체 도메인 `🟢 Sign-Off` (`viewer-immersion` `ADR-08` 원자적 커밋 완료 · 워킹 트리 Clean)
 - **현재 단계 (Stage)**: `🟢 Sign-Off` (전 도메인 미해결 티켓 `0 / 0`)
-- **직전 완료 작업**: 2026-11-25 전 도메인 클린코드 감사 티켓 9건(`REFACTOR-01~03` · `14~15` · `01~02` · `04` · `01`) 순차 해결, `npm run pack`(`disagall_viewer.zip` & Safari 9종 동기화) 및 `npm test` 7개 스위트 통과 후 원자적 커밋(`f09ddb9`~`c70cc78`) 완료
+- **직전 완료 작업**: 2026-11-27 `viewer-immersion` `ADR-08` 구현(`68d93f0`), 단위/E2E 회귀 테스트(`e9d6215`) 및 리빙 위키 동기화 원자적 커밋 완료 (`npm run pack`·`npm test` 7개 스위트 통과)
 - **👉 다음 추천 프롬프트 (복사해서 바로 실행)**:
   > 모든 도메인 `🟢 Sign-Off` 및 커밋 완료! 신규 기능 기획(`기획해줘`) 또는 릴리즈 검증 진행해줘
 
@@ -21,7 +21,7 @@
 | [`post-navigation`](./features/post-navigation/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `11/11 (100%)` | `0 / 0` | `REFACTOR-15` 해결(`no_photo_notice.js`·`post_nav_controller.js` 분리·방어 보강), `🟢 Sign-Off` 확정 |
 | [`post-recommend`](./features/post-recommend/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `6/6 (100%)` | `0 / 0` | `REFACTOR-02` 해결(`triggerPostRecommend` 분할·`findValidInSelector` 평탄화), `🟢 Sign-Off` 확정 |
 | [`modular-bundler-migration`](./features/modular-bundler-migration/README.md) | 🟢 Sign-Off | `[■■■■] 4/4` | `3/3 (100%)` | `0 / 0` | `REFACTOR-01` 해결(`npm test` 7개 스위트 연동·`fake_timer_env.js` 공용화·스크래치 2종 삭제·`build.js` 분할), `🟢 Sign-Off` 확정 |
-| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■■■■■] 8/8` | `16/16 (100%)` | `0 / 0` | `REFACTOR-04` 해결(`storage_sync.js`·`fullscreen_controller.js` 분리·`popup.js` 클램핑·`v1.1.0` 동기화), `🟢 Sign-Off` 확정 |
+| [`viewer-immersion`](./features/viewer-immersion/README.md) | 🟢 Sign-Off | `[■■■■■■■■] 8/8` | `17/17 (100%)` | `0 / 0` | `ADR-08` 구현(전체화면 임시 `0px` 표시 동기화 & 슬라이더 조작 시 즉시 해제·저장), `🟢 Sign-Off` 확정 |
 
 *(※ 상태 범례: `📐 Planning` | `🛠️ Implementing` | `🧐 Auditing` | `🧪 QA Testing` | `🩹 Debugging` | `🟢 Sign-Off`)*
 *(※ 미해결 티켓: `🚨D` = Open `DEFECT-xx` 개수, `🧐R` = Open `REFACTOR-xx` 개수)*
@@ -29,6 +29,10 @@
 ---
 
 ## 🕒 3. 최근 세션 타임라인 (Recent Session Changelog)
+
+- **`[2026-11-27]` `[atomic-commit-crafter]` [`viewer-immersion`]**: `68d93f0` (`feat(immersion)` `ADR-08`), `e9d6215` (`test(immersion)` Test 32/`TC-HP-07`) 및 리빙 위키/관제탑 동기화 커밋 완료.
+
+- **`[2026-11-27]` [`viewer-immersion`]**: `ADR-08` 구현 및 `🟢 Sign-Off` 확정 — `state.isFullscreenPaddingZero` 및 `getEffectivePadding()`/`syncPaddingSliderUi()` 도입으로 전체화면 진입 시 임시 `0px`과 슬라이더 UI(`0px`)를 일치시키고, 전체화면 중 슬라이더 조작 시 오버라이드 즉시 해제·리피팅·`defaultPadding` 저장 적용 (`npm run pack`·`npm test` 7개 스위트·`immersion.test.js` 32/32·`immersion_e2e.test.js` 17/17 PASS).
 
 - **`[2026-11-25]` `[systematic-debugger]` [`modular-bundler-migration`]**: `REFACTOR-01` 해결 — `tests/helpers/fake_timer_env.js`로 `createFakeTimerEnv()` 공용화, 무단언 스크래치 `tests/test_dc_sample.js`·`tests/test_rows_dc.js` 제거, `build.js` `buildExtensionBundle`/`buildUserscriptBundle`/`build`(각 `<= 25`줄) 분할, `package.json` `npm test` 7개 스위트(단위 5+E2E 2) 연동 및 `🟢 Sign-Off` 확정 (`npm run pack`·`npm test` 7개 스위트·`node --check` PASS).
 

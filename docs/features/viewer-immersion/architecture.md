@@ -22,7 +22,7 @@ flowchart TD
 
 - **설정 및 상태 레이어**:
   - `[기존]` `src/config.js`: `UI_IDLE_TIMEOUT`(2500), `STORAGE_KEY_AUTO_HIDE_UI`, `STORAGE_KEY_AUTO_FULLSCREEN`, `PADDING_MIN`(0), `PADDING_MAX`(100), `PADDING_SAVE_DEBOUNCE_MS`(250), `ZOOM_EPSILON`(1.001) 상수 정의
-  - `[기존]` `src/state.js`: `idleTimer`, `paddingSaveTimer`, `autoHideUi`, `autoFullscreen`, `isUiHidden`, `isFullscreenMode` 상태 관리 및 초기화
+  - `[기존]` `src/state.js`: `idleTimer`, `paddingSaveTimer`, `autoHideUi`, `autoFullscreen`, `isUiHidden`, `isFullscreenMode`, `isFullscreenPaddingZero` 상태 관리 및 초기화
 - **사용자 제어 및 비즈니스 레이어**:
   - `[기존]` `src/controller/storage_sync.js`: `defaultPadding`/`autoHideUi`/`autoFullscreen` 3키 통합 로드(`loadInitialSettings`), `onChanged` 실시간 동기화(자기 에코/로컬 편집/비동기 레이스 방어), 패딩 저장 디바운스(`schedulePaddingSave`/`flushPaddingSave`/`persistPaddingSetting`) 및 유한 정수 클램핑(`normalizePaddingValue`/`applyPaddingSetting`) 전담
   - `[기존]` `src/controller/fullscreen_controller.js`: OS 전체화면(`requestFullscreen`/`exitFullscreenSafely`) 및 폴백 전체 채움 상태 머신, `fullscreenchange`/`fullscreenerror` 동기화, 전환 마우스 가드(`isFullscreenTransitionGuarded`) 및 자동 전체화면 진입(`enterAutoFullscreenOnOpen`) 전담
@@ -31,7 +31,7 @@ flowchart TD
   - `[기존]` `popup.html`: 몰입 모드(자동 숨김) 및 뷰어 열 때 자동 전체화면(`#auto-fullscreen-toggle`) 스위치 UI 마크업, 2.5초/H/F 단축키 안내 및 `v1.1.0` 버전 푸터
   - `[기존]` `popup.js`: 스토리지 조회, `normalizePaddingValue`(0~100 유한 정수 클램핑), `bindPopupSlider`(250ms 디바운스/`change` 저장), `bindPopupToggle`(자동 숨김/자동 전체화면 공용) 및 `bindStorageSync`(`onChanged` 타입 가드) 동기화 처리
 - **UI 및 프레젠테이션 레이어**:
-  - `[기존]` `src/ui/overlay.js`: 헤더 전체화면 버튼(`#disagall-btn-fullscreen`), 하단 키힌트 바(`H UI숨김`, `F 전체화면`) 및 UI 숨김/전체화면(`effectivePadding = 0`) 연동 동적 피팅(`applyFittingAndPadding`, `.disagall-stage` 안전 패딩 동기화)
+  - `[기존]` `src/ui/overlay.js`: 헤더 전체화면 버튼(`#disagall-btn-fullscreen`), 하단 키힌트 바(`H UI숨김`, `F 전체화면`), `getEffectivePadding()`/`syncPaddingSliderUi()` 임시 `0px` 표시 동기화 및 UI 숨김/전체화면 연동 동적 피팅(`applyFittingAndPadding`, `.disagall-stage` 안전 패딩 동기화)
   - `[기존]` `src/ui/zoom_pan.js`: 줌/팬 제어 및 `1.0x` 복귀 시 현재 UI 상태에 맞춘 `applyFittingAndPadding()` 재동기화
   - `[기존]` `content.css`: `.disagall-header`/`.disagall-footer` 절대 위치 오버레이, `.disagall-stage` 상하 패딩 트랜지션, `.disagall-idle`/`.disagall-ui-hidden` 페이드아웃·커서 숨김(드래그 커서 유지 포함) 정의
 - **테스트 레이어**:

@@ -14,6 +14,7 @@
 - `state.autoFullscreen`: `boolean` (뷰어 열 때 자동 전체화면 설정 여부, 기본 `false`)
 - `state.isUiHidden`: `boolean` (현재 수동 UI 숨김 상태 여부 플래그, 기본 `false`)
 - `state.isFullscreenMode`: `boolean` (OS 전체화면 또는 `autoFullscreen` 폴백 꽉 채움 활성 상태, 기본 `false`)
+- `state.isFullscreenPaddingZero`: `boolean` (전체화면 진입 시 적용되는 임시 `0px` 여백 오버라이드 활성 플래그, 기본 `false`)
 - `state.elements.stageEl`: `HTMLElement | null` (`#disagall-stage` 캐시 참조)
 - `state.elements.fullscreenBtnEl`: `HTMLButtonElement | null` (`#disagall-btn-fullscreen` 캐시 참조)
 - **UI 숨김 연동 동적 피팅 (`src/ui/overlay.js`, `content.css`)**:
@@ -22,9 +23,10 @@
 - **줌 연동 보호 (`src/controller/immersion_controller.js`, `src/ui/zoom_pan.js`)**:
   - `showUi()` / `hideUi()` 상태 전이 시 `state.zoom.scale <= 1.001`일 때만 `applyFittingAndPadding()` 호출 (확대 중 크기 고정)
   - `resetZoom()` 및 휠 축소로 `1.0x` 복귀 시 `applyFittingAndPadding()` 호출하여 현재 UI 상태에 맞춰 즉시 리피팅
-- **전체화면 모드 & 자동 진입 폴백 (`popup.html`, `popup.js`, `overlay.js`, `immersion_controller.js`, `viewer_controller.js`)**:
+- **전체화면 모드 & 자동 진입 폴백 (`popup.html`, `popup.js`, `overlay.js`, `fullscreen_controller.js`, `overlay_bindings.js`, `viewer_controller.js`)**:
   - 헤더 `#disagall-btn-fullscreen` 버튼 + `F` 단축키 + `fullscreenchange`/`webkitfullscreenchange` 동기화
-  - `state.isFullscreenMode === true` 동안 `state.currentPadding` 저장값을 훼손하지 않고 임시 `effectivePadding = 0` 및 `hideUi(true)` 적용, 해제 시 원래 여백 및 UI 복구
+  - 전체화면 진입 시 `state.isFullscreenPaddingZero = true`로 임시 `0px` 및 `hideUi(true)`를 적용하고 `syncPaddingSliderUi()`로 슬라이더 UI(`0` / `'0px'`)를 실화면과 동기화하며, 조작 없이 해제 시 `state.currentPadding`과 UI를 복원 (`ADR-08`)
+  - 전체화면 도중 `#disagall-slider` 조작 시 `state.isFullscreenPaddingZero = false`로 즉시 오버라이드를 해제하여 조절한 여백을 실시간 리피팅하고 `defaultPadding` 스토리지에 저장 (전체화면 해제 후 유지, 다음 전체화면 재진입 시 다시 임시 `0px` 시작)
   - `openViewer()` 시 `state.autoFullscreen === true`이면 `requestFullscreen()` 시도 및 차단 시 `0px`+UI 숨김 폴백 적용 + 토스트 안내
 
 ## 2. 저장소 및 통신 계약 (Storage & Communication Contracts)

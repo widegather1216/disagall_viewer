@@ -1,7 +1,7 @@
 # 🧪 [viewer-immersion] Verification & Ticket Logs
 
-- **검증 상태**: `🟢 Sign-Off` (`0건 OPEN DEFECT` · `🧐 0건 OPEN REFACTOR` — `REFACTOR-04` 해결 완료)
-- **인수 조건 통과율**: `15 / 15 Scenarios PASS (100%)` (`DEFECT-01~03` 및 `REFACTOR-01~04` 전건 해결 완료)
+- **검증 상태**: `🟢 Sign-Off` (`0건 OPEN DEFECT` · `🧐 0건 OPEN REFACTOR` — `ADR-08` 반영 및 검증 완료)
+- **인수 조건 통과율**: `17 / 17 Scenarios PASS (100%)` (`DEFECT-01~03` 및 `REFACTOR-01~04` 전건 해결 완료)
 - **미해결 티켓**: `🚨 DEFECT: 0건` | `🧐 REFACTOR: 0건`
 
 ---
@@ -28,10 +28,10 @@
   - **Given** 뷰어가 활성화되고 이미지(`1.0x`)가 로드된 상태에서,
   - **When** 자동 유휴(`.disagall-idle`) 또는 수동(`H`, `.disagall-ui-hidden`)으로 UI가 숨겨지면,
   - **Then** 헤더·푸터 높이를 제외한 여백(`state.currentPadding`)만 유지한 채 이미지 `maxWidth`/`maxHeight`와 `.disagall-stage` 상하 패딩이 확장·중앙 정렬되고, UI 복원 시 원상 복구된다. 단, `state.zoom.scale > 1.001` 확대 중에는 크기를 고정했다가 `1.0x` 복귀 시 즉시 동기화한다.
-- **AC-06 (전체화면 모드 버튼·여백 0px·자동 전체화면 및 폴백)**:
+- **AC-06 (전체화면 모드 버튼·임시 여백 0px·슬라이더 해제·자동 전체화면 및 폴백)**:
   - **Given** 뷰어가 활성화되어 있거나 팝업에서 `뷰어 열 때 자동 전체화면`(`autoFullscreen`)이 켜져 있을 때,
-  - **When** 헤더 `#disagall-btn-fullscreen` 클릭·`F` 키로 전체화면에 진입하거나 `autoFullscreen === true` 상태로 뷰어를 열면,
-  - **Then** OS 전체화면 진입 시(및 `requestFullscreen` 차단 시 폴백으로) `state.currentPadding` 저장값을 훼손하지 않고 임시 여백 `0px` + UI 즉시 숨김을 적용하며, `fullscreenchange`/`ESC`/`F`/버튼 해제로 종료 시 원래 여백과 UI로 복원된다.
+  - **When** 헤더 `#disagall-btn-fullscreen` 클릭·`F` 키로 전체화면에 진입하거나 `autoFullscreen === true` 상태로 뷰어를 열고, 전체화면 도중 `#disagall-slider`를 조작하거나 조작 없이 해제하면,
+  - **Then** 진입 시 `state.isFullscreenPaddingZero = true`로 임시 `0px`(슬라이더 UI `0px` 동기화) + UI 즉시 숨김을 적용하며, 슬라이더 조작 시 즉시 오버라이드를 해제해 조절한 여백으로 리피팅·저장(`defaultPadding`)하고, 조작 없이 해제 시 원래 `state.currentPadding`과 UI로 복원한다.
 
 ---
 
@@ -54,6 +54,7 @@
 | `TC-BD-05` | Boundary | 팝업 `autoFullscreen` 토글 연동 및 `openViewer` 시 OS 전체화면 진입(허용 시) · `0px`+UI숨김 폴백(거부 시) | `AC-06` | `PASS (Fixed in DEFECT-03)` | [`DEFECT-03`](#defect-03-chromestoragesync-%EC%84%A4%EC%A0%95-%EB%8F%99%EA%B8%B0%ED%99%94-%EB%8B%A8%EC%A0%88defaultpadding-%EB%B0%8F-%EB%B9%84%EB%8F%99%EA%B8%B0-%EC%B4%88%EA%B8%B0%ED%99%94-%EB%A0%88%EC%9D%B4%EC%8A%A4) (비동기 `storage.sync.get` 지연 도착 시 `44px`·`autoFullscreen` 소급 진입 검증) |
 | `TC-NG-03` | Negative | 전체화면 진입·해제 반복 및 `closeViewer` 호출 시 사용자 저장 여백(`state.currentPadding`) 훼손 방지 | `AC-06` | `✅ PASS` | [`immersion.test.js`](../../../tests/immersion.test.js) (Test 24~25) + [`immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js) (`defaultPadding=44` 보존 및 해제 후 `622px` 복원·`closeViewer` 정리 검증) |
 | `TC-BD-06` | Boundary | 한글 IME(`key='ㄹ'`, `code='KeyF'`) 및 패딩 슬라이더(`type="range"`) 포커스 상태에서 `F` 전체화면 토글 검증 | `AC-06` | `✅ PASS` | [`immersion.test.js`](../../../tests/immersion.test.js) (Test 26) + [`immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js) (한글 IME `KeyF`/`KeyH`·슬라이더 포커스 통과·텍스트 `<input>` 차단 유지·수동 `F` 폴백 토글 검증) |
+| `TC-HP-07` | Happy | 전체화면 진입 시 슬라이더 `0px` 표시 동기화, 전체화면 도중 슬라이더 드래그 시 오버라이드 즉시 해제·리피팅·저장 및 재진입 시 `0px` 복귀 | `AC-06` | `✅ PASS` | [`immersion.test.js`](../../../tests/immersion.test.js) (Test 32) + [`immersion_e2e.test.js`](../../../tests/immersion_e2e.test.js) (`0px` 표시→`40px` 드래그 `630px` 리피팅·`defaultPadding=40` 저장→유휴 `720px`→해제 유지→재진입 `0px` 초기화 검증) |
 
 ---
 

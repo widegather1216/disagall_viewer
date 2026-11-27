@@ -47,22 +47,18 @@
 
 ## 🔄 3. Latest Session Handoff (최근 세션 인계 노트)
 
-- **직전 완료 작업**: 2026-11-25 / `systematic-debugger` / `viewer-immersion` `REFACTOR-04` 해결 및 **`🟢 Sign-Off`** 확정 (`storage_sync.js`·`fullscreen_controller.js` SRP 분리, `popup.js` 유한 정수 클램핑, `popup.html` `v1.1.0` 정합화)
+- **직전 완료 작업**: 2026-11-27 / `viewer-immersion` `ADR-08` 구현 및 검증 완료 — 전체화면 진입 시 임시 `0px` 패딩 및 슬라이더 UI `0px` 표시 동기화, 전체화면 도중 슬라이더 조작 시 오버라이드 즉시 해제·실시간 리피팅·`defaultPadding` 저장 적용
 - **생성/수정된 핵심 파일**:
-  - `src/config.js`, `src/state.js`: `PADDING_MIN`/`PADDING_MAX`/`PADDING_SAVE_DEBOUNCE_MS`/`ZOOM_EPSILON` 및 `state.paddingSaveTimer` 추가
-  - `src/controller/storage_sync.js`, `src/controller/fullscreen_controller.js`, `src/controller/immersion_controller.js`, `src/controller/viewer_controller.js`: 스토리지 동기화(249줄)·전체화면 상태 머신(268줄) 분리, `immersion_controller.js`(258줄) 슬림화 및 동일 참조 re-export 유지
-  - `popup.js`, `popup.html`, `tests/immersion.test.js`, `content.js`, `disagall_viewer.user.js`: `normalizePaddingValue` 클램핑 통합, `v1.1.0` 푸터 동기화, Test 31 추가 및 번들 재빌드
+  - `src/state.js`, `src/ui/overlay.js`: `state.isFullscreenPaddingZero` 플래그 및 `getEffectivePadding()`/`syncPaddingSliderUi()` 추가
+  - `src/controller/fullscreen_controller.js`, `src/controller/overlay_bindings.js`, `src/controller/storage_sync.js`: 전체화면 진입/해제/리셋 시 임시 `0px` 슬라이더 UI 동기화, 슬라이더 입력 시 오버라이드 즉시 해제 및 리피팅 가드(`isLockedZero`) 정합화
+  - `tests/immersion.test.js`, `tests/immersion_e2e.test.js`: Test 24/29.1/TC-BD-05b 갱신 및 Test 32/`TC-HP-07` 추가, `npm run pack` 번들·ZIP 동기화
 - **Recent Commits**:
-  - `ac95f7c` - `docs(immersion): mark REFACTOR-04 resolved and sign off viewer-immersion`
-  - `b551422` - `test(immersion): verify popup finite integer clamping and controller modularization`
-  - `241c9d2` - `refactor(immersion): extract storage_sync and fullscreen_controller and clamp popup padding`
-  - `9e6e693` - `test(immersion): add unit and E2E tests for fullscreen transition mouse guard`
-  - `f8e8887` - `fix(immersion): suppress mousemove UI wake flicker during fullscreen transition`
+  - `e9d6215` - `test(immersion): verify fullscreen 0px slider sync and live unlock`
+  - `68d93f0` - `feat(immersion): allow live padding slider override in fullscreen mode`
 - **Working Tree State**: 🟢 Clean (No uncommitted changes)
 - **실행 검증 명령 및 결과**:
-  - `npm run build` (`PASS`), `npm test` (7개 테스트 스위트·`immersion.test.js` 31/31 `PASS`)
-  - `node tests/immersion_e2e.test.js` (`16/16 PASS`), `node tests/post_navigation_e2e.test.js` (`11/11 PASS`), `node --check` (`PASS`)
+  - `npm run pack` (`PASS`), `npm test` (7개 테스트 스위트·`immersion.test.js` 32/32·`immersion_e2e.test.js` 17/17 `PASS`), `node --check popup.js build.js` (`PASS`)
   - 미해결 티켓 (`0 / 0` — `🚨 DEFECT: 0건`, `🧐 REFACTOR: 0건`)
 - **다음 세션 포커스 및 주의사항 (Caveats)**:
   - `viewer-immersion` 포함 전 도메인 구현/QA/감사 티켓 `0건`으로 `🟢 Sign-Off` 확정 상태.
-  - 참고: 실제 오버레이 패딩 슬라이더의 DOM ID는 `#disagall-slider`(스펙 표기 `#disagall-padding-slider` 대신 실제 마크업 `src/ui/overlay.js#L30`)임.
+  - 참고: 실제 오버레이 패딩 슬라이더의 DOM ID는 `#disagall-slider`(스펙 표기 `#disagall-padding-slider` 대신 실제 마크업 `src/ui/overlay_template.js#L31`)임.
