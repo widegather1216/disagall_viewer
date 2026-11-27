@@ -504,6 +504,7 @@ async function run() {
     state.autoFullscreen = false;
     state.isUiHidden = false;
     state.isFullscreenMode = false;
+    state.isFullscreenPaddingZero = false;
     state.zoom.isDragging = false;
     state.zoom.scale = 1.0;
     state.elements.overlayEl = null;
@@ -1149,12 +1150,14 @@ async function run() {
   });
   console.log('✅ Test 23: autoFullscreen CONFIG/state/popup.html/popup.js storage sync verified');
 
-  // 24. Verify header fullscreen button, 0px temporary padding, immediate UI hide, and fullscreenchange restore
+  // 24. Verify header fullscreen button, 0px temporary padding + slider UI sync, immediate UI hide, and fullscreenchange restore
   await withControllerHarness(async ({
     controller,
     overlayNode,
     stageNode,
     mainImgNode,
+    sliderNode,
+    sliderValNode,
     fullscreenBtnNode,
     fullscreenLabelNode,
     mockDocument,
@@ -1171,12 +1174,13 @@ async function run() {
     applyFittingAndPadding();
     assert.strictEqual(mainImgNode.style.maxHeight, '638px', 'Normal UI with 36px padding fits 800-52-38-72=638px');
 
-    // Click header fullscreen button -> enters OS fullscreen, sets 0px temp padding, hides UI immediately
+    // Click header fullscreen button -> enters OS fullscreen, sets 0px temp padding, syncs slider UI to 0px, hides UI immediately
     fullscreenBtnNode.dispatchEvent('click');
     await Promise.resolve();
     await Promise.resolve();
     assert.strictEqual(mockDocument.fullscreenElement, overlayNode);
     assert.strictEqual(state.isFullscreenMode, true, 'Entering fullscreen must set state.isFullscreenMode=true');
+    assert.strictEqual(state.isFullscreenPaddingZero, true, 'Entering fullscreen must set state.isFullscreenPaddingZero=true');
     assert.strictEqual(overlayNode.classList.contains('disagall-fullscreen'), true);
     assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), true, 'Entering fullscreen must immediately hide UI');
     assert.strictEqual(fullscreenBtnNode.classList.contains('active'), true);
@@ -1184,18 +1188,23 @@ async function run() {
     assert.strictEqual(fullscreenLabelNode.textContent, '전체화면 해제');
     assert.strictEqual(mainImgNode.style.maxHeight, '800px', 'Fullscreen mode must temporarily apply 0px padding (800px)');
     assert.strictEqual(stageNode.style.paddingTop, '0px');
+    assert.strictEqual(Number(sliderNode.value), 0, 'Fullscreen temporary 0px must display 0 on slider UI');
+    assert.strictEqual(sliderValNode.textContent, '0px', 'Fullscreen temporary 0px must display "0px" label');
     assert.strictEqual(state.currentPadding, 36, 'Fullscreen temporary 0px must NOT mutate saved state.currentPadding');
 
     // Native OS ESC exit -> browser clears fullscreenElement and fires fullscreenchange
     mockDocument.fullscreenElement = null;
     mockDocument.dispatchEvent('fullscreenchange');
     assert.strictEqual(state.isFullscreenMode, false, 'fullscreenchange exit must clear state.isFullscreenMode');
+    assert.strictEqual(state.isFullscreenPaddingZero, false, 'fullscreenchange exit must clear state.isFullscreenPaddingZero');
     assert.strictEqual(overlayNode.classList.contains('disagall-fullscreen'), false);
     assert.strictEqual(overlayNode.classList.contains('disagall-ui-hidden'), false, 'Exiting fullscreen must restore UI');
     assert.strictEqual(fullscreenBtnNode.classList.contains('active'), false);
     assert.strictEqual(fullscreenBtnNode.getAttribute('aria-pressed'), 'false');
     assert.strictEqual(fullscreenLabelNode.textContent, '전체화면');
     assert.strictEqual(mainImgNode.style.maxHeight, '638px', 'Exiting fullscreen must restore saved 36px padding fitting');
+    assert.strictEqual(Number(sliderNode.value), 36, 'Exiting fullscreen must restore slider UI value to 36');
+    assert.strictEqual(sliderValNode.textContent, '36px', 'Exiting fullscreen must restore slider UI label to "36px"');
     assert.strictEqual(stageNode.style.paddingTop, '52px');
     assert.strictEqual(stageNode.style.paddingBottom, '38px');
   });
@@ -1731,20 +1740,24 @@ async function run() {
         await Promise.resolve();
 
         assert.strictEqual(state.currentPadding, 44, 'DEFECT-03: Delayed get must sync state.currentPadding=44');
-        assert.strictEqual(Number(sliderNode.value), 44, 'DEFECT-03: Delayed get must sync sliderEl.value=44');
-        assert.strictEqual(sliderValNode.textContent, '44px', 'DEFECT-03: Delayed get must sync sliderValEl=44px');
         assert.strictEqual(state.autoHideUi, false, 'DEFECT-03: Delayed get must sync autoHideUi=false');
         assert.strictEqual(timers.count, 0, 'DEFECT-03: Delayed autoHideUi=false must clear idle timer');
         assert.strictEqual(state.autoFullscreen, true, 'DEFECT-03: Delayed get must sync autoFullscreen=true');
         assert.strictEqual(state.isFullscreenMode, true, 'DEFECT-03: Delayed get must retroactively enter autoFullscreen on open viewer');
+        assert.strictEqual(state.isFullscreenPaddingZero, true, 'ADR-08: Retroactive autoFullscreen engages temporary 0px override');
+        assert.strictEqual(Number(sliderNode.value), 0, 'ADR-08: Fullscreen slider UI displays 0 while temporary 0px override is active');
+        assert.strictEqual(sliderValNode.textContent, '0px', 'ADR-08: Fullscreen slider UI displays "0px" while temporary 0px override is active');
         assert.strictEqual(mockDocument.fullscreenElement, overlayNode);
         assert.strictEqual(mainImgNode.style.maxHeight, '800px', 'Fullscreen applies temp 0px padding');
 
-        // Exit fullscreen -> must restore delayed defaultPadding=44 (800-52-38-88 = 622px)
+        // Exit fullscreen -> must restore delayed defaultPadding=44 (800-52-38-88 = 622px) & slider UI 44px
         controller.handleKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() {} });
         await Promise.resolve();
         await Promise.resolve();
         assert.strictEqual(state.isFullscreenMode, false);
+        assert.strictEqual(state.isFullscreenPaddingZero, false);
+        assert.strictEqual(Number(sliderNode.value), 44, 'Exiting fullscreen must restore sliderEl.value=44');
+        assert.strictEqual(sliderValNode.textContent, '44px', 'Exiting fullscreen must restore sliderValEl=44px');
         assert.strictEqual(mainImgNode.style.maxHeight, '622px', 'Exiting fullscreen must reflect delayed 44px padding');
 
         // 29.2 Live onChanged defaultPadding sync (unzoomed active viewer) + clamping + ignore undefined
@@ -2037,6 +2050,137 @@ async function run() {
     assert(lineCount <= 300, `${relPath} must stay <= 300 lines (actual: ${lineCount})`);
   }
   console.log('✅ Test 31: REFACTOR-04 popup finite clamping, popup.html v1.1.0 & controller line caps verified');
+
+  // 32. ADR-08: Fullscreen temporary 0px override display & live slider unlock with storage persistence
+  await withFakeTimers(async (timers) => {
+    await withControllerHarness(async ({
+      controller,
+      overlayNode,
+      stageNode,
+      mainImgNode,
+      sliderNode,
+      sliderValNode,
+      mockDocument,
+      setRejectFullscreen,
+    }) => {
+      const savedSyncWrites = [];
+      global.chrome = {
+        storage: {
+          sync: {
+            get(_defaults, cb) {
+              cb({ defaultPadding: 24, autoHideUi: true, autoFullscreen: false });
+            },
+            set(payload) {
+              savedSyncWrites.push(payload);
+            },
+          },
+          onChanged: { addListener() {} },
+        },
+      };
+
+      controller.initViewerBase();
+      controller.createOverlay();
+      overlayNode.classList.add('active');
+      mainImgNode.naturalWidth = 1000;
+      mainImgNode.naturalHeight = 2000;
+      state.currentPadding = 24;
+      controller.applyPaddingSetting(24);
+      assert.strictEqual(mainImgNode.style.maxHeight, '662px');
+
+      // 32.1 Enter fullscreen -> temp 0px active, slider UI shows 0 / '0px'
+      controller.handleKeyDown({ key: 'f', code: 'KeyF', preventDefault() {}, stopPropagation() {} });
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(state.isFullscreenMode, true);
+      assert.strictEqual(state.isFullscreenPaddingZero, true);
+      assert.strictEqual(Number(sliderNode.value), 0);
+      assert.strictEqual(sliderValNode.textContent, '0px');
+      assert.strictEqual(mainImgNode.style.maxHeight, '800px');
+
+      // Wake UI inside fullscreen -> header visible, still 0px effective padding (800-52-38 = 710px)
+      controller.showUi();
+      assert.strictEqual(stageNode.style.paddingTop, '52px');
+      assert.strictEqual(stageNode.style.paddingBottom, '38px');
+      assert.strictEqual(mainImgNode.style.maxHeight, '710px');
+      assert.strictEqual(Number(sliderNode.value), 0);
+      assert.strictEqual(sliderValNode.textContent, '0px');
+
+      // 32.2 Drag slider to 50 inside fullscreen -> unlocks temp 0px immediately, refits & persists 50
+      sliderNode.dispatchEvent('input', { target: { value: '50' } });
+      sliderNode.dispatchEvent('change', { target: { value: '50' } });
+      assert.strictEqual(state.isFullscreenPaddingZero, false, 'Slider edit in fullscreen must unlock temp 0px override');
+      assert.strictEqual(state.currentPadding, 50);
+      assert.strictEqual(Number(sliderNode.value), 50);
+      assert.strictEqual(sliderValNode.textContent, '50px');
+      assert.strictEqual(mainImgNode.style.maxHeight, '610px', 'Fullscreen slider 50px with UI visible must fit 800-52-38-100=610px');
+      assert.strictEqual(savedSyncWrites[savedSyncWrites.length - 1].defaultPadding, 50, 'Fullscreen slider change must persist defaultPadding=50');
+
+      // Idle hide inside fullscreen -> expands chrome while preserving unlocked 50px padding (800-100 = 700px)
+      controller.hideUi(false);
+      assert.strictEqual(overlayNode.classList.contains('disagall-idle'), true);
+      assert.strictEqual(mainImgNode.style.maxHeight, '700px');
+
+      // 32.3 Exit fullscreen -> preserves newly saved 50px padding & slider UI
+      controller.handleKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() {} });
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(state.isFullscreenMode, false);
+      assert.strictEqual(state.isFullscreenPaddingZero, false);
+      assert.strictEqual(state.currentPadding, 50);
+      assert.strictEqual(Number(sliderNode.value), 50);
+      assert.strictEqual(sliderValNode.textContent, '50px');
+      assert.strictEqual(mainImgNode.style.maxHeight, '610px');
+
+      // 32.4 Re-enter fullscreen -> starts fresh at temporary 0px while keeping 50px baseline; untouched exit restores 50px
+      controller.handleKeyDown({ key: 'f', code: 'KeyF', preventDefault() {}, stopPropagation() {} });
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(state.isFullscreenPaddingZero, true);
+      assert.strictEqual(Number(sliderNode.value), 0);
+      assert.strictEqual(sliderValNode.textContent, '0px');
+      assert.strictEqual(mainImgNode.style.maxHeight, '800px');
+      assert.strictEqual(state.currentPadding, 50);
+
+      controller.handleKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() {} });
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(state.isFullscreenPaddingZero, false);
+      assert.strictEqual(Number(sliderNode.value), 50);
+      assert.strictEqual(sliderValNode.textContent, '50px');
+      assert.strictEqual(mainImgNode.style.maxHeight, '610px');
+
+      // 32.5 Fallback fullscreen -> slider unlock works, and upgrading to OS fullscreen preserves unlocked padding
+      setRejectFullscreen(true);
+      controller.handleKeyDown({ key: 'f', code: 'KeyF', preventDefault() {}, stopPropagation() {} });
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(mockDocument.fullscreenElement, null);
+      assert.strictEqual(state.isFullscreenMode, true);
+      assert.strictEqual(state.isFullscreenPaddingZero, true);
+      assert.strictEqual(mainImgNode.style.maxHeight, '800px');
+
+      controller.showUi();
+      sliderNode.dispatchEvent('input', { target: { value: '30' } });
+      sliderNode.dispatchEvent('change', { target: { value: '30' } });
+      assert.strictEqual(state.isFullscreenPaddingZero, false);
+      assert.strictEqual(mainImgNode.style.maxHeight, '650px');
+
+      // Upgrade from fallback fullscreen to OS fullscreen must NOT reset unlocked slider override
+      setRejectFullscreen(false);
+      controller.handleKeyDown({ key: 'f', code: 'KeyF', preventDefault() {}, stopPropagation() {} });
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(mockDocument.fullscreenElement, overlayNode);
+      assert.strictEqual(state.isFullscreenMode, true);
+      assert.strictEqual(state.isFullscreenPaddingZero, false, 'Upgrading fallback->OS fullscreen must preserve unlocked slider padding');
+      assert.strictEqual(Number(sliderNode.value), 30);
+      assert.strictEqual(sliderValNode.textContent, '30px');
+      assert.strictEqual(mainImgNode.style.maxHeight, '740px', 'OS fullscreen upgrade with UI hidden must fit 800-60=740px');
+
+      timers.clearAll();
+    });
+  });
+  console.log('✅ Test 32: ADR-08 fullscreen temporary 0px display & live slider unlock persistence verified');
 
   console.log('\n🎉 ALL VIEWER IMMERSION UNIT TESTS PASSED! 🎉');
 }

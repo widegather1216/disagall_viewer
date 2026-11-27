@@ -975,16 +975,18 @@ async function run() {
     await Promise.resolve();
     await Promise.resolve();
 
-    assert.strictEqual(Number(slider.value), 44, 'TC-BD-05b: Delayed get must sync slider value to 44');
-    assert.strictEqual(sliderVal.textContent, '44px', 'TC-BD-05b: Delayed get must sync slider label to 44px');
+    assert.strictEqual(Number(slider.value), 0, 'TC-BD-05b (ADR-08): Retroactive autoFullscreen displays 0 on slider UI');
+    assert.strictEqual(sliderVal.textContent, '0px', 'TC-BD-05b (ADR-08): Retroactive autoFullscreen displays "0px" on slider label');
     assert.strictEqual(env.doc.fullscreenElement, overlay, 'TC-BD-05b: Delayed get must retroactively enter autoFullscreen');
     assert.strictEqual(mainImg.style.maxHeight, '800px', 'TC-BD-05b: Fullscreen applies 0px temporary padding');
 
-    // Exit fullscreen -> restores delayed 44px padding (800 - 52 - 38 - 88 = 622px)
+    // Exit fullscreen -> restores delayed 44px padding (800 - 52 - 38 - 88 = 622px) & slider UI 44px
     env.win.dispatchEvent({ type: 'keydown', key: 'Escape' });
     await Promise.resolve();
     await Promise.resolve();
     assert.strictEqual(env.doc.fullscreenElement, null);
+    assert.strictEqual(Number(slider.value), 44, 'TC-BD-05b: Exiting fullscreen must restore slider value to 44');
+    assert.strictEqual(sliderVal.textContent, '44px', 'TC-BD-05b: Exiting fullscreen must restore slider label to 44px');
     assert.strictEqual(mainImg.style.maxHeight, '622px', 'TC-BD-05b: Exiting fullscreen must restore delayed 44px padding');
     console.log('✅ TC-BD-05 PASS: Popup autoFullscreen sync, blocked-gesture fallback & async init race verified');
   }
@@ -1089,6 +1091,90 @@ async function run() {
     assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), false, 'TC-BD-07: Real mousemove after transition must wake UI');
     assert.strictEqual(timers.timers.size, 1, 'TC-BD-07: Real mousemove must resume idle timer');
     console.log('✅ TC-BD-07 PASS: Built content.js fullscreen transition UI flicker suppression & post-transition wake verified');
+  }
+
+  // --- TC-HP-07 (ADR-08): Fullscreen temporary 0px slider display, live unlock refit & persistence across exit/re-enter ---
+  {
+    const timers = createFakeTimerEnv();
+    const env = createDomEnvironment({ autoHideUi: true, autoFullscreen: false, defaultPadding: 24 });
+    let fakeNow = 300000;
+    const FakeDate = class extends Date {
+      static now() {
+        return fakeNow;
+      }
+    };
+    loadContentBundle(env, timers, { Date: FakeDate });
+
+    env.win.postMessage({ action: 'disagall_test_open' }, '*');
+    const overlay = env.doc.getElementById('disagall-viewer-overlay');
+    const header = overlay.querySelector('.disagall-header');
+    const footer = overlay.querySelector('.disagall-footer');
+    const mainImg = env.doc.getElementById('disagall-main-img');
+    const slider = env.doc.getElementById('disagall-slider');
+    const sliderVal = env.doc.getElementById('disagall-slider-val');
+
+    header.offsetHeight = 52;
+    footer.offsetHeight = 38;
+    mainImg.naturalWidth = 1000;
+    mainImg.naturalHeight = 2000;
+    env.win.dispatchEvent({ type: 'resize' });
+    timers.advanceBy(20);
+    assert.strictEqual(mainImg.style.maxHeight, '662px');
+
+    // Enter fullscreen -> slider displays 0 / '0px' and image fills 800px
+    env.win.dispatchEvent({ type: 'keydown', key: 'f' });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(env.doc.fullscreenElement, overlay);
+    assert.strictEqual(Number(slider.value), 0, 'TC-HP-07: Fullscreen entry must display 0 on slider');
+    assert.strictEqual(sliderVal.textContent, '0px', 'TC-HP-07: Fullscreen entry must display "0px" label');
+    assert.strictEqual(mainImg.style.maxHeight, '800px');
+
+    // Wake UI after transition guard, then drag slider to 40px -> refits immediately & persists 40
+    fakeNow += 1200;
+    overlay.dispatchEvent({ type: 'mousemove', screenX: 420, screenY: 180, clientX: 420, clientY: 180, movementX: 20, movementY: 20 });
+    assert.strictEqual(overlay.classList.contains('disagall-ui-hidden'), false);
+    assert.strictEqual(mainImg.style.maxHeight, '710px');
+
+    slider.dispatchEvent({ type: 'mousedown' });
+    slider.value = '40';
+    slider.dispatchEvent({ type: 'input', target: slider });
+    slider.dispatchEvent({ type: 'change', target: slider });
+    slider.dispatchEvent({ type: 'mouseup' });
+    assert.strictEqual(sliderVal.textContent, '40px', 'TC-HP-07: Fullscreen slider drag must update label to 40px');
+    assert.strictEqual(mainImg.style.maxHeight, '630px', 'TC-HP-07: Fullscreen slider drag must immediately refit to 800-52-38-80=630px');
+    assert.strictEqual(env.syncStore.defaultPadding, 40, 'TC-HP-07: Fullscreen slider edit must persist defaultPadding=40');
+
+    // Wait 2500ms idle inside fullscreen -> expands to 720px (800 - 80) preserving 40px padding
+    timers.advanceBy(2500);
+    assert.strictEqual(overlay.classList.contains('disagall-idle'), true);
+    assert.strictEqual(mainImg.style.maxHeight, '720px', 'TC-HP-07: Idle hide in fullscreen must preserve unlocked 40px padding');
+
+    // Exit fullscreen -> keeps 40px / 630px
+    env.win.dispatchEvent({ type: 'keydown', key: 'Escape' });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(env.doc.fullscreenElement, null);
+    assert.strictEqual(Number(slider.value), 40);
+    assert.strictEqual(sliderVal.textContent, '40px');
+    assert.strictEqual(mainImg.style.maxHeight, '630px', 'TC-HP-07: Exiting fullscreen must keep newly saved 40px padding');
+
+    // Re-enter fullscreen -> starts fresh at temporary 0px while keeping defaultPadding=40; exit untouched -> restores 40px
+    env.win.dispatchEvent({ type: 'keydown', key: 'f' });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(Number(slider.value), 0);
+    assert.strictEqual(sliderVal.textContent, '0px');
+    assert.strictEqual(mainImg.style.maxHeight, '800px');
+    assert.strictEqual(env.syncStore.defaultPadding, 40);
+
+    env.win.dispatchEvent({ type: 'keydown', key: 'Escape' });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(Number(slider.value), 40);
+    assert.strictEqual(sliderVal.textContent, '40px');
+    assert.strictEqual(mainImg.style.maxHeight, '630px');
+    console.log('✅ TC-HP-07 PASS: Built content.js fullscreen temp 0px display, live slider unlock & persistence verified');
   }
 
   console.log('\n🎉 ALL VIEWER IMMERSION E2E TESTS (HAPPY PATH + BOUNDARY & NEGATIVE) PASSED! 🎉');
